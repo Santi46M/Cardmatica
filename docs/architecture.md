@@ -1,0 +1,34 @@
+# Inspección y decisiones
+
+Inspección realizada el 20 de octubre de 2026, antes de modificar la aplicación.
+El repositorio contenía únicamente index.html, styles.css y script.js, además de
+metadatos de IntelliJ y Git. No había backend, dependencias, tests ni base de datos.
+
+El JavaScript original construye CARDS, ITEMS, PR y V en memoria mediante datos
+de demostración y un generador pseudoaleatorio. Los IDs son índices de arrays;
+no son identificadores oficiales. El carrito referencia ITEMS y sus cantidades.
+TCG/OCG filtra cartas duplicadas de ejemplo; las monedas se guardan en localStorage.
+Las fichas, precios e historiales originales son ilustrativos. Hay declaraciones
+duplicadas de init, inv, add y showCart y una extensión final de list/init.
+
+Se conservan los controles, diseño de vidrio, modal, navegación, carrito y flujos
+comerciales anteriores. Un adaptador explícito conecta las vistas del catálogo
+con la API; los UUID del catálogo jamás se interpretan como índices de ITEMS.
+Las ofertas anteriores continúan identificadas como demostración: no existe aún
+un backend comercial y no se presentan como ofertas de cartas importadas.
+
+PostgreSQL + SQLAlchemy 2 + Alembic evita una migración posterior desde almacenamiento
+local y permite integridad, búsquedas e historial con concurrencia. FastAPI sirve
+la API y archivos frontend permitidos desde el mismo origen. El mantenimiento es
+un CLI/worker independiente; las rutas públicas solo consultan PostgreSQL.
+
+El modelo separa identidad, nombres, impresiones, imágenes, textos, erratas,
+arquetipos/series, relaciones, banlists, observaciones por campo y trabajos.
+La sincronización usa transacciones por carta, checkpoints y leases persistentes.
+No se añade Redis ni una cola externa; PostgreSQL actúa como cola de trabajos.
+
+La correspondencia prioriza CID y referencias previamente validadas. Un passcode
+requiere además nombre localizado exacto y tipo coincidente. La similitud difusa
+no fusiona cartas. Las discrepancias quedan en data_conflicts. La identidad
+de impresión incluye código, idioma, rareza, edición y arte. Las dimensiones
+desconocidas permanecen explícitas y no justifican asignar imágenes.

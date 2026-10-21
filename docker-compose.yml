@@ -1,0 +1,51 @@
+services:
+  db:
+    restart: unless-stopped
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Ejecutar init_env.py}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Ejecutar init_env.py}
+      POSTGRES_DB: ${POSTGRES_DB:-cardmatica}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+  api:
+    restart: unless-stopped
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cardmatica}
+      CACHE_DIRECTORY: /data/cache
+      IMAGE_DIRECTORY: /data/images
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - .:/workspace:ro
+      - catalog_data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+  worker:
+    build: ./backend
+    profiles: ["maintenance"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cardmatica}
+      CACHE_DIRECTORY: /data/cache
+      IMAGE_DIRECTORY: /data/images
+    volumes:
+      - catalog_data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["cardmatica", "worker", "--poll-seconds", "5"]
+volumes:
+  postgres_data:
+  catalog_data:

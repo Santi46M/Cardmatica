@@ -1,0 +1,98 @@
+import logging
+
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from starlette.exceptions import HTTPException
+
+from app.api import admin, catalog
+from app.core.config import ROOT, get_settings
+from app.core.logging import configure_logging
+
+configure_logging()
+app = FastAPI(title="Cardmática — Catálogo", version="1.0.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_settings().cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+app.include_router(catalog.router)
+app.include_router(admin.router)
+
+
+@app.exception_handler(HTTPException)
+async def http_error(request: Request, exception: HTTPException):
+    return JSONResponse(
+        status_code=exception.status_code,
+        content={"error": {"code": "http_error", "message": str(exception.detail)}},
+        headers=exception.headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request: Request, exception: RequestValidationError):
+    details = [
+        {"location": list(error["loc"]), "message": error["msg"]} for error in exception.errors()
+    ]
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "code": "validation_error",
+                "message": "Parámetros inválidos",
+                "details": details,
+            }
+        },
+    )
+
+
+@app.exception_handler(SQLAlchemyError)
+async def database_error(request: Request, exception: SQLAlchemyError):
+    # Never return SQL statements, credentials or connection details to the client.
+    logging.getLogger(__name__).error("Database unavailable: %s", type(exception).__name__)
+    return JSONResponse(
+        status_code=503,
+        content={
+            "error": {
+                "code": "database_unavailable",
+                "message": "Catálogo temporalmente no disponible",
+            }
+        },
+    )
+
+
+@app.get("/health/live", tags=["Estado"])
+def live():
+    return {"status": "ok"}
+
+
+@app.get("/health/ready", tags=["Estado"])
+def ready(session: catalog.SessionDep):
+    session.execute(text("SELECT 1 FROM alembic_version LIMIT 1"))
+    return {"status": "ready"}
+
+
+@app.get("/", include_in_schema=False)
+def index():
+    return FileResponse(ROOT / "index.html")
+
+
+@app.get("/styles.css", include_in_schema=False)
+def styles():
+    return FileResponse(ROOT / "styles.css", media_type="text/css")
+
+
+@app.get("/script.js", include_in_schema=False)
+def legacy_script():
+    return FileResponse(ROOT / "script.js", media_type="text/javascript")
+
+
+frontend = ROOT / "frontend"
+if frontend.is_dir():
+    app.mount("/frontend", StaticFiles(directory=frontend), name="frontend")

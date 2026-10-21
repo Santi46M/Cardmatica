@@ -9,10 +9,10 @@
 <body>
 <header class="gl">
     <div class="bar">
-        <a href="index.html" class="logo" aria-label="Ir al inicio">
+        <a href="/" class="logo" aria-label="Ir al inicio">
             Card<b>mática</b>
         </a><div class="seg" role="group" aria-label="Mercado"><button data-mk="TCG" aria-pressed="true" title="Cartas occidentales">TCG</button><button data-mk="OCG" aria-pressed="false" title="Cartas asiáticas">OCG</button></div>
-        <label class="search"><input id="q" type="search" placeholder="Busca por nombre, código o set" aria-label="Buscar"></label>
+        <label class="search"><input id="q" type="search" placeholder="Nombre, código, set o arquetipo" aria-label="Buscar cartas"></label>
         <select id="cur" aria-label="Moneda"></select><button class="btn" id="cb">Carrito (<span id="cc">0</span>)</button>
     </div>
     <nav id="tabs"></nav>
@@ -27,11 +27,13 @@
     <div class="pn gl wrap"><table><thead><tr><th>Carta</th><th>Tipo</th><th class="hide">Impresiones</th><th class="num">Desde</th><th class="num hide">Ofertas</th></tr></thead><tbody id="list"></tbody></table></div>
 </div>
     <div id="vend" style="display:none"><div class="pn gl wrap"><table><thead><tr><th>Vendedor</th><th class="hide">País</th><th>Valoración</th><th class="num">Artículos</th><th class="num hide">Unidades</th><th class="num">Valor</th></tr></thead><tbody id="vl"></tbody></table></div></div>
-    <p style="color:var(--mu);font-size:13px">Datos de ejemplo: códigos de set, vendedores, stock, precios y tipos de cambio son ilustrativos.</p>
+    <p id="catalog-status" class="catalog-status" role="status" aria-live="polite"></p>
+    <p id="commercial-notice" class="catalog-status" hidden>Productos, vendedores, precios, tipos de cambio y carrito pertenecen al comercio de demostración original. No representan ofertas del catálogo importado.</p>
 </main>
 <div id="md" role="dialog" aria-modal="true"><div class="box" id="mb"></div></div>
 <div id="cart" role="dialog" aria-modal="true"><div class="box" id="cbx"></div></div>
 <div class="toast" id="ts"></div>
 <script src="script.js"></script>
+<script type="module" src="frontend/js/catalog.js"></script>
 </body>
 </html>
