@@ -8,6 +8,7 @@ from app.models import (
     BanlistEntry,
     Card,
     CardArchetype,
+    CardArtwork,
     CardErratum,
     CardImage,
     CardName,
@@ -16,7 +17,9 @@ from app.models import (
     CardSeries,
     CardSet,
     CardTextVersion,
+    DataConflict,
     DataSource,
+    FieldObservation,
     Rarity,
     Series,
     SourceReference,
@@ -26,6 +29,7 @@ from app.schemas.ingestion import CardRecord, PrintingInput, TextInput
 from app.services.reconciliation import resolve_card
 
 SOURCE_POLICIES = {
+    "ygoprodeck": (80, "YGOPRODeck", "https://api.ygoprodeck.com/api-guide/"),
     "konami": (100, "Konami", "https://legal.konami.com/games/neuron/terms/tou/en/"),
     "yugipedia": (20, "Yugipedia", "https://yugipedia.com/wiki/Yugipedia:API"),
 }
@@ -52,10 +56,12 @@ class IngestionService:
                 source_id=source.id, external_id=record.external_id, language=record.language
             )
         )
-        if reference and (
-            aware(reference.fetched_at) > record.fetched_at
-            or reference.content_hash == content_hash
-        ):
+        if reference and aware(reference.fetched_at) > record.fetched_at:
+            return card
+        if reference and reference.content_hash == content_hash:
+            reference.fetched_at = record.fetched_at
+            reference.revision = record.revision
+            self._limitations(card, record)
             return card
         if not reference:
             reference = SourceReference(
@@ -72,7 +78,11 @@ class IngestionService:
         reference.revision = record.revision
         reference.url = str(record.url)
         reference.validation_status = (
-            "official_identifier" if record.source == "konami" else "community_identifier"
+            "official_identifier"
+            if record.source == "konami"
+            else "provider_identifier"
+            if record.source == "ygoprodeck"
+            else "community_identifier"
         )
         self.session.flush()
         provenance = ProvenanceRepository(self.session, reference, source)
@@ -88,6 +98,7 @@ class IngestionService:
             "atk",
             "defense",
             "pendulum_scale",
+            "available_markets",
         ):
             value = getattr(record, field)
             if provenance.select_value(key, field, value):
@@ -103,6 +114,7 @@ class IngestionService:
                     "normalized": normalized_name(incoming.name),
                     "is_current": False,
                     "is_official": record.source == "konami",
+                    "source_slug": record.source,
                 },
                 ["card_id", "language", "name"],
             )
@@ -121,10 +133,40 @@ class IngestionService:
                     .values(is_current=False)
                 )
                 name_row.is_current = True
+                name_row.source_slug = record.source
                 if provenance.select_value(key, "display_name", incoming.name):
                     card.display_name = incoming.name
         for printing in record.printings:
             self._printing(card, printing, provenance, record.source)
+        for artwork in record.artworks:
+            if record.source != "ygoprodeck":
+                continue
+            row = upsert(
+                self.session,
+                CardArtwork,
+                {
+                    "card_id": card.id,
+                    "source_slug": record.source,
+                    "external_id": artwork.external_id,
+                    "source_url": str(artwork.source_url),
+                    "small_source_url": str(artwork.small_source_url)
+                    if artwork.small_source_url
+                    else None,
+                    "rights_status": "unverified",
+                },
+                ["card_id", "source_slug", "external_id"],
+            )
+            if provenance.select_value(
+                f"artwork:{row.id}", "metadata", artwork.model_dump(mode="json")
+            ):
+                if row.source_url != str(artwork.source_url):
+                    row.local_path = row.thumbnail_path = row.sha256 = None
+                    row.rights_status = "unverified"
+                    row.authorization_reference = None
+                row.source_url = str(artwork.source_url)
+                row.small_source_url = (
+                    str(artwork.small_source_url) if artwork.small_source_url else None
+                )
         seen_groups = set()
         for group in record.groups:
             group_model, link_model, column = (
@@ -152,6 +194,8 @@ class IngestionService:
                         f"{kind}_relation:{link.id}", "classification", {"active": False}
                     ):
                         self.session.delete(link)
+        if record.source == "ygoprodeck":
+            self._retire_provider_archetypes(card, seen_groups, provenance)
         for text in record.texts:
             self._text(card, text, record.source == "konami", provenance)
         for erratum in record.errata:
@@ -231,13 +275,50 @@ class IngestionService:
                 f"banlist:{row.id}", "status", entry.status, entry.source_url
             ):
                 row.status = entry.status
-        for limitation in record.limitations:
-            conflict(
-                self.session, record.source, "source_limitation", {"message": limitation}, card.id
-            )
+        self._limitations(card, record)
         card.updated_at = utcnow()
         self.session.flush()
         return card
+
+    def _limitations(self, card, record):
+        if record.source == "ygoprodeck":
+            for previous in self.session.scalars(
+                select(DataConflict).where(
+                    DataConflict.card_id == card.id,
+                    DataConflict.source_slug == record.source,
+                    DataConflict.field == "source_limitation",
+                )
+            ):
+                previous.status = (
+                    "open" if previous.details.get("message") in record.limitations else "resolved"
+                )
+        for limitation in record.limitations:
+            row = conflict(
+                self.session, record.source, "source_limitation", {"message": limitation}, card.id
+            )
+            row.status = "open"
+
+    def _retire_provider_archetypes(self, card, seen, provenance):
+        """Replace this provider's scalar membership, preserving other wiki groups."""
+        for link in self.session.scalars(
+            select(CardArchetype).where(CardArchetype.card_id == card.id)
+        ):
+            if ("archetype", link.id) in seen:
+                continue
+            key = f"archetype_relation:{link.id}"
+            owned = self.session.scalar(
+                select(FieldObservation.id)
+                .join(SourceReference, FieldObservation.reference_id == SourceReference.id)
+                .join(DataSource, SourceReference.source_id == DataSource.id)
+                .where(
+                    FieldObservation.entity_key == key,
+                    FieldObservation.field == "classification",
+                    FieldObservation.selected.is_(True),
+                    DataSource.slug == "ygoprodeck",
+                )
+            )
+            if owned and provenance.select_value(key, "classification", {"active": False}):
+                self.session.delete(link)
 
     def _printing(self, card, incoming: PrintingInput, provenance, source):
         card_set = upsert(
@@ -248,16 +329,23 @@ class IngestionService:
                 "name": incoming.set_name,
                 "language": incoming.language,
                 "market": incoming.market,
-                "release_date": incoming.release_date,
+                "release_date": incoming.set_release_date or incoming.release_date,
                 "product_type": incoming.product_type,
             },
             ["source_key", "language", "market"],
         )
         rarity = upsert(self.session, Rarity, {"name": rarity_name(incoming.rarity)}, ["name"])
         for field in ("name", "product_type", "release_date"):
-            value = incoming.set_name if field == "name" else getattr(incoming, field)
+            value = (
+                incoming.set_name
+                if field == "name"
+                else incoming.set_release_date or incoming.release_date
+                if field == "release_date"
+                else getattr(incoming, field)
+            )
             encoded = value.isoformat() if field == "release_date" and value else value
-            if provenance.select_value(f"set:{card_set.id}", field, encoded):
+            source_url = incoming.set_source_url if field == "release_date" else None
+            if provenance.select_value(f"set:{card_set.id}", field, encoded, source_url):
                 setattr(card_set, field, value)
         identity = {
             "card_id": card.id,
@@ -359,14 +447,15 @@ class IngestionService:
                 "pendulum_text": incoming.pendulum_text,
                 "content_hash": value_hash,
                 "is_official": official,
+                "source_slug": provenance.source.slug,
                 "is_current": False,
                 "valid_from": incoming.valid_from,
             },
-            ["card_id", "language", "content_hash", "is_official"],
+            ["card_id", "language", "content_hash", "is_official", "source_slug"],
         )
         if (
             incoming.current
-            and official
+            and provenance.source.slug in {"konami", "ygoprodeck"}
             and provenance.select_value(
                 f"card:{card.id}", f"official_text:{incoming.language}", value_hash
             )
@@ -376,7 +465,7 @@ class IngestionService:
                 .where(
                     CardTextVersion.card_id == card.id,
                     CardTextVersion.language == incoming.language,
-                    CardTextVersion.is_official.is_(True),
+                    CardTextVersion.source_slug.in_(["konami", "ygoprodeck"]),
                     CardTextVersion.id != row.id,
                 )
                 .values(is_current=False)

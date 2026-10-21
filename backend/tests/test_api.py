@@ -59,7 +59,7 @@ def test_pagination_sort_validation_and_errors(factory, client, record):
 
 
 def test_admin_is_protected_and_only_enqueues(client, settings):
-    request = {"source": "konami", "mode": "card", "identifier": "990001"}
+    request = {"source": "ygoprodeck", "mode": "card", "identifier": "990001"}
     assert client.post("/api/v1/admin/sync-jobs", json=request).status_code == 401
     assert (
         client.post(

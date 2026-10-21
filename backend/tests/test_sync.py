@@ -22,18 +22,20 @@ class FixtureSource:
         return CardRecord.model_validate(
             {
                 **self.record.model_dump(),
+                "source": "ygoprodeck",
+                "ygoprodeck_id": int(identifier),
                 "konami_id": int(identifier),
                 "external_id": identifier,
                 "passcode": identifier.zfill(8),
-                "url": f"https://www.db.yugioh-card.com/yugiohdb/card_search.action?ope=2&cid={identifier}",
+                "url": f"https://db.ygoprodeck.com/api/v7/cardinfo.php?id={identifier}",
             }
         )
 
 
 async def test_checkpoint_resume_idempotence(factory, settings, record):
     source = FixtureSource(record)
-    runner = SyncRunner(factory, settings, {"konami": source})
-    job_id = runner.enqueue(JobRequest(source="konami", mode="initial", max_cards=1))
+    runner = SyncRunner(factory, settings, {"ygoprodeck": source})
+    job_id = runner.enqueue(JobRequest(source="ygoprodeck", mode="initial", max_cards=1))
     assert await runner.run(job_id)
     with factory() as session:
         job = session.get(SyncJob, job_id)
@@ -53,14 +55,14 @@ async def test_checkpoint_resume_idempotence(factory, settings, record):
 async def test_failures_can_be_retried_without_duplicate_cards(factory, settings, record):
     source = FixtureSource(record)
     source.fail.add("990002")
-    runner = SyncRunner(factory, settings, {"konami": source})
-    job_id = runner.enqueue(JobRequest(source="konami", mode="initial", max_cards=10))
+    runner = SyncRunner(factory, settings, {"ygoprodeck": source})
+    job_id = runner.enqueue(JobRequest(source="ygoprodeck", mode="initial", max_cards=10))
     await runner.run(job_id)
     with factory() as session:
         assert session.get(SyncJob, job_id).status == "completed_with_errors"
         assert session.scalar(select(SyncError)).external_id == "990002"
     source.fail.clear()
-    retry_id = runner.enqueue(JobRequest(source="konami", mode="retry", retry_job_id=job_id))
+    retry_id = runner.enqueue(JobRequest(source="ygoprodeck", mode="retry", retry_job_id=job_id))
     await runner.run(retry_id)
     with factory() as session:
         assert session.get(SyncJob, retry_id).status == "completed"
@@ -68,9 +70,10 @@ async def test_failures_can_be_retried_without_duplicate_cards(factory, settings
         assert session.scalar(select(func.count()).select_from(Card)) == 3
 
 
-async def test_policy_failure_is_persisted_without_network(factory, settings):
+async def test_policy_failure_is_persisted_without_network(factory, settings, monkeypatch):
+    monkeypatch.setattr(settings, "ygoprodeck_enabled", False)
     runner = SyncRunner(factory, settings)
-    job_id = runner.enqueue(JobRequest(source="konami", mode="card", identifier="990001"))
+    job_id = runner.enqueue(JobRequest(source="ygoprodeck", mode="card", identifier="990001"))
     assert not await runner.run(job_id)
     with factory() as session:
         assert session.get(SyncJob, job_id).status == "failed"
@@ -80,8 +83,8 @@ async def test_policy_failure_is_persisted_without_network(factory, settings):
 async def test_record_transaction_rolls_back_on_sync_failure(factory, settings, record):
     source = FixtureSource(record)
     source.fail.add("990001")
-    runner = SyncRunner(factory, settings, {"konami": source})
-    job_id = runner.enqueue(JobRequest(source="konami", mode="card", identifier="990001"))
+    runner = SyncRunner(factory, settings, {"ygoprodeck": source})
+    job_id = runner.enqueue(JobRequest(source="ygoprodeck", mode="card", identifier="990001"))
     await runner.run(job_id)
     with factory() as session:
         assert session.scalar(select(func.count()).select_from(Card)) == 0

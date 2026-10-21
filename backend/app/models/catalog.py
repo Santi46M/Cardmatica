@@ -25,6 +25,8 @@ class Card(Entity, Base):
         Index("ix_cards_type_name", "card_type", "display_name"),
     )
     konami_id: Mapped[int | None] = mapped_column(Integer, unique=True)
+    ygoprodeck_id: Mapped[int | None] = mapped_column(Integer, unique=True)
+    available_markets: Mapped[list] = mapped_column(JSON, default=list)
     passcode: Mapped[str | None] = mapped_column(String(8), index=True)
     display_name: Mapped[str] = mapped_column(String(300), index=True)
     card_type: Mapped[str | None] = mapped_column(String(30))
@@ -40,6 +42,7 @@ class Card(Entity, Base):
         back_populates="card", cascade="all, delete-orphan"
     )
     printings: Mapped[list["CardPrinting"]] = relationship(back_populates="card")
+    artworks: Mapped[list["CardArtwork"]] = relationship(back_populates="card")
 
 
 class CardName(Entity, Base):
@@ -51,6 +54,7 @@ class CardName(Entity, Base):
     normalized: Mapped[str] = mapped_column(String(300), index=True)
     is_current: Mapped[bool] = mapped_column(Boolean, default=True)
     is_official: Mapped[bool] = mapped_column(Boolean, default=False)
+    source_slug: Mapped[str] = mapped_column(String(30), default="yugipedia")
     card: Mapped[Card] = relationship(back_populates="names")
 
 
@@ -135,15 +139,39 @@ class CardImage(Entity, Base):
     printing: Mapped[CardPrinting] = relationship(back_populates="images")
 
 
+class CardArtwork(Entity, Base):
+    """General illustrations, deliberately separate from printing scans."""
+
+    __tablename__ = "card_artworks"
+    __table_args__ = (UniqueConstraint("card_id", "source_slug", "external_id"),)
+    card_id: Mapped[UUID] = mapped_column(ForeignKey("cards.id", ondelete="CASCADE"), index=True)
+    source_slug: Mapped[str] = mapped_column(String(30))
+    external_id: Mapped[str] = mapped_column(String(100))
+    source_url: Mapped[str] = mapped_column(Text)
+    small_source_url: Mapped[str | None] = mapped_column(Text)
+    author: Mapped[str | None] = mapped_column(Text)
+    license: Mapped[str | None] = mapped_column(Text)
+    license_url: Mapped[str | None] = mapped_column(Text)
+    rights_status: Mapped[str] = mapped_column(String(30), default="unverified")
+    authorization_reference: Mapped[str | None] = mapped_column(Text)
+    local_path: Mapped[str | None] = mapped_column(String(300))
+    thumbnail_path: Mapped[str | None] = mapped_column(String(300))
+    sha256: Mapped[str | None] = mapped_column(String(64))
+    card: Mapped[Card] = relationship(back_populates="artworks")
+
+
 class CardTextVersion(Entity, Base):
     __tablename__ = "card_text_versions"
-    __table_args__ = (UniqueConstraint("card_id", "language", "content_hash", "is_official"),)
+    __table_args__ = (
+        UniqueConstraint("card_id", "language", "content_hash", "is_official", "source_slug"),
+    )
     card_id: Mapped[UUID] = mapped_column(ForeignKey("cards.id", ondelete="CASCADE"), index=True)
     language: Mapped[str] = mapped_column(String(12))
     text: Mapped[str] = mapped_column(Text)
     pendulum_text: Mapped[str | None] = mapped_column(Text)
     content_hash: Mapped[str] = mapped_column(String(64))
     is_official: Mapped[bool] = mapped_column(Boolean)
+    source_slug: Mapped[str] = mapped_column(String(30), default="yugipedia")
     is_current: Mapped[bool] = mapped_column(Boolean, default=False)
     valid_from: Mapped[date | None] = mapped_column(Date)
     printing_id: Mapped[UUID | None] = mapped_column(ForeignKey("card_printings.id"))

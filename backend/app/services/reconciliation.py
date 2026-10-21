@@ -24,6 +24,20 @@ def resolve_card(session: Session, record: CardRecord, source: DataSource) -> Ca
         if record.konami_id
         else None
     )
+    if record.ygoprodeck_id:
+        provider_card = session.scalar(
+            select(Card).where(Card.ygoprodeck_id == record.ygoprodeck_id)
+        )
+        if provider_card:
+            if (existing and provider_card.id != existing.id) or (
+                provider_card.konami_id
+                and record.konami_id
+                and provider_card.konami_id != record.konami_id
+            ):
+                raise IdentityConflict(
+                    "El ID de YGOPRODeck y el CID corresponden a cartas distintas"
+                )
+            existing = provider_card
     if reference:
         mapped = session.get(Card, reference.card_id)
         if (existing and existing.id != mapped.id) or (
@@ -55,7 +69,7 @@ def resolve_card(session: Session, record: CardRecord, source: DataSource) -> Ca
                 "Passcode ambiguo o sin corroboración por nombre localizado y tipo"
             )
     if not existing:
-        if not record.konami_id:
+        if not record.konami_id and not record.ygoprodeck_id:
             conflict(
                 session,
                 record.source,
@@ -66,14 +80,23 @@ def resolve_card(session: Session, record: CardRecord, source: DataSource) -> Ca
                 },
             )
             raise IdentityConflict("No se vinculan cartas solo por similitud de nombre")
+        identity = (
+            {"konami_id": record.konami_id}
+            if record.konami_id
+            else {"ygoprodeck_id": record.ygoprodeck_id}
+        )
         existing = upsert(
             session,
             Card,
-            {"konami_id": record.konami_id, "display_name": record.names[0].name},
-            ["konami_id"],
+            {**identity, "display_name": record.names[0].name},
+            list(identity),
         )
     # Serialize cross-source field selection for the same card.
     existing = session.scalar(select(Card).where(Card.id == existing.id).with_for_update())
     if not existing.konami_id and record.konami_id:
         existing.konami_id = record.konami_id
+    if record.ygoprodeck_id:
+        if existing.ygoprodeck_id and existing.ygoprodeck_id != record.ygoprodeck_id:
+            raise IdentityConflict("No se fusionan identificadores de YGOPRODeck distintos")
+        existing.ygoprodeck_id = record.ygoprodeck_id
     return existing

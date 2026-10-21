@@ -24,6 +24,8 @@ class ImageView(BaseModel):
     license_url: str | None = None
     rights_status: str
     fallback_reason: str | None = None
+    association: Literal["printing", "card_artwork"] = "printing"
+    usage_scope: str = "commercial_permission_verified"
 
 
 class PrintingView(BaseModel):
@@ -44,6 +46,8 @@ class PrintingView(BaseModel):
 class CardSummary(BaseModel):
     id: UUID
     konami_id: int | None
+    ygoprodeck_id: int | None = None
+    name_source: str | None = None
     name: str
     name_is_official: bool
     card_type: str | None
@@ -61,6 +65,7 @@ class NameView(BaseModel):
     name: str
     is_current: bool
     is_official: bool
+    source_slug: str
 
 
 class TextView(BaseModel):
@@ -70,6 +75,7 @@ class TextView(BaseModel):
     text: str
     pendulum_text: str | None
     is_official: bool
+    source_slug: str
     is_current: bool
     valid_from: date | None
 
@@ -108,6 +114,7 @@ class ErratumView(BaseModel):
 
 
 class CardDetail(CardSummary):
+    artworks: list[ImageView] = []
     passcode: str | None
     names: list[NameView]
     level: int | None
@@ -140,7 +147,7 @@ class SetView(NamedView):
 
 
 class JobRequest(BaseModel):
-    source: Literal["konami", "yugipedia"]
+    source: Literal["ygoprodeck", "yugipedia"]
     mode: Literal["initial", "incremental", "card", "images", "errata", "retry", "banlist"]
     identifier: str | None = Field(default=None, max_length=200)
     language: Literal["en", "es", "fr", "de", "it", "pt", "ja", "ko", "ae"] = "en"
@@ -152,14 +159,10 @@ class JobRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_mode(self):
-        if self.mode == "banlist" and (
-            self.source != "konami" or not self.banlist_format or not self.effective_date
-        ):
-            raise ValueError("Banlist requiere Konami, formato y fecha efectiva revisados")
-        if self.mode == "banlist" and (
-            (self.banlist_format == "OCG") != (self.language in {"ja", "ko"})
-        ):
-            raise ValueError("El idioma de la lista debe corresponder a su formato TCG/OCG")
+        if self.source == "ygoprodeck" and self.language not in {"en", "fr", "de", "it", "pt"}:
+            raise ValueError("YGOPRODeck admite en, fr, de, it y pt; no inventar traducciones")
+        if self.mode == "banlist":
+            raise ValueError("La nueva fuente no documenta vigencia de banlists oficiales")
         if self.mode in {"card", "errata", "images"} and not self.identifier:
             raise ValueError("Este modo requiere identifier")
         if self.mode == "incremental" and self.source == "yugipedia" and not self.since:
@@ -168,8 +171,8 @@ class JobRequest(BaseModel):
             raise ValueError("since debe incluir zona horaria")
         if self.mode == "retry" and not self.retry_job_id:
             raise ValueError("retry requiere retry_job_id")
-        if self.mode == "images" and self.source != "yugipedia":
-            raise ValueError("Las imágenes se mantienen desde Yugipedia")
+        if self.mode == "errata" and self.source != "yugipedia":
+            raise ValueError("Las erratas documentadas se mantienen desde Yugipedia")
         return self
 
 

@@ -36,6 +36,8 @@ class PrintingInput(BaseModel):
     edition: str = "unknown"
     artwork: str = "unknown"
     release_date: date | None = None
+    set_release_date: date | None = None
+    set_source_url: HttpUrl | None = None
     product_type: str | None = None
     images: list[ImageInput] = []
 
@@ -43,6 +45,12 @@ class PrintingInput(BaseModel):
     @classmethod
     def normalize_code(cls, value):
         return value.strip().upper()
+
+
+class ArtworkInput(BaseModel):
+    external_id: str
+    source_url: HttpUrl
+    small_source_url: HttpUrl | None = None
 
 
 class GroupInput(BaseModel):
@@ -82,13 +90,15 @@ class BanlistInput(BaseModel):
 
 
 class CardRecord(BaseModel):
-    source: Literal["konami", "yugipedia"]
+    source: Literal["konami", "ygoprodeck", "yugipedia"]
     external_id: str = Field(min_length=1, max_length=200)
     url: HttpUrl
     language: str
     fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     revision: str | None = None
     konami_id: int | None = Field(default=None, gt=0)
+    ygoprodeck_id: int | None = Field(default=None, gt=0)
+    available_markets: list[Literal["TCG", "OCG"]] = []
     passcode: str | None = Field(default=None, pattern=r"^\d{8}$")
     names: list[NameInput] = Field(min_length=1)
     card_type: str | None = None
@@ -101,6 +111,7 @@ class CardRecord(BaseModel):
     defense: str | None = None
     pendulum_scale: int | None = Field(default=None, ge=0, le=13)
     printings: list[PrintingInput] = []
+    artworks: list[ArtworkInput] = []
     groups: list[GroupInput] = []
     groups_complete: bool = False
     texts: list[TextInput] = []
@@ -124,6 +135,17 @@ class CardRecord(BaseModel):
                 raise ValueError("Registro oficial sin identificador o URL de Konami")
             if self.external_id != str(self.konami_id):
                 raise ValueError("El identificador externo debe ser el CID de Konami")
+        elif self.source == "ygoprodeck":
+            if host != "db.ygoprodeck.com" or not self.ygoprodeck_id:
+                raise ValueError("YGOPRODeck requiere su propio identificador y URL de API")
+            if self.external_id != str(self.ygoprodeck_id):
+                raise ValueError("El identificador externo debe ser el ID de YGOPRODeck")
+            for image in self.artworks:
+                if image.source_url.host != "images.ygoprodeck.com" or (
+                    image.small_source_url
+                    and image.small_source_url.host != "images.ygoprodeck.com"
+                ):
+                    raise ValueError("Ilustración fuera del servidor de imágenes de YGOPRODeck")
         elif host != "yugipedia.com":
             raise ValueError("La URL complementaria debe pertenecer a Yugipedia")
         return self

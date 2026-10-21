@@ -6,22 +6,24 @@ se ejecuta por CLI o worker; ninguna visita al catálogo dispara scraping.
 
 ## Estado y límites reales
 
-La API, persistencia, normalización, procedencia, reconciliación, trabajos y vistas
-están implementados. Las pruebas usan fixtures sintéticas y HTTP simulado. Las
+La fuente principal es **YGOPRODeck API v7**. La API, persistencia, normalización,
+procedencia, reconciliación, trabajos y vistas reutilizan la arquitectura existente. Las
+pruebas automatizadas usan fixtures sintéticas y HTTP simulado. Las
 funcionalidades comerciales originales se conservan y están identificadas como
 demostración. No existe todavía un backend de vendedores, precios ni pedidos.
 Los UUID del catálogo no se mezclan con los índices del carrito original.
 
-**No se ha cargado un catálogo oficial ni descargado imágenes de cartas.** Los
-términos de Konami prohíben crear una base mediante descarga sistemática y requieren
-permiso escrito para uso comercial. Yugipedia restringe agentes de IA en robots.txt.
-Las dos fuentes están deshabilitadas inicialmente. Configurar un booleano no otorga
-derechos ni autoriza eludir restricciones. Consulte [la investigación de fuentes](docs/source-policies.md).
+Se cargó una muestra real desde YGOPRODeck: **5 cartas, 164 impresiones, 103 sets,
+5 arquetipos y 24 ilustraciones** (21 de octubre de 2026). No son semillas ficticias.
+Las ilustraciones están separadas de los escaneos por impresión: no acreditan la
+rareza ni edición seleccionada. Su visualización local de prueba no concede derechos
+comerciales sobre el arte o texto de Konami. Producción no sirve ilustraciones sin
+permiso documentado. Consulte [las condiciones de las fuentes](docs/source-policies.md).
 
-Los parsers se validaron con fixtures; no se certificó el HTML actual completo de
-Konami ni todas las convenciones históricas de Yugipedia. Un cambio de marcado se
-registra como error o limitación, sin rellenar campos con datos inventados. La
-validación con cartas reales representativas queda pendiente de acceso y permisos.
+Yugipedia permanece como complemento opcional y deshabilitado: sus restricciones
+de acceso para agentes de IA impidieron validar aquí sus erratas y escaneos reales.
+El conector activo de Konami fue retirado. Se preservan sus identificadores,
+procedencia histórica y parsers de importaciones autorizadas, sin consultas automáticas.
 
 ## Organización
 
@@ -32,7 +34,7 @@ backend/app/core/               Configuración y logging JSON
 backend/app/models/             Catálogo, procedencia y mantenimiento
 backend/app/repositories/       SQL paginado y upserts
 backend/app/services/           Reconciliación, precedencia, consultas e imágenes
-backend/app/integrations/       HTTP respetuoso, Konami y Yugipedia
+backend/app/integrations/       HTTP respetuoso, YGOPRODeck y Yugipedia
 backend/app/ingestion/          Normalización, checkpoints y worker
 backend/app/api/                API pública y administración autenticada
 backend/alembic/                Migraciones versionadas
@@ -106,10 +108,12 @@ volúmenes; evitar `down -v` salvo que se desee eliminar los datos.
 ## Configurar fuentes
 
 1. Revisar los términos y robots vigentes con el operador de cada servicio.
-2. Configurar USER_AGENT con nombre del servicio y contacto real.
-3. Para Konami, obtener permiso escrito que cubra extracción, almacenamiento y
-   reutilización comercial; registrar KONAMI_AUTHORIZATION_REFERENCE y habilitar
-   KONAMI_ENABLED solo dentro del alcance concedido.
+2. YGOPRODECK_ENABLED=true habilita la API pública documentada. USER_AGENT debe
+   identificar el servicio. Se usa una petición por segundo, por debajo del máximo
+   del proveedor (20/s), y caché persistente de dos días para cartas y sets.
+3. Para mostrar las imágenes de la muestra exclusivamente en localhost, configurar
+   DEPLOYMENT_MODE=local y ALLOW_LOCAL_IMAGE_PREVIEW=true y ejecutar `images`.
+   Los valores por defecto son production/false; no equivalen a una licencia comercial.
 4. Para Yugipedia, confirmar que el acceso del servicio está permitido y habilitar
    YUGIPEDIA_ENABLED. La cuota mínima es una petición por segundo, incluyendo
    robots, API, reintentos e imágenes. Procesos independientes deben compartir
@@ -117,22 +121,26 @@ volúmenes; evitar `down -v` salvo que se desee eliminar los datos.
 
 El cliente valida orígenes, robots, UA, timeout, tamaño de respuesta, reintentos y
 redirecciones. Un CAPTCHA, 401, 403 o denegación de robots suspende el trabajo.
-La caché usa 30 días por defecto y revalidación ETag/Last-Modified. MediaWiki usa
+La caché usa revalidación ETag/Last-Modified. MediaWiki conserva 30 días y usa
 recentchanges para incrementales y embeddedin para enumerar CardTable2.
-Konami no tiene una API pública documentada: el incremental recorre y revalida
-páginas públicas autorizadas; no se promete un feed de modificaciones inexistente.
+YGOPRODeck pagina con num/offset y reutiliza las cartas del lote; el incremental
+revalida páginas y solo escribe contenido modificado. No hay un feed de cambios
+por carta: las fechas de lanzamiento no se utilizan como fechas de modificación.
 
 ## Sincronizar y reanudar
 
-Los siguientes comandos requieren primero los permisos y configuración anteriores.
-Reemplazar los identificadores de ejemplo simbólicos por un CID o título válido.
+Los siguientes comandos utilizan el ID propio de YGOPRODeck o un nombre exacto.
+El CID de Konami es otro identificador. YGOPRODeck admite en/fr/de/it/pt; no ofrece
+español ni japonés. La interfaz en español muestra el idioma real del registro.
 
 ```bash
-cardmatica sync konami card --identifier CID_OFICIAL --language es
+cardmatica sync ygoprodeck card --identifier 89631139 --language en
+cardmatica sync ygoprodeck initial --max-cards 3
+cardmatica sync ygoprodeck incremental --max-cards 20
+cardmatica sync ygoprodeck images --identifier 89631139 --max-cards 30
 cardmatica sync yugipedia card --identifier "TITULO_EXACTO_DE_LA_CARTA"
 cardmatica sync yugipedia initial --max-cards 3
 cardmatica sync yugipedia incremental --since 2026-10-01T00:00:00+00:00 --max-cards 20
-cardmatica sync konami incremental --language en --max-cards 20
 cardmatica sync yugipedia errata --identifier "TITULO_EXACTO_DE_LA_CARTA"
 cardmatica sync yugipedia images --identifier "TITULO_EXACTO_DE_LA_CARTA" --max-cards 20
 cardmatica resume UUID_DEL_TRABAJO --max-cards 20
@@ -151,20 +159,19 @@ los trabajos de una misma fuente se excluyen con un advisory lock de PostgreSQL.
 Un registro ya confirmado puede volver a inspeccionarse tras una interrupción,
 sin duplicar entidades. Los errores individuales quedan pendientes para retry.
 
-Antes de ampliar el límite, revisar un conjunto real que incluya múltiples rarezas,
-ilustraciones, idiomas, arquetipos y erratas. Verificar las fichas y conflictos
-contra los documentos originales. Esta revisión real **no se realizó** porque no
-se dispone aquí de los permisos requeridos para la extracción y reutilización.
-
-Para una banlist, revisar explícitamente su formato y fecha de vigencia:
+La muestra real incluye Blue-Eyes White Dragon, Dark Magician, Decode Talker,
+Odd-Eyes Pendulum Dragon y Number 39: Utopia. Para repetir esa validación usando
+el PostgreSQL del servicio existente y sus cachés (no utiliza fixtures):
 
 ```bash
-cardmatica sync konami banlist --banlist-format TCG --effective-date AAAA-MM-DD --language en --max-cards 3
+docker compose exec -T api python scripts/validate_live_catalog.py --confirm-live-access --images
 ```
 
-No se usa la fecha de consulta como fecha efectiva. Las listas OCG requieren un
-idioma OCG. El estado se guarda por carta, formato y vigencia; se conserva la
-citación del documento de la lista por campo.
+El modo images requiere vista local habilitada o permiso comercial por ilustración.
+Cuenta una operación de metadata y una por imagen; ajustar max-cards o reanudar.
+La sincronización de banlists fechadas se rechaza: YGOPRODeck no documenta la
+vigencia de sus estados actuales. No se inventan listas oficiales ni erratas a
+partir de diferencias de texto. Las listas históricas existentes se conservan.
 
 ## Importar una exportación autorizada
 
@@ -188,7 +195,7 @@ dependencias de ejecución y corre como un usuario sin privilegios.
 
 ## Imágenes y revisión de derechos
 
-`images` descubre la galería a partir de enlaces reales de la página, consulta
+El modo `images` de Yugipedia descubre la galería a partir de enlaces reales de la página, consulta
 imageinfo y asocia únicamente escaneos cuya combinación de set, idioma, rareza y
 edición tenga una correspondencia inequívoca. La variante conserva la identidad
 del escaneo. Nombres de archivo no reconocidos, códigos ambiguos o información
@@ -205,11 +212,20 @@ cardmatica sync yugipedia images --identifier "TITULO_EXACTO_DE_LA_CARTA" --max-
 cardmatica image-rights UUID_IMAGEN denied
 ```
 
-Solo las imágenes aprobadas se descargan y generan miniaturas PNG de 120×180.
+Los escaneos por impresión requieren permiso comercial verificable antes de
+descargarse y servirse. Las ilustraciones de YGOPRODeck admiten además una vista
+local de prueba explícita, sin cambiar rights_status=unverified. Para aprobar una
+ilustración general se usa `image-rights UUID approved --artwork --authorization-reference ...`.
+El documento debe cubrir realmente esa imagen; el comando no concede derechos.
+Las imágenes se guardan localmente y generan miniaturas PNG de 120×180.
 La API comprueba el permiso en cada solicitud y no publica el directorio de medios
 directamente. Revocar derechos impide servir el archivo incluso si permanece en
 disco. El frontend no hace hotlink de imágenes sin permiso y muestra un fallback
-de la impresión seleccionada. La atribución conserva URL, autor y licencia.
+de la impresión seleccionada. Una ilustración general alternativa lleva una
+etiqueta visible y nunca se añade a printing.images. La atribución conserva URL,
+autor y licencia cuando se conocen. No se inventa autor ni licencia ausentes.
+La vista local de ilustraciones solo acepta hosts localhost/127.0.0.1/::1; Docker
+publica el puerto únicamente en loopback. Deshabilitarla al desplegar públicamente.
 
 ## API y seguridad
 
@@ -220,6 +236,7 @@ Endpoints principales:
 - `GET /api/v1/cards/{uuid}`; `/printings`; `/errata`.
 - `GET /api/v1/printings/{uuid}`, `/archetypes`, `/archetypes/{uuid}/cards`, `/sets`.
 - `GET /api/v1/images/{uuid}?thumbnail=true`.
+- `GET /api/v1/artworks/{uuid}?thumbnail=true`: ilustración general y control de uso.
 - `POST /api/v1/admin/sync-jobs`, `GET /api/v1/admin/sync-jobs/{uuid}`,
   `POST /api/v1/admin/sync-jobs/{uuid}/resume`, `/errors` y `/admin/conflicts`.
 - `GET /health/live` y `/health/ready`.
@@ -254,7 +271,14 @@ Las pruebas rápidas usan SQLite como adaptador de tests; producción usa Postgr
 Las pruebas PostgreSQL crean y eliminan esquemas aleatorios `test_*`, sin borrar
 el catálogo. Las de navegador levantan una API real local con datos exclusivamente
 de prueba y verifican catálogo, selección de impresión, moneda, TCG/OCG y carrito.
-Las peticiones de Konami/Yugipedia siempre se simulan en tests. Para combinar
+Las peticiones externas siempre se simulan en pytest. La validación real separada
+del frontend consulta la API local poblada, abre Chrome y guarda capturas/reporte:
+
+```powershell
+.\.venv\Scripts\python.exe backend/scripts/verify_live_frontend.py
+```
+
+Resultados en `.cache/live-frontend/`. Para combinar
 ejecuciones elevadas y de sandbox en Windows, elegir un `--basetemp` nuevo dentro
 de `.cache` y crear primero ese directorio padre, evitando mezclar propietarios de
 los temporales de pytest.

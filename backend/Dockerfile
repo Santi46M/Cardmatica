@@ -1,6 +1,6 @@
 FROM python:3.13-slim
 WORKDIR /workspace/backend
-ENV CARDMATICA_ROOT=/workspace PYTHONDONTWRITEBYTECODE=1
+ENV CARDMATICA_ROOT=/workspace PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/workspace/backend
 COPY . .
 RUN pip install --no-cache-dir -c requirements.lock . \
     && useradd --create-home --uid 10001 cardmatica \

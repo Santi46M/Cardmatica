@@ -1,5 +1,6 @@
 from sqlalchemy import select
 
+from app.core.config import get_settings
 from app.models import (
     Archetype,
     BanlistEntry,
@@ -49,6 +50,29 @@ def image_view(image):
     )
 
 
+def artwork_view(image):
+    commercial = image.rights_status == "approved" and bool(image.authorization_reference)
+    allowed = image.rights_status != "denied" and (commercial or get_settings().local_image_preview)
+    available = allowed and bool(image.local_path)
+    return ImageView(
+        id=image.id,
+        url=f"/api/v1/artworks/{image.id}" if available else None,
+        thumbnail_url=f"/api/v1/artworks/{image.id}?thumbnail=true"
+        if available and image.thumbnail_path
+        else None,
+        source_url=image.source_url,
+        author=image.author,
+        license=image.license,
+        license_url=image.license_url,
+        rights_status=image.rights_status,
+        association="card_artwork",
+        usage_scope="commercial_permission_verified" if commercial else "local_preview_only",
+        fallback_reason=None
+        if available
+        else "Ilustración sin permiso comercial o sin descarga local",
+    )
+
+
 def printing_view(printing):
     return PrintingView(
         id=printing.id,
@@ -82,15 +106,28 @@ def card_summary(card, language="es", market=None):
     printings = [printing for printing in card.printings if not market or printing.market == market]
     images = [image_view(image) for printing in printings for image in printing.images]
     available = next((image for image in images if image.url), None)
+    if available is None:
+        available = next(
+            (
+                view
+                for image in sorted(card.artworks, key=lambda row: row.external_id)
+                if (view := artwork_view(image)).url
+            ),
+            None,
+        )
     return CardSummary(
         id=card.id,
         konami_id=card.konami_id,
+        ygoprodeck_id=card.ygoprodeck_id,
+        name_source=name.source_slug if name else None,
         name=name.name if name else card.display_name,
         name_is_official=bool(name and name.is_official),
         card_type=card.card_type,
         subtypes=card.subtypes,
         attribute=card.attribute,
-        markets=sorted({printing.market for printing in card.printings}),
+        markets=sorted(
+            set(card.available_markets) | {printing.market for printing in card.printings}
+        ),
         printing_count=len(printings),
         image=available,
         updated_at=card.updated_at,
@@ -156,6 +193,7 @@ def card_detail(session, card, language="es"):
     ).all()
     return CardDetail(
         **card_summary(card, language).model_dump(),
+        artworks=[artwork_view(image) for image in card.artworks],
         passcode=card.passcode,
         names=[NameView.model_validate(name) for name in card.names],
         level=card.level,

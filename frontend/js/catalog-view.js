@@ -6,7 +6,12 @@ export const escapeHtml = (value) =>
     );
 
 const h = escapeHtml;
-const kinds = { Monster: "Monstruo", Spell: "Magia", Trap: "Trampa", Skill: "Habilidad" };
+const kinds = {
+    Monster: "Monstruo",
+    Spell: "Magia",
+    Trap: "Trampa",
+    Skill: "Habilidad"
+};
 const chip = (value) => `<span class="chip">${h(value)}</span>`;
 const section = (title, content) =>
     content ? `<section class="catalog-section"><h3>${h(title)}</h3>${content}</section>` : "";
@@ -25,7 +30,8 @@ function creditLink(value, label) {
 function assetUrl(value) {
     if (!value) return null;
     const url = new URL(value, location.origin);
-    return url.origin === location.origin && /^\/api\/v1\/images\/[0-9a-f-]+$/.test(url.pathname)
+    return url.origin === location.origin &&
+        /^\/api\/v1\/(images|artworks)\/[0-9a-f-]+$/.test(url.pathname)
         ? url.href
         : null;
 }
@@ -68,9 +74,15 @@ export function catalogRows(data) {
                     card.id
                 )}"><td><div class="nm">${imageHtml(
                     card.image,
-                    `${card.name} — imagen de una impresión`
+                    `${card.name} — ${
+                        card.image?.association === "card_artwork"
+                            ? "ilustración general"
+                            : "imagen de impresión"
+                    }`
                 )}<div><b>${h(card.name)}</b><small>${h(card.attribute || "")}${
-                    card.name_is_official ? "" : " · Nombre de fuente comunitaria"
+                    card.name_is_official
+                        ? ""
+                        : ` · Fuente: ${h(card.name_source || "comunitaria")}`
                 }</small></div></div></td><td>${chip(
                     kinds[card.card_type] || card.card_type || "Sin clasificar"
                 )}${card.subtypes.map(chip).join("")}</td><td class="hide">${
@@ -104,8 +116,9 @@ export function homeHtml(data) {
 
 export function detailHtml(card, printings, selectedId) {
     const printing = printings.items.find((item) => item.id === selectedId) || printings.items[0];
-    const image = printing?.images.find((item) => item.url);
-    const texts = card.texts.filter((text) => text.is_official && text.is_current);
+    const image =
+        printing?.images.find((item) => item.url) || card.artworks?.find((item) => item.url);
+    const texts = card.texts.filter((text) => text.is_current);
     const text =
         texts.find((item) => item.language === printing?.language) ||
         texts.find((item) => item.language === "es") ||
@@ -120,7 +133,9 @@ export function detailHtml(card, printings, selectedId) {
             const url = new URL(source.url);
             if (
                 url.protocol !== "https:" ||
-                !["www.db.yugioh-card.com", "yugipedia.com"].includes(url.hostname)
+                !["www.db.yugioh-card.com", "yugipedia.com", "db.ygoprodeck.com"].includes(
+                    url.hostname
+                )
             )
                 return "";
             return `<li><a href="${h(url.href)}" target="_blank" rel="noopener noreferrer">${h(
@@ -163,16 +178,29 @@ export function detailHtml(card, printings, selectedId) {
                 }</summary><p class="card-text">${h(entry.text)}</p></details>`
         )
         .join("");
-    return `<div class="top"><div><h2>${h(card.name)}</h2><small>${
-        card.konami_id ? `CID ${card.konami_id}` : "Identidad pendiente de revisión"
-    }</small></div><button class="ghost" data-close="md">Cerrar</button></div><div class="hero"><div>${imageHtml(
+    return `<div class="top"><div><h2>${h(card.name)}</h2><small>${[
+        card.ygoprodeck_id ? `YGOPRODeck ${card.ygoprodeck_id}` : "",
+        card.konami_id ? `CID ${card.konami_id}` : ""
+    ]
+        .filter(Boolean)
+        .join(
+            " · "
+        )}</small></div><button class="ghost" data-close="md">Cerrar</button></div><div class="hero"><div>${imageHtml(
         image,
-        `${card.name} · ${printing?.code || ""}`,
+        `${card.name} · ${
+            image?.association === "card_artwork" ? "ilustración general" : printing?.code || ""
+        }`,
         true
     )}${
         image
-            ? `<small>${h(image.author || "Autor no indicado")} · ${h(
-                  image.license || "Permiso documentado"
+            ? `<small>${
+                  image.association === "card_artwork"
+                      ? "Ilustración general: no verifica la rareza, edición o set seleccionado.<br>"
+                      : ""
+              }${h(image.author || "Autor no indicado")} · ${h(
+                  image.usage_scope === "local_preview_only"
+                      ? "Vista local de prueba; derechos comerciales sin verificar"
+                      : image.license || "Permiso documentado"
               )} · ${creditLink(image.source_url, "Origen")}${
                   image.license_url ? ` · ${creditLink(image.license_url, "Licencia")}` : ""
               }</small>`
@@ -211,7 +239,11 @@ export function detailHtml(card, printings, selectedId) {
     }${
         text
             ? section(
-                  `Texto oficial vigente · ${text.language}`,
+                  `${
+                      text.is_official
+                          ? "Texto oficial vigente"
+                          : "Texto de catálogo · " + (text.source_slug || "fuente comunitaria")
+                  } · ${text.language}`,
                   `<p class="card-text">${h(text.text)}</p>${
                       text.pendulum_text
                           ? `<h4>Efecto Péndulo</h4><p class="card-text">${h(
@@ -220,7 +252,7 @@ export function detailHtml(card, printings, selectedId) {
                           : ""
                   }`
               )
-            : '<p class="catalog-status">Texto oficial vigente todavía no disponible.</p>'
+            : '<p class="catalog-status">Texto vigente todavía no disponible.</p>'
     }${section(
         "Arquetipos · clasificación comunitaria",
         groups(card.archetypes, "member")

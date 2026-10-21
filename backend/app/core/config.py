@@ -11,9 +11,15 @@ ROOT = Path(os.environ.get("CARDMATICA_ROOT", Path(__file__).resolve().parents[3
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT / ".env", extra="ignore")
 
-    database_url: str = "postgresql+psycopg://cardmatica:CHANGE_ME@localhost:5432/cardmatica"
-    admin_token: str = ""
-    user_agent: str = "Cardmatica/0.1 (contact: REPLACE_WITH_CONTACT)"
+    database_url: str = Field(
+        default="postgresql+psycopg://cardmatica:CHANGE_ME@localhost:5432/cardmatica", repr=False
+    )
+    admin_token: str = Field(default="", repr=False)
+    user_agent: str = "Cardmatica/0.2 (catalog maintenance)"
+    ygoprodeck_enabled: bool = True
+    ygoprodeck_request_interval: float = Field(default=1.0, ge=0.05)
+    deployment_mode: str = "production"
+    allow_local_image_preview: bool = False
     konami_enabled: bool = False
     konami_authorization_reference: str = ""
     yugipedia_enabled: bool = False
@@ -24,6 +30,10 @@ class Settings(BaseSettings):
     cache_directory: Path = ROOT / ".cache/http"
     image_directory: Path = ROOT / "data/images"
     cors_origins: list[str] = ["http://localhost:8000", "http://localhost:5500"]
+
+    @property
+    def local_image_preview(self) -> bool:
+        return self.deployment_mode == "local" and self.allow_local_image_preview
 
 
 @lru_cache

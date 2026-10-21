@@ -85,16 +85,16 @@ class PoliteHttpClient:
         self.source = source
         self.settings = settings
         self.store = HttpStore(settings.cache_directory)
-        self.interval = (
-            settings.yugipedia_request_interval
-            if source == "yugipedia"
-            else settings.konami_request_interval
-        )
-        self.allowed_hosts = (
-            {"yugipedia.com", "ms.yugipedia.com"}
-            if source == "yugipedia"
-            else {"www.db.yugioh-card.com"}
-        )
+        self.interval = {
+            "ygoprodeck": settings.ygoprodeck_request_interval,
+            "yugipedia": settings.yugipedia_request_interval,
+            "konami": settings.konami_request_interval,
+        }[source]
+        self.allowed_hosts = {
+            "ygoprodeck": {"db.ygoprodeck.com", "images.ygoprodeck.com"},
+            "yugipedia": {"yugipedia.com", "ms.yugipedia.com"},
+            "konami": {"www.db.yugioh-card.com"},
+        }[source]
         self.client = httpx.AsyncClient(
             timeout=settings.http_timeout,
             follow_redirects=False,
@@ -105,6 +105,8 @@ class PoliteHttpClient:
     def check_policy(self):
         if "REPLACE_WITH_CONTACT" in self.settings.user_agent:
             raise AccessDenied("Configurar USER_AGENT descriptivo con contacto real")
+        if self.source == "ygoprodeck" and not self.settings.ygoprodeck_enabled:
+            raise AccessDenied("YGOPRODeck deshabilitado en la configuración")
         if self.source == "konami" and not (
             self.settings.konami_enabled and self.settings.konami_authorization_reference.strip()
         ):
@@ -226,6 +228,7 @@ class PoliteHttpClient:
                     await asyncio.sleep(delay)
                     continue
                 if allow_missing and response.status_code in (404, 410):
+                    self.store.write(key, response)
                     return response
                 if not response.is_redirect:
                     response.raise_for_status()

@@ -45,7 +45,18 @@ class CatalogRepository:
         printing_query = (
             select(1).select_from(CardPrinting).join(CardSet).join(Rarity).where(*conditions)
         )
-        if market or rarity or set_id or product_type:
+        if market:
+            query = query.where(
+                or_(
+                    Card.available_markets.cast(Text).contains('"' + market + '"', autoescape=True),
+                    exists(
+                        select(1).where(
+                            CardPrinting.card_id == Card.id, CardPrinting.market == market
+                        )
+                    ),
+                )
+            )
+        if rarity or set_id or product_type:
             query = query.where(exists(printing_query))
         if card_type:
             query = query.where(Card.card_type == card_type)
@@ -114,7 +125,9 @@ class CatalogRepository:
             ordering = (name_order.desc() if sort == "name_desc" else name_order.asc(), Card.id)
         cards = self.session.scalars(
             query.options(
-                selectinload(Card.names), selectinload(Card.printings).options(*printing_loads())
+                selectinload(Card.names),
+                selectinload(Card.artworks),
+                selectinload(Card.printings).options(*printing_loads()),
             )
             .order_by(*ordering)
             .offset((page - 1) * page_size)
@@ -127,7 +140,9 @@ class CatalogRepository:
             select(Card)
             .where(Card.id == identifier)
             .options(
-                selectinload(Card.names), selectinload(Card.printings).options(*printing_loads())
+                selectinload(Card.names),
+                selectinload(Card.artworks),
+                selectinload(Card.printings).options(*printing_loads()),
             )
         )
 

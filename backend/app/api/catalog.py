@@ -1,13 +1,13 @@
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 
 from app.api.dependencies import SessionDep
 from app.core.config import get_settings
-from app.models import Archetype, Card, CardImage, CardPrinting, CardSet, Rarity
+from app.models import Archetype, Card, CardArtwork, CardImage, CardPrinting, CardSet, Rarity
 from app.repositories.catalog import CatalogRepository, printing_loads
 from app.schemas.catalog import (
     CardDetail,
@@ -231,4 +231,35 @@ def image(image_id: UUID, session: SessionDep, thumbnail: bool = False):
         raise HTTPException(404, "Imagen pendiente de descarga autorizada")
     return FileResponse(
         path, media_type="image/png", headers={"Cache-Control": "private, no-cache"}
+    )
+
+
+@router.get("/artworks/{image_id}", tags=["Imágenes"])
+def artwork(image_id: UUID, request: Request, session: SessionDep, thumbnail: bool = False):
+    row = session.get(CardArtwork, image_id)
+    settings = get_settings()
+    commercial = row and row.rights_status == "approved" and bool(row.authorization_reference)
+    local = settings.local_image_preview and request.url.hostname in {
+        "localhost",
+        "127.0.0.1",
+        "::1",
+        "testserver",
+    }
+    if not row or row.rights_status == "denied" or not (commercial or local):
+        raise HTTPException(404, "Ilustración no disponible para este uso")
+    relative = row.thumbnail_path if thumbnail else row.local_path
+    root = settings.image_directory.resolve()
+    path = (root / relative).resolve() if relative else None
+    if not path or not path.is_relative_to(root) or not path.is_file():
+        raise HTTPException(404, "Ilustración pendiente de descarga")
+    return FileResponse(
+        path,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "private, no-cache",
+            "X-Image-Association": "card-artwork",
+            "X-Image-Usage": "commercial-permission-verified"
+            if commercial
+            else "local-preview-only",
+        },
     )

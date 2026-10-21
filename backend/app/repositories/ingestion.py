@@ -57,7 +57,11 @@ class ProvenanceRepository:
             )
         ).first()
         accepted = True
-        status = "official" if self.source.slug == "konami" else "community"
+        status = (
+            "official"
+            if self.source.slug == "konami"
+            else ("provider" if self.source.slug == "ygoprodeck" else "community")
+        )
         if current:
             observation, _, old_source = current
             accepted = self.source.authority > old_source.authority or (
@@ -98,6 +102,7 @@ class ProvenanceRepository:
         if accepted:
             incoming.selected = True
             incoming.observed_at = self.reference.fetched_at
+            incoming.source_url = str(source_url or self.reference.url)
             incoming.status = status
         self.session.flush()
         return accepted

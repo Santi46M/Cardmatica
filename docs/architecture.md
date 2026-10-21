@@ -32,3 +32,25 @@ requiere además nombre localizado exacto y tipo coincidente. La similitud difus
 no fusiona cartas. Las discrepancias quedan en data_conflicts. La identidad
 de impresión incluye código, idioma, rareza, edición y arte. Las dimensiones
 desconocidas permanecen explícitas y no justifican asignar imágenes.
+
+El 21 de octubre se sustituyó el cliente activo de Konami por YGOPRODeck v7 sin
+crear otro backend. Las migraciones 003 y 004 incorporan ygoprodeck_id único,
+disponibilidad regional, ilustraciones generales y fuente de nombres/textos.
+La identidad del proveedor permite importar cartas sin CID; el CID, cuando viene
+informado, es independiente. Un desacuerdo entre ambos produce conflicto, no una fusión.
+La jerarquía es Konami histórico autorizado (100), YGOPRODeck (80), Yugipedia (20).
+El texto vigente del proveedor conserva is_official=false y fuente explícita.
+Sus revisiones crean versiones históricas sin inferir una errata.
+
+card_artworks no tiene FK a una impresión. Las dimensiones de edición y arte
+que YGOPRODeck no documenta quedan unknown en las impresiones. La fecha de un
+set se guarda en sets.release_date y no se copia a todas sus impresiones.
+La disponibilidad OCG informada en misc_info no crea impresiones OCG ficticias:
+la búsqueda devuelve la carta y la ficha explica si no hay impresiones para ese mercado.
+Las tarjetas pueden mostrar ilustración general con etiqueta; printing.images
+permanece reservado al escaneo específico y autorizado.
+
+El worker conserva sus checkpoints, lotes, reintentos y transacciones por carta.
+La paginación de YGOPRODeck utiliza num/offset y reutiliza la respuesta del lote.
+El incremental revalida páginas e identifica cambios por hash; no existe un feed
+documentado de cartas modificadas ni se usan fechas de lanzamiento como sustituto.

@@ -10,9 +10,9 @@ from app.core.config import get_settings
 from app.db.base import utcnow
 from app.db.session import session_factory
 from app.integrations.http import AccessDenied, PoliteHttpClient
-from app.integrations.konami.client import KonamiClient
+from app.integrations.ygoprodeck.client import YgoprodeckClient
 from app.integrations.yugipedia.client import YugipediaClient
-from app.models import CardImage, SyncError, SyncJob
+from app.models import CardArtwork, CardImage, SyncError, SyncJob
 from app.repositories.ingestion import conflict
 from app.schemas.catalog import JobRequest
 from app.schemas.ingestion import BanlistInput
@@ -93,7 +93,7 @@ class SyncRunner:
             if client is None:
                 http = PoliteHttpClient(source, self.settings)
                 http.check_policy()
-                client = KonamiClient(http) if source == "konami" else YugipediaClient(http)
+                client = YgoprodeckClient(http) if source == "ygoprodeck" else YugipediaClient(http)
             await self._process(job_id, request, client)
             return True
         except Exception as exc:
@@ -186,7 +186,11 @@ class SyncRunner:
                 identifier = item["identifier"] if isinstance(item, dict) else item
                 mode = item.get("mode", "card") if isinstance(item, dict) else request.mode
                 try:
-                    if mode == "images":
+                    if mode == "artwork":
+                        with self.factory.begin() as session:
+                            artwork = session.get(CardArtwork, UUID(identifier))
+                            await ImageService(self.settings, client).download_artwork(artwork)
+                    elif mode == "images":
                         with self.factory.begin() as session:
                             image = session.get(CardImage, UUID(identifier))
                             await ImageService(self.settings, client).download(image)
@@ -221,12 +225,22 @@ class SyncRunner:
                             with self.factory.begin() as session:
                                 card = IngestionService(session).ingest(record)
                                 if mode == "images_metadata":
-                                    pending.extend(
-                                        {"identifier": str(image.id), "mode": "images"}
-                                        for image in session.scalars(
-                                            eligible_images(session, card.konami_id)
+                                    if request.source == "ygoprodeck":
+                                        pending.extend(
+                                            {"identifier": str(image.id), "mode": "artwork"}
+                                            for image in session.scalars(
+                                                select(CardArtwork).where(
+                                                    CardArtwork.card_id == card.id
+                                                )
+                                            )
                                         )
-                                    )
+                                    else:
+                                        pending.extend(
+                                            {"identifier": str(image.id), "mode": "images"}
+                                            for image in session.scalars(
+                                                eligible_images(session, card.konami_id)
+                                            )
+                                        )
                     with self.factory.begin() as session:
                         job = session.get(SyncJob, job_id)
                         job.processed += 1

@@ -10,7 +10,7 @@ from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.db.session import session_factory
 from app.ingestion.sync import SyncRunner, worker
-from app.models import CardImage, SyncError, SyncJob
+from app.models import CardArtwork, CardImage, SyncError, SyncJob
 from app.schemas.catalog import JobRequest
 from app.schemas.ingestion import CardRecord
 from app.services.ingestion import IngestionService
@@ -71,7 +71,7 @@ def main():
     parser = argparse.ArgumentParser(prog="cardmatica")
     commands = parser.add_subparsers(dest="command", required=True)
     sync = commands.add_parser("sync")
-    sync.add_argument("source", choices=["konami", "yugipedia"])
+    sync.add_argument("source", choices=["ygoprodeck", "yugipedia"])
     sync.add_argument(
         "mode", choices=["initial", "incremental", "card", "images", "errata", "retry", "banlist"]
     )
@@ -96,6 +96,9 @@ def main():
     approval.add_argument("image_id", type=UUID)
     approval.add_argument("status", choices=["approved", "denied", "unverified"])
     approval.add_argument("--authorization-reference")
+    approval.add_argument(
+        "--artwork", action="store_true", help="Ilustración general, no escaneo de impresión"
+    )
     args = parser.parse_args()
     if args.command == "import-jsonl":
         return import_records(args.path, args.authorization_reference)
@@ -108,7 +111,7 @@ def main():
         if args.status == "approved" and not args.authorization_reference:
             parser.error("La aprobación requiere evidencia de permiso comercial")
         with session_factory().begin() as session:
-            row = session.get(CardImage, args.image_id)
+            row = session.get(CardArtwork if args.artwork else CardImage, args.image_id)
             if not row:
                 parser.error("Imagen inexistente")
             row.rights_status = args.status
