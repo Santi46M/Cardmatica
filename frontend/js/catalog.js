@@ -18,14 +18,15 @@ import {
     detailHtml,
     homeHtml,
     pager,
-    previewHtml,
     pricesHtml,
     skeletonRows,
     skeletonTiles
 } from "./catalog-view.js";
 import { TYPE_FILTERS, typeFiltersHtml, typeParams } from "./card-types.js";
-import { BACK_TO_TOP_PX, CATALOG, HOVER_PREVIEW } from "./config.js";
+import { CATALOG } from "./config.js";
 import { escapeHtml } from "./html.js";
+import { installBackToTop } from "./back-to-top.js";
+import { installCardPreview } from "./card-preview.js";
 import { cardMeta, tabMeta } from "./page-meta.js";
 import { priceChartHtml, priceSummary } from "./price-chart.js";
 import { installProfile, renderProfile } from "./profile.js";
@@ -591,58 +592,10 @@ document.addEventListener(
     true
 );
 
-// ---- Card preview on hover (mouse only; touch opens the card directly) -------
+// ---- Card preview on hover and back to top (their own modules) ---------------
 
-const preview = document.createElement("div");
-preview.id = "card-preview";
-preview.className = "card-preview gl";
-preview.hidden = true;
-preview.setAttribute("aria-hidden", "true");
-document.body.append(preview);
-const canHover = window.matchMedia("(hover: hover) and (pointer: fine)");
-let previewTimer;
-let previewTarget;
-
-function hidePreview() {
-    clearTimeout(previewTimer);
-    previewTarget = null;
-    preview.hidden = true;
-}
-
-function placePreview(x, y) {
-    const box = preview.getBoundingClientRect();
-    const { offsetPx, marginPx } = HOVER_PREVIEW;
-    // Prefer the right of the pointer; flip to the left near the window edge.
-    const fitsRight = x + offsetPx + box.width <= window.innerWidth - marginPx;
-    const left = fitsRight ? x + offsetPx : x - box.width - offsetPx;
-    const top = Math.min(
-        Math.max(marginPx, y - box.height / 2),
-        window.innerHeight - box.height - marginPx
-    );
-    preview.style.left = `${Math.max(marginPx, left)}px`;
-    preview.style.top = `${top}px`;
-}
-
-document.addEventListener("pointerover", (event) => {
-    const target = event.target.closest("[data-preview]");
-    if (!canHover.matches || !target || target === previewTarget) return;
-    const card = shownItems.get(target.dataset.preview);
-    if (!card) return;
-    previewTarget = target;
-    clearTimeout(previewTimer);
-    previewTimer = setTimeout(() => {
-        preview.innerHTML = previewHtml(card);
-        preview.hidden = false;
-        placePreview(event.clientX, event.clientY);
-    }, HOVER_PREVIEW.delayMs);
-});
-document.addEventListener("pointermove", (event) => {
-    if (!preview.hidden && previewTarget) placePreview(event.clientX, event.clientY);
-});
-document.addEventListener("pointerout", (event) => {
-    if (previewTarget && !previewTarget.contains(event.relatedTarget)) hidePreview();
-});
-window.addEventListener("scroll", hidePreview, { passive: true });
+const { hidePreview } = installCardPreview({ lookup: (id) => shownItems.get(id) });
+installBackToTop({ focus: element("q") });
 
 // ---- Keyboard shortcut and back to top ----------------------------------------
 
@@ -660,27 +613,6 @@ document.addEventListener("keydown", (event) => {
         openCard(row.dataset.catalogCard);
     }
 });
-
-const toTop = document.createElement("button");
-toTop.id = "to-top";
-toTop.className = "btn to-top";
-toTop.type = "button";
-toTop.hidden = true;
-toTop.textContent = "↑ Arriba";
-toTop.setAttribute("aria-label", "Volver arriba");
-document.body.append(toTop);
-toTop.addEventListener("click", () => {
-    const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    window.scrollTo({ top: 0, behavior: smooth ? "smooth" : "auto" });
-    element("q").focus({ preventScroll: true });
-});
-window.addEventListener(
-    "scroll",
-    () => {
-        toTop.hidden = window.scrollY < Math.min(BACK_TO_TOP_PX, window.innerHeight);
-    },
-    { passive: true }
-);
 
 // ---- Local panels and the demo store ------------------------------------------
 
