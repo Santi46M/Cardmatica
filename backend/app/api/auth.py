@@ -9,6 +9,7 @@ Cookies:
 
 import logging
 import secrets
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import select
@@ -39,6 +40,7 @@ from app.schemas.accounts import (
 from app.services import accounts
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Cuentas"])
+LAST_SEEN_EVERY = timedelta(minutes=5)
 logger = logging.getLogger(__name__)
 
 
@@ -145,8 +147,11 @@ def logout(found: Current, response: Response, session: SessionDep):
 @router.get("/me", response_model=UserView)
 def me(found: Current, session: SessionDep):
     user, row = found
-    row.last_seen_at = utcnow()
-    session.commit()
+    # Every page load asks /me; the activity time is written at most every few minutes.
+    now = utcnow()
+    if now - accounts.as_aware(row.last_seen_at) > LAST_SEEN_EVERY:
+        row.last_seen_at = now
+        session.commit()
     return user_view(user)
 
 

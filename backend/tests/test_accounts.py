@@ -234,3 +234,15 @@ def test_cleanup_removes_expired_sessions_and_spent_links(client, factory, outbo
         session.scalar(select(AccountToken)).used_at = utcnow()
     with factory.begin() as session:
         assert accounts.remove_expired(session) == {"sessions": 1, "tokens": 1}
+
+
+def test_attempt_limiter_forgets_idle_addresses(monkeypatch):
+    limiter = accounts.AttemptLimiter()
+    clock = [1000.0]
+    monkeypatch.setattr(accounts.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(accounts.AttemptLimiter, "PRUNE_EVERY", 3)
+    limiter.allow("a", 5)
+    limiter.allow("b", 5)
+    clock[0] += 120
+    limiter.allow("c", 5)  # third call: prunes before counting
+    assert set(limiter._attempts) == {"c"}

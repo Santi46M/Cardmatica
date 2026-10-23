@@ -324,7 +324,10 @@ Cuentas (`/api/v1/auth`): `POST /register`, `/login`, `/logout`, `/password`,
 hash del token. Los cambios exigen la cabecera `X-CSRF-Token` con el valor de la
 cookie `cm_csrf` y se rechazan si llegan de otro sitio. Contraseñas con scrypt;
 bloqueo temporal tras `LOGIN_MAX_FAILURES` intentos y límite por IP
-(`AUTH_ATTEMPTS_PER_MINUTE`, en memoria: válido para un solo proceso). Al registrarse
+(`AUTH_ATTEMPTS_PER_MINUTE`, en memoria: válido para un solo proceso). Detrás de un
+proxy público, `FORWARDED_ALLOW_IPS` debe indicar su dirección para que el límite
+se aplique a cada visitante y no al proxy. `cardmatica cleanup` borra sesiones
+vencidas y enlaces de correo usados (conviene programarlo una vez al día). Al registrarse
 se envía un enlace para confirmar el correo (`/verificar`) y desde el inicio de
 sesión se puede pedir uno para restablecer la contraseña (`/restablecer`); los
 enlaces son de un solo uso y vencen (`EMAIL_CONFIRMATION_HOURS`,
