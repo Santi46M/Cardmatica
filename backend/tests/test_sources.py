@@ -4,6 +4,8 @@ from datetime import date
 
 import httpx
 import pytest
+from pydantic import ValidationError
+
 from app.core.config import Settings
 from app.integrations.http import AccessDenied, HttpStore, PoliteHttpClient
 from app.integrations.konami.banlist import parse_banlist
@@ -11,7 +13,6 @@ from app.integrations.konami.parser import KonamiMarkupError, card_ids, parse_ca
 from app.integrations.yugipedia.images import match_scan
 from app.integrations.yugipedia.parser import classify_group, parse_errata
 from app.integrations.yugipedia.parser import parse_card as parse_wiki
-from pydantic import ValidationError
 
 
 @pytest.fixture

@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
@@ -13,6 +14,7 @@ from starlette.exceptions import HTTPException
 from app.api import admin, catalog
 from app.core.config import ROOT, get_settings
 from app.core.logging import configure_logging
+from app.core.security import SecurityHeadersMiddleware
 
 configure_logging()
 app = FastAPI(title="Cardmática — Catálogo", version="1.0.0")
@@ -25,6 +27,9 @@ app.add_middleware(
 )
 # JSON and the frontend files shrink to about a quarter of their size.
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+app.add_middleware(SecurityHeadersMiddleware, hsts=get_settings().deployment_mode == "production")
+# Added last so it runs first: requests for an unknown host are refused early.
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=get_settings().allowed_hosts)
 app.include_router(catalog.router)
 app.include_router(admin.router)
 

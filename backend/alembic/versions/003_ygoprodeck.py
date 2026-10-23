@@ -5,6 +5,7 @@ Revises: 002_provenance_search
 """
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "003_ygoprodeck"

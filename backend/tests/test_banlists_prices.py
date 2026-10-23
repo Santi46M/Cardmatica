@@ -2,10 +2,11 @@ from datetime import date, datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import func, select
+
 from app.models import BanlistListEntry
 from app.services.banlists import BanlistFile, bundled_files, import_banlist, load_file
 from app.services.ingestion import IngestionService
-from sqlalchemy import func, select
 
 
 def seed(factory, record):

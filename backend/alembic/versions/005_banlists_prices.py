@@ -5,6 +5,7 @@ Revises: 004_name_source
 """
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "005_banlists_prices"
@@ -61,9 +62,7 @@ def upgrade():
             name=op.f("ck_banlist_list_entries_valid_list_status"),
         ),
     )
-    op.create_index(
-        "ix_banlist_list_entries_banlist_id", "banlist_list_entries", ["banlist_id"]
-    )
+    op.create_index("ix_banlist_list_entries_banlist_id", "banlist_list_entries", ["banlist_id"])
     op.create_index(
         "ix_banlist_list_entries_normalized_name", "banlist_list_entries", ["normalized_name"]
     )

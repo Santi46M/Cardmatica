@@ -96,9 +96,7 @@ def preview_images(max_cards: int, runner=None):
             "Activar DEPLOYMENT_MODE=local y ALLOW_LOCAL_IMAGE_PREVIEW=true antes de descargar"
         )
     runner = runner or SyncRunner()
-    downloaded = exists().where(
-        CardArtwork.card_id == Card.id, CardArtwork.local_path.is_not(None)
-    )
+    downloaded = exists().where(CardArtwork.card_id == Card.id, CardArtwork.local_path.is_not(None))
     with runner.factory() as session:
         identifiers = list(
             session.scalars(

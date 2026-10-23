@@ -64,10 +64,7 @@ class CatalogRepository:
             # Evaluated once for the whole query. A per-card EXISTS made the planner
             # walk every printing of a common rarity for each card (seconds, not ms).
             matching_cards = (
-                select(CardPrinting.card_id)
-                .join(CardSet)
-                .join(Rarity)
-                .where(*printing_filters)
+                select(CardPrinting.card_id).join(CardSet).join(Rarity).where(*printing_filters)
             )
             query = query.where(Card.id.in_(matching_cards))
         if card_type:

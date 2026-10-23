@@ -9,8 +9,8 @@ from sqlalchemy import or_, select, text
 from app.core.config import get_settings
 from app.db.base import utcnow
 from app.db.session import session_factory
-from app.integrations.http import AccessDenied, PoliteHttpClient
 from app.ingestion.selection import pick_printings
+from app.integrations.http import AccessDenied, PoliteHttpClient
 from app.integrations.ygoprodeck.client import YgoprodeckClient
 from app.integrations.yugipedia.client import YugipediaClient
 from app.models import CardArtwork, CardImage, SyncError, SyncJob

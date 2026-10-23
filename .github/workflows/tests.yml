@@ -1,0 +1,81 @@
+# Pruebas automáticas en cada pull request y en cada cambio a main.
+# - lint: estilo y errores comunes (ruff).
+# - tests: API, sincronización y navegador (Chromium) sobre SQLite.
+# - postgres: migraciones Alembic y pruebas contra PostgreSQL, como en producción.
+name: Pruebas
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      # Misma versión que requirements.lock, para que el formato no cambie entre equipos.
+      - run: pip install "ruff==0.16.9"
+      - run: ruff check backend
+      - run: ruff format --check backend
+
+  tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.lock
+      - run: pip install -c requirements.lock -e ".[dev]"
+      - run: python -m playwright install --with-deps chromium
+      - name: Pruebas (incluye navegador)
+        env:
+          CARDMATICA_BROWSER_TESTS: "1"
+        run: python -m pytest -q
+
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:17
+        env:
+          POSTGRES_USER: cardmatica
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: cardmatica
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cardmatica" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://cardmatica:ci-only-password@localhost:5432/cardmatica
+      CARDMATICA_TEST_POSTGRES: "1"
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.lock
+      - run: pip install -c requirements.lock -e ".[dev]"
+      - name: Migraciones
+        run: alembic upgrade head
+      - name: Pruebas contra PostgreSQL
+        run: python -m pytest -q

@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     cache_directory: Path = ROOT / ".cache/http"
     image_directory: Path = ROOT / "data/images"
     cors_origins: list[str] = ["http://localhost:8000", "http://localhost:5500"]
+    # Host names the site answers to. "*" accepts any; set the real domain in
+    # production, e.g. ["cardmatica.com", "www.cardmatica.com"].
+    allowed_hosts: list[str] = ["*"]
 
     @property
     def local_image_preview(self) -> bool:

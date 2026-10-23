@@ -1,9 +1,10 @@
 from uuid import uuid4
 
+from sqlalchemy import event, select
+
 from app.models import CardImage
 from app.schemas.ingestion import GroupInput, ImageInput
 from app.services.ingestion import IngestionService
-from sqlalchemy import event, select
 
 
 def seed(factory, record):
@@ -139,3 +140,21 @@ def test_fixed_query_count_instead_of_n_plus_one(factory, client, record):
         assert len(queries) == single
     finally:
         event.remove(engine, "before_cursor_execute", before_execute)
+
+
+def test_security_headers_on_page_and_api(client):
+    for path in ["/", "/api/v1/cards", "/styles.css"]:
+        response = client.get(path)
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert response.headers["X-Frame-Options"] == "DENY"
+        assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+        policy = response.headers["Content-Security-Policy"]
+        assert "script-src 'self'" in policy and "frame-ancestors 'none'" in policy
+    # The API docs load their own scripts, so they skip the page policy.
+    assert "Content-Security-Policy" not in client.get("/docs").headers
+
+
+def test_hsts_only_over_https(client):
+    assert "Strict-Transport-Security" not in client.get("/health/live").headers
+    secure = client.get("/health/live", headers={"X-Forwarded-Proto": "https"})
+    assert secure.headers["Strict-Transport-Security"].startswith("max-age=31536000")

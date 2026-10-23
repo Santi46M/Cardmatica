@@ -5,6 +5,10 @@ from datetime import date, timedelta
 
 import httpx
 import pytest
+from PIL import Image
+from pydantic import ValidationError
+from sqlalchemy import func, select
+
 from app.core.config import Settings
 from app.integrations.http import AccessDenied, PoliteHttpClient
 from app.integrations.ygoprodeck.client import YgoprodeckClient
@@ -25,9 +29,6 @@ from app.schemas.ingestion import GroupInput
 from app.services.images import ImageService
 from app.services.ingestion import IngestionService
 from app.services.reconciliation import IdentityConflict
-from PIL import Image
-from pydantic import ValidationError
-from sqlalchemy import func, select
 
 
 @pytest.fixture
@@ -71,7 +72,9 @@ def test_parser_preserves_identity_and_printing_dimensions(payload):
         not printing.images and printing.edition == "unknown" for printing in record.printings
     )
     assert record.printings[0].set_release_date == date(2026, 1, 1)
-    assert str(record.printings[0].set_source_url) == "https://db.ygoprodeck.com/api/v7/cardsets.php"
+    assert (
+        str(record.printings[0].set_source_url) == "https://db.ygoprodeck.com/api/v7/cardsets.php"
+    )
     assert record.printings[0].release_date is None
     assert "price" not in record.model_dump_json(warnings="error")
 

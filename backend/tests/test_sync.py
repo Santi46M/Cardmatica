@@ -1,12 +1,13 @@
 from datetime import date
 
+from sqlalchemy import func, select
+
 from app.ingestion.selection import pick_printings
 from app.ingestion.sync import SyncRunner
 from app.integrations.http import AccessDenied, ExternalError
 from app.models import Card, CardPrinting, SyncError, SyncJob
 from app.schemas.catalog import JobRequest
 from app.schemas.ingestion import CardRecord, PrintingInput
-from sqlalchemy import func, select
 
 
 class FixtureSource:

@@ -8,14 +8,15 @@ from decimal import Decimal
 
 import pytest
 import uvicorn
+from playwright.sync_api import expect, sync_playwright
+from sqlalchemy import select
+
 from app.db.session import get_session
 from app.main import app
 from app.models import Card, CardArtwork, CardPrinting, PriceObservation
 from app.schemas.ingestion import PrintingInput
 from app.services.banlists import BanlistFile, import_banlist
 from app.services.ingestion import IngestionService
-from playwright.sync_api import expect, sync_playwright
-from sqlalchemy import select
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("CARDMATICA_BROWSER_TESTS") != "1",
@@ -67,14 +68,24 @@ def browser_page():
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(channel="chrome" if os.name == "nt" else None)
         page = browser.new_page(viewport={"width": 1280, "height": 900})
+        # The Content-Security-Policy must not block anything any page uses.
+        blocked = []
+        page.on(
+            "console",
+            lambda message: (
+                "Content Security Policy" in message.text and blocked.append(message.text)
+            ),
+        )
         yield page
         browser.close()
+        assert not blocked
 
 
 def test_catalog_printing_switch_currency_and_market(live_server, browser_page):
     page = browser_page
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
+
     page.goto(live_server)
     expect(page.locator("#home")).to_contain_text("Synthetic Test Dragon")
     page.locator('[data-go="Todas"]').click()
@@ -123,7 +134,6 @@ def test_existing_product_cart_add_remove_checkout(live_server, browser_page):
     assert not errors
 
 
-
 def test_demo_seller_inventory_card_and_currency(live_server, browser_page):
     page = browser_page
     errors = []
@@ -148,6 +158,7 @@ def test_demo_seller_inventory_card_and_currency(live_server, browser_page):
     page.keyboard.press("Escape")
     expect(page.locator("#md")).not_to_have_class("on")
     assert not errors
+
 
 def test_banlist_price_history_wantlists_and_profile(live_server, browser_page, factory):
     """Synthetic list and sales; the bundled official lists are validated elsewhere."""
@@ -287,9 +298,7 @@ def test_cart_page_from_popup(live_server, browser_page):
     assert not errors
 
 
-def test_list_url_state_grid_preview_shortcut_and_price_alerts(
-    live_server, browser_page, factory
-):
+def test_list_url_state_grid_preview_shortcut_and_price_alerts(live_server, browser_page, factory):
     with factory.begin() as session:
         import_banlist(
             session,
