@@ -1,5 +1,9 @@
 import { CatalogApi } from "./api.js";
+import { homeBanlistHtml, startCountdowns } from "./banlist.js";
 import { catalogRows, detailHtml, escapeHtml, homeHtml, pager } from "./catalog-view.js";
+import { priceChartHtml } from "./price-chart.js";
+import { installProfile, renderProfile } from "./profile.js";
+import { installWantlists, renderWantlists } from "./wantlists.js";
 
 const api = new CatalogApi();
 const h = escapeHtml;
@@ -14,8 +18,14 @@ let timer;
 let facets;
 let detail;
 let printingPage;
+let selectedPrinting = "";
+let priceHistory;
+let chartDays = 365;
 const cardTypes = { Monstruo: "Monster", Magia: "Spell", Trampa: "Trap" };
 const isCommerce = () => ["Productos", "Vendedores"].includes(window.tab);
+// Panels stored in this browser only; they never query the catalogue list.
+const localPanels = { Wantlists: "wlv", Perfil: "pfv" };
+const isLocal = () => window.tab in localPanels;
 const pagination = document.createElement("div");
 pagination.id = "catalog-pagination";
 element("cat").append(pagination);
@@ -41,13 +51,40 @@ async function loadFacets() {
     }
 }
 
+function renderDetail() {
+    element("mb").innerHTML = detailHtml(detail, printingPage, selectedPrinting, {
+        market: window.mk
+    });
+    renderChart();
+}
+
+function renderChart() {
+    const slot = element("price-history");
+    if (!slot) return;
+    slot.innerHTML = priceChartHtml(priceHistory, { printingId: selectedPrinting, days: chartDays });
+}
+
+async function loadHomeBanlist() {
+    const slot = element("home-banlist");
+    if (!slot) return;
+    try {
+        slot.innerHTML = homeBanlistHtml(await api.get("banlists"), window.mk);
+        startCountdowns();
+    } catch (error) {
+        slot.innerHTML = `<p class="catalog-status" role="alert">No se pudo cargar la banlist: ${h(
+            error.message
+        )}</p>`;
+    }
+}
+
 async function loadCards(reset = false) {
     clearTimeout(timer);
     if (isCommerce()) return commerceList();
-    if (window.tab === "Inicio" && element("q").value.trim()) {
+    if ((window.tab === "Inicio" || isLocal()) && element("q").value.trim()) {
         window.tab = "Todas";
         return window.init();
     }
+    if (isLocal()) return;
     if (reset) page = 1;
     controller?.abort();
     controller = new AbortController();
@@ -73,7 +110,10 @@ async function loadCards(reset = false) {
             { signal: controller.signal }
         );
         if (current !== generation || isCommerce()) return;
-        if (home) element("home").innerHTML = homeHtml(data);
+        if (home) {
+            element("home").innerHTML = `${homeHtml(data)}<div id="home-banlist"></div>`;
+            loadHomeBanlist();
+        }
         else {
             element("list").innerHTML = catalogRows(data);
             element("cnt").textContent = `${data.total} cartas`;
@@ -102,6 +142,7 @@ async function loadCards(reset = false) {
 
 window.list = function () {
     if (isCommerce()) return commerceList();
+    if (isLocal() && !element("q").value.trim()) return;
     clearTimeout(timer);
     timer = setTimeout(() => loadCards(true), 250);
 };
@@ -116,6 +157,7 @@ window.init = function () {
         /* Preference is optional. */
     }
     element("commercial-notice").hidden = !isCommerce();
+    for (const id of Object.values(localPanels)) element(id).style.display = "none";
     if (isCommerce()) {
         status("");
         return commerceInit();
@@ -126,9 +168,17 @@ window.init = function () {
                 window.TN[tab]
             )}</button>`
     ).join("");
-    const panel = window.tab === "Inicio" ? "home" : "cat";
-    for (const id of ["home", "cat", "prod", "vend"])
+    const panel = localPanels[window.tab] || (window.tab === "Inicio" ? "home" : "cat");
+    for (const id of ["home", "cat", "prod", "vend", ...Object.values(localPanels)])
         element(id).style.display = id === panel ? "" : "none";
+    if (isLocal()) {
+        status("");
+        if (window.tab === "Wantlists") renderWantlists(element("wlv"));
+        else renderProfile(element("pfv"));
+        if (element("md").classList.contains("on") && element("md").dataset.mode === "catalog")
+            openCard(element("md").dataset.catalogId);
+        return;
+    }
     element("srt").innerHTML =
         '<option value="name">Nombre</option><option value="name_desc">Nombre: Z–A</option><option value="updated">Actualizadas recientemente</option>';
     loadCards(true);
@@ -146,9 +196,14 @@ async function openCard(id) {
     window.pad();
     element("md").classList.add("on");
     try {
+        priceHistory = undefined;
+        const market = window.mk;
+        const history = api
+            .get(`cards/${id}/price-history`, { market, days: 3650 })
+            .catch(() => null);
         const [card, printings] = await Promise.all([
             api.get(`cards/${id}`),
-            api.get(`cards/${id}/printings`, { page: 1, page_size: 24, market: window.mk })
+            api.get(`cards/${id}/printings`, { page: 1, page_size: 24, market })
         ]);
         if (
             current !== detailGeneration ||
@@ -158,7 +213,13 @@ async function openCard(id) {
             return;
         detail = card;
         printingPage = printings;
-        element("mb").innerHTML = detailHtml(detail, printingPage);
+        selectedPrinting = "";
+        renderDetail();
+        history.then((data) => {
+            if (current !== detailGeneration || element("md").dataset.mode !== "catalog") return;
+            priceHistory = data;
+            renderChart();
+        });
     } catch (error) {
         if (current !== detailGeneration || element("md").dataset.mode !== "catalog") return;
         element(
@@ -200,7 +261,8 @@ document.addEventListener(
                 if (current !== detailGeneration || element("md").dataset.mode !== "catalog")
                     return;
                 printingPage = data;
-                element("mb").innerHTML = detailHtml(detail, printingPage);
+                selectedPrinting = "";
+                renderDetail();
             } catch (error) {
                 window.toast(error.message);
             } finally {
@@ -212,9 +274,34 @@ document.addEventListener(
 );
 
 document.addEventListener("change", (event) => {
-    if (event.target.id === "catalog-printing" && detail)
-        element("mb").innerHTML = detailHtml(detail, printingPage, event.target.value);
+    if (event.target.id === "catalog-printing" && detail) {
+        selectedPrinting = event.target.value;
+        renderDetail();
+    }
+    // Prices follow the currency chosen in the header while a card is open.
+    if (event.target.id === "cur" && detail && element("md").dataset.mode === "catalog")
+        renderChart();
 });
+document.addEventListener(
+    "click",
+    (event) => {
+        const range = event.target.closest("[data-ph-range]");
+        if (!range) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        chartDays = Number(range.dataset.phRange);
+        renderChart();
+    },
+    true
+);
+installWantlists({
+    panel: () => (window.tab === "Wantlists" ? element("wlv") : null),
+    detail: () =>
+        detail && element("md").dataset.mode === "catalog"
+            ? { card: detail, printings: printingPage, selectedId: selectedPrinting }
+            : null
+});
+installProfile({ panel: () => element("pfv") });
 document.addEventListener("keydown", (event) => {
     const row = event.target.closest("[data-catalog-card]");
     if (row && ["Enter", " "].includes(event.key) && event.target.tagName !== "BUTTON") {
@@ -249,6 +336,9 @@ for (const name of ["detail", "vendor", "popen", "showCart"]) {
 }
 window.TN.Productos = "Productos (demo)";
 window.TN.Vendedores = "Vendedores (demo)";
+for (const name of Object.keys(localPanels)) if (!window.TABS.includes(name)) window.TABS.push(name);
+window.TN.Wantlists = "Wantlists";
+window.TN.Perfil = "Perfil";
 try {
     const market = localStorage.getItem("cm_market");
     if (["TCG", "OCG"].includes(market)) window.mk = market;

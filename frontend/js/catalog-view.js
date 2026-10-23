@@ -1,3 +1,5 @@
+import { badgeHtml, banlistSectionHtml, statusFor } from "./banlist.js";
+
 export const escapeHtml = (value) =>
     String(value ?? "").replace(
         /[&<>"']/g,
@@ -114,7 +116,7 @@ export function homeHtml(data) {
     }`;
 }
 
-export function detailHtml(card, printings, selectedId) {
+export function detailHtml(card, printings, selectedId, { market = "TCG" } = {}) {
     const printing = printings.items.find((item) => item.id === selectedId) || printings.items[0];
     const image =
         printing?.images.find((item) => item.url) || card.artworks?.find((item) => item.url);
@@ -178,14 +180,16 @@ export function detailHtml(card, printings, selectedId) {
                 }</summary><p class="card-text">${h(entry.text)}</p></details>`
         )
         .join("");
-    return `<div class="top"><div><h2>${h(card.name)}</h2><small>${[
+    return `<div class="top"><div><h2>${badgeHtml(statusFor(card, market))}${h(
+        card.name
+    )}</h2><small>${[
         card.ygoprodeck_id ? `YGOPRODeck ${card.ygoprodeck_id}` : "",
         card.konami_id ? `CID ${card.konami_id}` : ""
     ]
         .filter(Boolean)
         .join(
             " · "
-        )}</small></div><button class="ghost" data-close="md">Cerrar</button></div><div class="hero"><div>${imageHtml(
+        )}</small></div><div class="top-actions"><button class="btn s" data-wl-open aria-controls="wl-picker">+ Wantlist</button><button class="ghost" data-close="md">Cerrar</button></div></div><div id="wl-picker"></div><div class="hero"><div>${imageHtml(
         image,
         `${card.name} · ${
             image?.association === "card_artwork" ? "ilustración general" : printing?.code || ""
@@ -236,7 +240,7 @@ export function detailHtml(card, printings, selectedId) {
                   )
                   .join("")}</select></label>${pager(printings, "printing")}`
             : '<p class="empty">No hay impresiones documentadas para este mercado.</p>'
-    }${
+    }<div id="price-history" class="chart" aria-live="polite"></div>${
         text
             ? section(
                   `${
@@ -278,15 +282,7 @@ export function detailHtml(card, printings, selectedId) {
     )}${section("Erratas documentadas", errata)}${section(
         "Versiones históricas y textos comunitarios",
         history
-    )}${section(
-        "Listas oficiales por formato y vigencia",
-        card.banlist
-            .map(
-                (entry) =>
-                    `<p>${h(entry.format)} · ${h(entry.effective_date)} · ${h(entry.status)}</p>`
-            )
-            .join("")
-    )}${section(
+    )}${banlistSectionHtml(card, market)}${section(
         "Procedencia",
         sourceLinks ? `<ul>${sourceLinks}</ul>` : ""
     )}<p class="catalog-status">No hay publicaciones comerciales vinculadas a esta impresión.</p>`;
