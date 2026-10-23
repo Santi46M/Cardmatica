@@ -21,6 +21,7 @@ from app.api.dependencies import (
     csrf,
     is_https,
     same_origin,
+    site_url,
 )
 from app.core.config import get_settings
 from app.db.base import utcnow
@@ -41,19 +42,10 @@ router = APIRouter(prefix="/api/v1/auth", tags=["Cuentas"])
 logger = logging.getLogger(__name__)
 
 
-def base_url(request: Request) -> str:
-    """Where links in emails point: PUBLIC_BASE_URL, or the site this request came to."""
-    configured = get_settings().public_base_url.rstrip("/")
-    if configured:
-        return configured
-    host = request.headers.get("x-forwarded-host") or request.headers.get("host", "localhost")
-    return f"{'https' if is_https(request) else 'http'}://{host}"
-
-
 def send_confirmation(session, user, request: Request) -> None:
     # A failing mail server must not undo the registration; the link can be resent.
     try:
-        accounts.send_confirmation(session, user, base_url(request))
+        accounts.send_confirmation(session, user, site_url(request))
     except OSError as error:
         logger.error("No se pudo enviar el correo de confirmación: %s", type(error).__name__)
 
@@ -235,7 +227,7 @@ def confirm_email(payload: TokenInput, session: SessionDep):
 )
 def request_password_reset(payload: PasswordResetRequest, request: Request, session: SessionDep):
     try:
-        accounts.request_password_reset(session, payload.email, base_url(request))
+        accounts.request_password_reset(session, payload.email, site_url(request))
     except OSError as error:
         logger.error("No se pudo enviar el correo de recuperación: %s", type(error).__name__)
     session.commit()

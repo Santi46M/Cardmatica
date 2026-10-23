@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 
+from app.api.analytics import top_keys
 from app.api.dependencies import SessionDep, require_admin
 from app.models import (
     Card,
@@ -137,6 +138,8 @@ def overview(session: SessionDep):
         "pending_jobs": session.scalar(
             select(func.count()).select_from(SyncJob).where(SyncJob.status == "pending")
         ),
+        # Most viewed pages and events of the last 7 days (anonymous counts).
+        "top_pages": top_keys(session),
     }
 
 

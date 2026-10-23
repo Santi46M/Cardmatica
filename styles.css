@@ -577,12 +577,15 @@ small {
     border-radius: 16px;
 }
 
+.hero2 h1,
 .hero2 h2 {
+    margin: 0 0 8px;
     font-size: 28px;
     font-weight: 300;
     line-height: 1.2;
 }
 
+.hero2 h1 b,
 .hero2 h2 b {
     color: var(--ac);
     font-weight: 700;
@@ -2001,4 +2004,32 @@ button.acc-avatar:hover,
 .auth-notice {
     margin: 0 0 10px;
     border-color: rgba(120, 220, 160, .35);
+}
+
+.hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 16px 0 0;
+}
+
+.sec-title {
+    margin: 22px 0 10px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.admin-top {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0;
+    display: grid;
+    gap: 4px;
+}
+
+.admin-top li {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(170, 215, 255, .1);
+    padding: 3px 0;
 }

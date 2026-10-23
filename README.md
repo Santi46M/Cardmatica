@@ -363,6 +363,21 @@ subcadenas, orden estable y límite máximo de 100 elementos por página. Las of
 y precios no se deducen del catálogo externo; por ello el catálogo ordena por nombre
 o actualización, mientras el comercio original conserva su orden por precio.
 
+## Lanzamiento: buscadores, enlaces e íconos
+
+- Cada página sale con su título, descripción, enlace canónico y etiquetas
+  Open Graph (imagen `frontend/assets/og-image.png`, 1200×630), con direcciones
+  absolutas basadas en `PUBLIC_BASE_URL` o en el sitio de la petición. Al moverse
+  por pestañas o abrir una carta, la página actualiza título y descripción.
+- `/robots.txt` y `/sitemap.xml` (inicio, páginas legales y cada carta, con su
+  fecha de actualización).
+- Íconos: `favicon.ico`, `favicon.svg`, `apple-touch-icon` y manifiesto con
+  íconos de 192 y 512 px (`frontend/assets/`).
+- Estadísticas anónimas propias (`/api/v1/analytics/event`): visitas por
+  pestaña y unas pocas acciones, sumadas por día, sin cookies ni datos
+  personales; respetan Do Not Track y Global Privacy Control. Se ven en el panel
+  de administración. `ANALYTICS_ENABLED=false` las apaga.
+
 ## Pruebas
 
 GitHub Actions (`.github/workflows/tests.yml`) corre en cada pull request y en

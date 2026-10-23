@@ -63,6 +63,26 @@ function jobsHtml(jobs) {
         .join("")}</tbody></table>`;
 }
 
+// "tab:Todas" → "Todas las cartas"; events keep a readable name.
+const KEY_LABELS = {
+    carta: "Fichas de carta abiertas",
+    busqueda: "Búsquedas",
+    "cuenta:registro": "Cuentas creadas",
+    "wantlist:agregar": "Cartas añadidas a wantlists"
+};
+
+function topHtml(rows) {
+    if (!rows.length) return '<p class="catalog-status">Todavía no hay visitas registradas.</p>';
+    return `<ul class="admin-top">${rows
+        .map((row) => {
+            const label = row.key.startsWith("tab:")
+                ? `Pestaña ${window.TAB_LABELS[row.key.slice(4)] || row.key.slice(4)}`
+                : KEY_LABELS[row.key] || row.key;
+            return `<li><span>${h(label)}</span><b>${row.count}</b></li>`;
+        })
+        .join("")}</ul>`;
+}
+
 async function loadUsers() {
     const slot = document.getElementById("admin-users");
     if (!slot) return;
@@ -84,7 +104,9 @@ export async function renderAdmin(container) {
             ([key, label]) => `<div class="gl pnl"><small>${label}</small><b>${overview[key]}</b></div>`
         ).join(
             ""
-        )}</div><section class="gl pnl"><b>Cuentas</b><input id="admin-search" type="search" placeholder="Buscar por correo o nombre" aria-label="Buscar cuentas" value="${h(
+        )}</div><section class="gl pnl"><b>Lo más visto · últimos 7 días</b>${topHtml(
+            overview.top_pages
+        )}<small>Recuentos anónimos por día, sin cookies ni datos personales.</small></section><section class="gl pnl"><b>Cuentas</b><input id="admin-search" type="search" placeholder="Buscar por correo o nombre" aria-label="Buscar cuentas" value="${h(
             search
         )}"><div class="wrap" id="admin-users"></div></section><section class="gl pnl"><b>Últimas sincronizaciones</b><div class="wrap">${jobsHtml(
             jobs

@@ -219,12 +219,18 @@ export function installProfile({ panel }) {
             if (error[0]) document.getElementById(error[0]).focus();
             return;
         }
+        const button = event.target.querySelector("button[type=submit]");
+        button.disabled = true;
+        button.textContent = "Guardando…";
         try {
             await saveProfile(data);
         } catch (failure) {
             message.textContent = failure.message;
             message.hidden = false;
             return;
+        } finally {
+            button.disabled = false;
+            button.textContent = "Guardar perfil";
         }
         window.toast?.(currentUser() ? "Perfil guardado en tu cuenta" : "Perfil guardado");
         document.dispatchEvent(new CustomEvent("cm:profile"));

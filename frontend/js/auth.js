@@ -1,5 +1,6 @@
 // Accounts in the browser: sign in, register, sign out, password and sessions.
 import { escapeHtml } from "./html.js";
+import { track } from "./analytics.js";
 import { request } from "./session-api.js";
 
 const h = escapeHtml;
@@ -238,6 +239,7 @@ export function installAuth({ panel, go }) {
                     }
                 });
                 window.toast?.("Cuenta creada");
+                track("cuenta:registro");
                 changed();
                 go("Perfil");
             } else {

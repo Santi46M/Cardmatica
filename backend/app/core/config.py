@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = Field(default="", repr=False)
     smtp_starttls: bool = True
+    # Anonymous page counts (app/api/analytics.py); false turns them off.
+    analytics_enabled: bool = True
     # Address used in links inside emails, e.g. "https://cardmatica.com".
     # Empty: the address of the request that triggered the email.
     public_base_url: str = ""

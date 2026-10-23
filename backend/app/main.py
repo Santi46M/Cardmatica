@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 
-from app.api import account, admin, auth, catalog, pages
+from app.api import account, admin, analytics, auth, catalog, pages
 from app.core.config import ROOT, get_settings
 from app.core.logging import configure_logging
 from app.core.security import SecurityHeadersMiddleware
@@ -34,6 +34,7 @@ app.include_router(catalog.router)
 app.include_router(admin.router)
 app.include_router(auth.router)
 app.include_router(account.router)
+app.include_router(analytics.router)
 
 
 @app.exception_handler(HTTPException)
@@ -41,7 +42,7 @@ async def http_error(request: Request, exception: HTTPException):
     # A person following a broken link gets a page; programs get JSON.
     wants_page = "text/html" in request.headers.get("accept", "")
     if exception.status_code == 404 and wants_page and not request.url.path.startswith("/api/"):
-        return pages.not_found_page()
+        return pages.not_found_page(request)
     return JSONResponse(
         status_code=exception.status_code,
         content={"error": {"code": "http_error", "message": str(exception.detail)}},

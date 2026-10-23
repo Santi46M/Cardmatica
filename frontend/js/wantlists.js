@@ -1,6 +1,7 @@
 import { escapeHtml } from "./html.js";
 import { WANTLIST } from "./config.js";
 import { formatDate, money, toEuro } from "./format.js";
+import { track } from "./analytics.js";
 import { currentUser } from "./auth.js";
 import { request } from "./session-api.js";
 import { newId, readJson, writeJson } from "./storage.js";
@@ -227,6 +228,7 @@ function addFromForm(card, printings, market) {
     state.active = list.id;
     save();
     window.toast?.(`${card.name} añadida a «${list.name}»`);
+    track("wantlist:agregar");
     return true;
 }
 

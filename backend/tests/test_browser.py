@@ -625,3 +625,37 @@ def test_email_links_confirm_and_reset(live_server, browser_page, monkeypatch):
     page.locator("#auth-login button[type=submit]").click()
     expect(page.locator("#ts")).to_contain_text("Hola, Sofía")
     assert not errors
+
+
+def test_launch_checklist(live_server, browser_page, factory):
+    from sqlalchemy import select
+
+    from app.models import UsageCount
+
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(live_server)
+    # The call to action is visible without scrolling, on a laptop and a phone.
+    for width, height in [(1280, 720), (390, 740)]:
+        page.set_viewport_size({"width": width, "height": height})
+        box = page.locator(".hero2 .btn").first.bounding_box()
+        assert box and box["y"] + box["height"] <= height
+    page.set_viewport_size({"width": 1280, "height": 900})
+    expect(page.locator("h1")).to_have_count(1)
+    assert page.locator('link[rel="icon"][type="image/svg+xml"]').count() == 1
+    assert page.locator('meta[property="og:image"]').get_attribute("content").startswith("http")
+    page.locator('[data-g="Trampa"]').click()
+    expect(page).to_have_title(re.compile("^Trampas"))
+    assert "contraefecto" in page.locator('meta[name="description"]').get_attribute("content")
+    page.locator('[data-g="Todas"]').click()
+    expect(page.locator("#list [data-catalog-card]").first).to_be_visible()
+    # Every image has a text alternative.
+    assert page.locator("img:not([alt])").count() == 0
+    page.locator("#list [data-catalog-card]").first.click()
+    expect(page).to_have_title(re.compile("Synthetic Test Dragon"))
+    page.wait_for_load_state("networkidle")
+    with factory() as session:
+        keys = {row.key for row in session.scalars(select(UsageCount))}
+    assert {"tab:Inicio", "tab:Trampa", "carta"} <= keys
+    assert not errors

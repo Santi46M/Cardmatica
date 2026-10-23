@@ -1,6 +1,14 @@
 import { installAccountMenu } from "./account-menu.js";
+import { track, trackPage } from "./analytics.js";
 import { installAdmin, renderAdmin } from "./admin.js";
-import { installAuth, loadAccount, openAccountLink, renderAuth, renderSecurity } from "./auth.js";
+import {
+    currentUser,
+    installAuth,
+    loadAccount,
+    openAccountLink,
+    renderAuth,
+    renderSecurity
+} from "./auth.js";
 import { CatalogApi } from "./api.js";
 import { homeBanlistHtml, startCountdowns } from "./banlist.js";
 import { installCart, renderCart } from "./cart-page.js";
@@ -18,6 +26,7 @@ import {
 import { TYPE_FILTERS, typeFiltersHtml, typeParams } from "./card-types.js";
 import { BACK_TO_TOP_PX, CATALOG, HOVER_PREVIEW } from "./config.js";
 import { escapeHtml } from "./html.js";
+import { cardMeta, tabMeta } from "./page-meta.js";
 import { priceChartHtml, priceSummary } from "./price-chart.js";
 import { installProfile, renderProfile } from "./profile.js";
 import { readJson, writeJson } from "./storage.js";
@@ -201,6 +210,7 @@ window.addEventListener("popstate", () => {
 // Closing the card returns to the list entry the card was opened from.
 new MutationObserver(() => {
     if (element("md").classList.contains("on")) return;
+    tabMeta(window.tab);
     if (closingFromHistory) {
         closingFromHistory = false;
         return;
@@ -311,6 +321,7 @@ function renderResults(data) {
 }
 
 let lastData = null;
+let lastSearch = "";
 
 async function loadCards(reset = false) {
     clearTimeout(timer);
@@ -355,8 +366,12 @@ async function loadCards(reset = false) {
             { signal: controller.signal }
         );
         if (current !== generation || isCommerce()) return;
+        // A search counts once per different text, not on every page of results.
+        const query = element("q").value.trim();
+        if (query && query !== lastSearch) track("busqueda");
+        lastSearch = query;
         if (home) {
-            element("home").innerHTML = `${homeHtml(data)}<div id="home-banlist"></div>`;
+            element("home").innerHTML = `${homeHtml(data, { signedIn: Boolean(currentUser()) })}<div id="home-banlist"></div>`;
             loadHomeBanlist();
         } else {
             lastData = data;
@@ -397,6 +412,10 @@ window.refreshList = function () {
 };
 
 window.showTab = function () {
+    if (!openCardId()) {
+        tabMeta(window.tab);
+        trackPage(`tab:${window.tab}`);
+    }
     ++generation;
     controller?.abort();
     clearTimeout(timer);
@@ -467,6 +486,8 @@ async function openCard(id, { push = true } = {}) {
         )
             return;
         detail = card;
+        cardMeta(card.name);
+        track("carta");
         printingPage = printings;
         selectedPrinting = "";
         renderDetail();
@@ -739,6 +760,10 @@ installAuth({
 });
 installAccountMenu();
 installAdmin();
+// The home page's call to action depends on whether someone is signed in.
+document.addEventListener("cm:account", () => {
+    if (window.tab === "Inicio") window.refreshList();
+});
 loadAccount();
 const initial = readUrl();
 applyUrl(initial);

@@ -205,7 +205,7 @@ export function previewHtml(card) {
     const image = assetUrl(card.image?.url || card.image?.thumbnail_url);
     return `${
         image
-            ? `<img src="${h(image)}" alt="" width="200" height="292">`
+            ? `<img src="${h(image)}" alt="${h(card.name)}" width="200" height="292">`
             : '<div class="catalog-image-fallback preview-fallback">Sin imagen verificada</div>'
     }<div class="preview-body"><b>${badgeHtml(card.market_banlist)}${h(card.name)}</b>${
         image && provisional(card.image)
@@ -226,8 +226,13 @@ export function previewHtml(card) {
     }</div>`;
 }
 
-export function homeHtml(data) {
-    return `<section class="hero2 gl"><h2>Tu catálogo de <b>Yu-Gi-Oh!</b></h2><p>Consulta cartas, impresiones y su procedencia. Las ofertas comerciales se administran de forma independiente.</p><button class="btn" data-go="Todas">Explorar cartas</button></section><h3>Cartas del catálogo</h3>${
+export function homeHtml(data, { signedIn = false } = {}) {
+    // The page's one <h1> and its calls to action, visible without scrolling.
+    return `<section class="hero2 gl"><h1>Cartas de <b>Yu-Gi-Oh!</b> para el Mercosur</h1><p>Busca cualquier carta TCG u OCG, compara sus impresiones y rarezas, revisa la banlist y arma tus wantlists con avisos de precio.</p><p class="hero-actions"><button class="btn" data-go="Todas">Explorar cartas</button>${
+        signedIn
+            ? '<button class="ghost" data-go="Wantlists">Mis wantlists</button>'
+            : '<button class="ghost" data-go="Acceso" data-auth-mode="register">Crear cuenta gratis</button>'
+    }</p></section><h2 class="sec-title">Cartas del catálogo</h2>${
         data.items.length
             ? `<div class="grid">${data.items
                   .map(

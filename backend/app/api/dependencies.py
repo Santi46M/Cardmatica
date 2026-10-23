@@ -23,6 +23,15 @@ def is_https(request: Request) -> bool:
     return request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
 
 
+def site_url(request: Request) -> str:
+    """The site's public address: PUBLIC_BASE_URL, or the one this request came to."""
+    configured = get_settings().public_base_url.rstrip("/")
+    if configured:
+        return configured
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host", "localhost")
+    return f"{'https' if is_https(request) else 'http'}://{host}"
+
+
 def same_origin(request: Request):
     """Refuse a change sent from another site (checked before any cookie is used)."""
     origin = request.headers.get("origin") or request.headers.get("referer")

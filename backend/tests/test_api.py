@@ -173,7 +173,11 @@ def test_card_page_title_legal_pages_and_404(client, factory, record):
     page = client.get(f"/carta/{card_id}/synthetic-test-dragon")
     assert page.status_code == 200
     assert "<title>Synthetic Test Dragon · Cartas sueltas · Cardmática</title>" in page.text
-    assert f'rel="canonical" href="/carta/{card_id}"' in page.text
+    assert f'rel="canonical" href="http://testserver/carta/{card_id}"' in page.text
+    assert (
+        'property="og:image" content="http://testserver/frontend/assets/og-image.png"' in page.text
+    )
+    assert 'property="og:title" content="Synthetic Test Dragon · Cartas sueltas' in page.text
     assert client.get("/terminos").status_code == 200
     assert "Borrador" in client.get("/privacidad").text
     html = {"Accept": "text/html"}
@@ -183,4 +187,12 @@ def test_card_page_title_legal_pages_and_404(client, factory, record):
     assert "no existe" in client.get("/no-existe/aqui", headers=html).text
     # The API keeps answering JSON.
     assert client.get("/api/v1/nada", headers=html).json()["error"]["code"] == "http_error"
-    assert client.get("/robots.txt").text.startswith("User-agent")
+    robots = client.get("/robots.txt").text
+    assert robots.startswith("User-agent") and "Sitemap: http://testserver/sitemap.xml" in robots
+    sitemap = client.get("/sitemap.xml")
+    assert sitemap.headers["content-type"].startswith("application/xml")
+    assert f"<loc>http://testserver/carta/{card_id}</loc>" in sitemap.text
+    assert "<loc>http://testserver/privacidad</loc>" in sitemap.text
+    assert client.get("/favicon.ico").status_code == 200
+    legal = client.get("/terminos").text
+    assert '<link rel="canonical" href="http://testserver/terminos">' in legal
