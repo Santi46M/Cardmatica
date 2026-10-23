@@ -84,5 +84,8 @@ jobs:
       - run: pip install -c requirements.lock -e ".[dev]"
       - name: Migraciones
         run: alembic upgrade head
+      # The models and the migrations must describe the same tables.
+      - name: Modelos y migraciones coinciden
+        run: alembic check
       - name: Pruebas contra PostgreSQL
         run: python -m pytest -q

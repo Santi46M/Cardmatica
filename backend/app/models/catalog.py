@@ -46,7 +46,7 @@ class Card(Entity, Base):
     # stored so the catalogue can filter and sort by them with an index.
     monster_frame: Mapped[str | None] = mapped_column(String(20))
     is_pendulum: Mapped[bool] = mapped_column(Boolean, default=False)
-    monster_abilities: Mapped[list] = mapped_column(JSON, default=list)
+    monster_abilities: Mapped[list | None] = mapped_column(JSON, default=list)
     monster_race: Mapped[str | None] = mapped_column(String(40))
     card_property: Mapped[str | None] = mapped_column(String(20))
     names: Mapped[list["CardName"]] = relationship(
