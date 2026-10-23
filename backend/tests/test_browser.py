@@ -448,3 +448,41 @@ def test_type_filters_follow_the_tab(live_server, browser_page):
     expect(page.locator("#f-property option", has_text="Juego rápido")).to_have_count(1)
     expect(page.locator("#f-frame")).to_have_count(0)
     assert not errors
+
+
+def test_register_sign_out_and_sign_in_from_the_account_menu(live_server, browser_page):
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(live_server)
+    page.locator("#account-button").click()
+    expect(page.locator("#account-menu")).to_contain_text("Invitado")
+    page.locator('#account-menu [data-auth-mode="register"]').click()
+    expect(page.locator("#auth-register")).to_be_visible()
+    page.locator("#auth-name").fill("Martín")
+    page.locator("#auth-email").fill("martin@example.com")
+    page.locator("#auth-password").fill("una frase larga de prueba")
+    page.locator("#auth-register button[type=submit]").click()
+    expect(page.locator("#authv [data-auth-error]")).to_contain_text("términos")
+    page.locator("#auth-terms").check()
+    page.locator("#auth-register button[type=submit]").click()
+    expect(page.locator("#ts")).to_contain_text("Cuenta creada")
+    expect(page.locator("#account-button")).to_have_text("M")
+    page.reload()
+    expect(page.locator("#account-button")).to_have_text("M")
+    page.locator("#account-button").click()
+    page.locator('#account-menu [data-go="Seguridad"]').click()
+    expect(page.locator("#auth-sessions")).to_contain_text("(esta)")
+    page.locator("#account-button").click()
+    page.locator("#account-menu [data-auth-logout]").click()
+    expect(page.locator("#ts")).to_contain_text("Sesión cerrada")
+    page.locator("#account-button").click()
+    page.locator('#account-menu [data-auth-mode="login"]').click()
+    page.locator("#auth-email").fill("martin@example.com")
+    page.locator("#auth-password").fill("equivocada")
+    page.locator("#auth-login button[type=submit]").click()
+    expect(page.locator("#authv [data-auth-error]")).to_contain_text("incorrectos")
+    page.locator("#auth-password").fill("una frase larga de prueba")
+    page.locator("#auth-login button[type=submit]").click()
+    expect(page.locator("#ts")).to_contain_text("Hola, Martín")
+    assert not errors

@@ -36,6 +36,15 @@ class Settings(BaseSettings):
     # Host names the site answers to. "*" accepts any; set the real domain in
     # production, e.g. ["cardmatica.com", "www.cardmatica.com"].
     allowed_hosts: list[str] = ["*"]
+    # Accounts (app/services/accounts.py).
+    # Days a "remember me" session lasts; without it, hours.
+    session_days: int = Field(default=30, ge=1, le=365)
+    session_short_hours: int = Field(default=12, ge=1, le=72)
+    # Failed logins in a row before the account locks, and for how long.
+    login_max_failures: int = Field(default=5, ge=3, le=20)
+    login_lock_minutes: int = Field(default=15, ge=1, le=1440)
+    # Login and registration attempts allowed per IP address per minute.
+    auth_attempts_per_minute: int = Field(default=10, ge=1, le=120)
 
     @property
     def local_image_preview(self) -> bool:

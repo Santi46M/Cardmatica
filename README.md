@@ -301,7 +301,12 @@ de demostración.
 Endpoints principales:
 
 - `GET /api/v1/cards`: q, market, card_type, subtype, rarity, set_id,
-  archetype_id, product_type, language, sort, page, page_size.
+  archetype_id, product_type, language, sort, page, page_size, y los niveles de
+  tipo: frame (Normal, Effect, Ritual, Fusion, Synchro, Xyz, Link o Pendulum),
+  ability (Tuner, Flip, Gemini, Spirit, Toon, Union), race, attribute, level
+  (nivel, rango o link) y property (tipo de magia o trampa). Ver
+  `backend/app/services/card_types.py`.
+- `GET /api/v1/facets`: rarezas, orígenes y la taxonomía de tipos ordenada.
 - `GET /api/v1/cards/{uuid}`; `/printings`; `/errata`; `/price-history`
   (market, printing_id, days). La ficha incluye `banlist_status` por formato.
 - `GET /api/v1/banlists`: lista vigente por formato, recuentos y fuente.
@@ -312,6 +317,20 @@ Endpoints principales:
   `POST /api/v1/admin/sync-jobs/{uuid}/resume`, `/errors` y `/admin/conflicts`.
 - `POST /api/v1/admin/price-observations`: registra una venta completada.
 - `GET /health/live` y `/health/ready`.
+
+Cuentas (`/api/v1/auth`): `POST /register`, `/login`, `/logout`, `/password`,
+`/sessions/end-others`; `GET /me` y `/sessions`. La sesión viaja en la cookie
+`cm_session` (HttpOnly, SameSite=Lax, Secure en HTTPS) y la base guarda solo el
+hash del token. Los cambios exigen la cabecera `X-CSRF-Token` con el valor de la
+cookie `cm_csrf` y se rechazan si llegan de otro sitio. Contraseñas con scrypt;
+bloqueo temporal tras `LOGIN_MAX_FAILURES` intentos y límite por IP
+(`AUTH_ATTEMPTS_PER_MINUTE`, en memoria: válido para un solo proceso). Falta el
+envío de correos (confirmación de cuenta y recuperación de contraseña).
+
+Todas las respuestas llevan Content-Security-Policy estricta (solo recursos del
+propio sitio), `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` y,
+en producción bajo HTTPS, HSTS (`backend/app/core/security.py`). En producción,
+definir `ALLOWED_HOSTS` con el dominio real.
 
 Administración exige `Authorization: Bearer ADMIN_TOKEN` de al menos 32 caracteres.
 Sin token configurado, queda deshabilitada. La API solo encola; no ejecuta scraping
@@ -324,6 +343,10 @@ y precios no se deducen del catálogo externo; por ello el catálogo ordena por 
 o actualización, mientras el comercio original conserva su orden por precio.
 
 ## Pruebas
+
+GitHub Actions (`.github/workflows/tests.yml`) corre en cada pull request y en
+cada cambio a main: ruff, todas las pruebas con navegador sobre SQLite, y las
+migraciones más las pruebas contra PostgreSQL 17.
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest backend/tests -q

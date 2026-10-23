@@ -1,4 +1,5 @@
 import { installAccountMenu } from "./account-menu.js";
+import { installAuth, loadAccount, renderAuth, renderSecurity } from "./auth.js";
 import { CatalogApi } from "./api.js";
 import { homeBanlistHtml, startCountdowns } from "./banlist.js";
 import { installCart, renderCart } from "./cart-page.js";
@@ -46,8 +47,20 @@ const wanted = {};
 const cardTypes = { Monstruo: "Monster", Magia: "Spell", Trampa: "Trap" };
 const isCommerce = () => ["Productos", "Vendedores"].includes(window.tab);
 // Panels stored in this browser only; they never query the catalogue list.
-const localPanels = { Wantlists: "wlv", Perfil: "pfv", Carrito: "cartv" };
-const renderLocal = { Wantlists: renderWantlists, Perfil: renderProfile, Carrito: renderCart };
+const localPanels = {
+    Wantlists: "wlv",
+    Perfil: "pfv",
+    Carrito: "cartv",
+    Acceso: "authv",
+    Seguridad: "secv"
+};
+const renderLocal = {
+    Wantlists: renderWantlists,
+    Perfil: renderProfile,
+    Carrito: renderCart,
+    Acceso: renderAuth,
+    Seguridad: renderSecurity
+};
 const isLocal = () => window.tab in localPanels;
 const isCatalog = () => !isCommerce() && !isLocal() && window.tab !== "Inicio";
 const SORTS =
@@ -110,8 +123,8 @@ function readUrl() {
 }
 
 function applyUrl(state) {
-    // Profile and cart open from the account menu and the cart popup, not from a tab.
-    const tabs = [...window.TABS, "Perfil", "Carrito"];
+    // Profile, cart and account panels open from menus and popups, not from a tab.
+    const tabs = [...window.TABS, ...Object.keys(localPanels)];
     window.tab = tabs.includes(state.tab) ? state.tab : "Inicio";
     if (["TCG", "OCG"].includes(state.mk)) window.market = state.mk;
     element("q").value = state.q;
@@ -708,7 +721,16 @@ document.addEventListener("cm:view", (event) => {
         if (lastData) renderResults(lastData);
     }
 });
+installAuth({
+    panel: (tab) => (window.tab === tab ? element(localPanels[tab]) : null),
+    go: (tab) => {
+        window.tab = tab;
+        window.showTab();
+        window.scrollTo(0, 0);
+    }
+});
 installAccountMenu();
+loadAccount();
 const initial = readUrl();
 applyUrl(initial);
 window.updateMarketButtons();

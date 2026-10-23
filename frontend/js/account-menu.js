@@ -2,6 +2,7 @@
 // style of Cardmarket and TCGplayer. Entries that already work open their
 // panel; the rest show what is coming next (see the roadmap) and are disabled.
 import { escapeHtml } from "./html.js";
+import { currentUser } from "./auth.js";
 import { currentProfile, ROLE_LABELS } from "./profile.js";
 import { countItems } from "./wantlists.js";
 
@@ -38,7 +39,7 @@ const SECTIONS = [
         [
             ["Pagos y saldo", null],
             ["Direcciones y envíos", null],
-            ["Seguridad e inicio de sesión", null],
+            ["Seguridad e inicio de sesión", "Seguridad"],
             ["Notificaciones por correo", null]
         ]
     ]
@@ -52,8 +53,13 @@ function initials(name) {
 const PERSON_ICON =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>';
 
-function avatarHtml(profile) {
-    const letters = initials(profile?.name);
+// The account name wins over the profile kept in this browser.
+function displayName() {
+    return currentUser()?.display_name || currentProfile()?.name || "";
+}
+
+function avatarHtml() {
+    const letters = initials(displayName());
     return letters ? `<span>${h(letters)}</span>` : PERSON_ICON;
 }
 
@@ -68,22 +74,42 @@ function itemHtml([label, tab, anchor]) {
     }>${h(label)}${badge}</button>`;
 }
 
-function menuHtml() {
+function whoHtml() {
+    const user = currentUser();
     const profile = currentProfile();
-    const role = profile ? ROLE_LABELS[profile.role] : "";
-    const who = profile
-        ? `<b>${h(profile.name)}</b><small>${h(role)}${profile.store ? ` · ${h(profile.store)}` : ""}</small>`
-        : "<b>Invitado</b><small>Completa tu perfil para comprar y vender</small>";
-    return `<div class="acc-who"><span class="acc-avatar big" aria-hidden="true">${avatarHtml(
-        profile
-    )}</span><div>${who}</div></div>${SECTIONS.map(
+    if (user)
+        return `<b>${h(user.display_name)}</b><small>${h(user.email)}${
+            profile?.store ? ` · ${h(profile.store)}` : ""
+        }</small>`;
+    // Without an account, the profile kept in this browser still names the person.
+    if (profile)
+        return `<b>${h(profile.name)}</b><small>${h(ROLE_LABELS[profile.role] || "")}${
+            profile.store ? ` · ${h(profile.store)}` : ""
+        } · sin cuenta</small>`;
+    return "<b>Invitado</b><small>Inicia sesión o crea una cuenta</small>";
+}
+
+// Signed out: the way in comes first. Signed in: the way out comes last.
+function accessHtml() {
+    if (currentUser())
+        return '<div class="acc-section"><button role="menuitem" class="acc-item" data-auth-logout>Cerrar sesión</button></div>';
+    return '<div class="acc-access"><button role="menuitem" class="btn s acc-item-main" data-go="Acceso" data-auth-mode="login">Iniciar sesión</button><button role="menuitem" class="ghost acc-item-main" data-go="Acceso" data-auth-mode="register">Crear cuenta</button></div>';
+}
+
+function menuHtml() {
+    const role = currentProfile() ? ROLE_LABELS[currentProfile().role] : "";
+    return `<div class="acc-who"><span class="acc-avatar big" aria-hidden="true">${avatarHtml()}</span><div>${whoHtml()}${
+        role && currentUser() ? `<small>${h(role)}</small>` : ""
+    }</div></div>${currentUser() ? "" : accessHtml()}${SECTIONS.map(
         ([title, items]) =>
             `<div class="acc-section" role="group" aria-label="${h(title)}"><span class="acc-title">${h(
                 title
             )}</span>${items.map(itemHtml).join("")}</div>`
-    ).join(
-        ""
-    )}<p class="acc-note">Las cuentas todavía no existen en el servidor: el perfil y las wantlists se guardan en este navegador.</p>`;
+    ).join("")}${currentUser() ? accessHtml() : ""}<p class="acc-note">${
+        currentUser()
+            ? "El perfil, las wantlists y el carrito todavía se guardan en este navegador; pasarán a tu cuenta en el próximo paso."
+            : "Sin cuenta, el perfil y las wantlists se guardan solo en este navegador."
+    }</p>`;
 }
 
 export function installAccountMenu() {
@@ -96,9 +122,9 @@ export function installAccountMenu() {
     const button = wrap.querySelector("#account-button");
     const menu = wrap.querySelector("#account-menu");
     const refreshAvatar = () => {
-        const profile = currentProfile();
-        button.innerHTML = avatarHtml(profile);
-        button.setAttribute("aria-label", profile ? `Mi cuenta: ${profile.name}` : "Mi cuenta");
+        const name = displayName();
+        button.innerHTML = avatarHtml();
+        button.setAttribute("aria-label", name ? `Mi cuenta: ${name}` : "Mi cuenta");
     };
     const close = (focusButton = false) => {
         if (menu.hidden) return;
@@ -110,7 +136,7 @@ export function installAccountMenu() {
         menu.innerHTML = menuHtml();
         menu.hidden = false;
         button.setAttribute("aria-expanded", "true");
-        menu.querySelector(".acc-item:not([disabled])")?.focus();
+        menu.querySelector("[role=menuitem]:not([disabled])")?.focus();
     };
     refreshAvatar();
     button.addEventListener("click", (event) => {
@@ -121,7 +147,7 @@ export function installAccountMenu() {
     // Entries carry data-go, so the store's click router changes the tab; this
     // only closes the menu and, for "Personalización", scrolls to its section.
     menu.addEventListener("click", (event) => {
-        const item = event.target.closest("[data-go]");
+        const item = event.target.closest("[data-go], [data-auth-logout]");
         if (!item) return;
         const anchor = item.dataset.accScroll;
         close();
@@ -136,10 +162,11 @@ export function installAccountMenu() {
         if (event.key === "Escape") return close(true);
         if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
         event.preventDefault();
-        const items = [...menu.querySelectorAll(".acc-item:not([disabled])")];
+        const items = [...menu.querySelectorAll("[role=menuitem]:not([disabled])")];
         const index = items.indexOf(document.activeElement);
         const next = event.key === "ArrowDown" ? index + 1 : index - 1;
         items.at(next % items.length)?.focus();
     });
     document.addEventListener("cm:profile", refreshAvatar);
+    document.addEventListener("cm:account", refreshAvatar);
 }

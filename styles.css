@@ -1821,3 +1821,98 @@ button.acc-avatar:hover,
 .type-filters {
     display: contents;
 }
+
+/* Acceso y seguridad de la cuenta */
+.auth {
+    max-width: 460px;
+    margin: 0 auto;
+}
+
+.auth-tabs {
+    display: flex;
+    margin-bottom: 10px;
+    border: 1px solid var(--bd);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.auth-tabs button {
+    flex: 1;
+    padding: 9px;
+    border: 0;
+    background: rgba(0, 0, 0, .18);
+    color: var(--mu);
+    cursor: pointer;
+}
+
+.auth-tabs button[aria-selected="true"] {
+    background: rgba(255, 255, 255, .08);
+    color: var(--tx);
+    font-weight: 600;
+}
+
+.fm-stack {
+    display: grid;
+    gap: 12px;
+}
+
+.fm-stack label {
+    display: grid;
+    gap: 4px;
+    color: var(--mu);
+    font-size: 13px;
+}
+
+.fm-stack label.check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.fm-stack input:not([type="checkbox"]) {
+    width: 100%;
+}
+
+.fm-stack small {
+    color: var(--mu);
+}
+
+#secv .pnl + .pnl {
+    margin-top: 12px;
+}
+
+.auth-session-list {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 12px;
+    display: grid;
+    gap: 8px;
+}
+
+.auth-session-list li {
+    display: grid;
+    gap: 2px;
+}
+
+.auth-session-list small {
+    color: var(--mu);
+}
+
+.acc-access {
+    display: grid;
+    gap: 6px;
+    padding: 10px 8px;
+    border-bottom: 1px solid rgba(170, 215, 255, .1);
+}
+
+.acc-item-main {
+    width: 100%;
+}
+
+#secv {
+    max-width: 640px;
+}
+
+#secv .fm-stack .btn {
+    justify-self: start;
+}
