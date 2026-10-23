@@ -29,17 +29,22 @@ procedencia histórica y parsers de importaciones autorizadas, sin consultas aut
 
 ```text
 index.html, styles.css          Página y estilos
-frontend/js/                    Catálogo real: cliente API, vistas, banlist, wantlists, perfil y carrito
+frontend/js/catalog.js          Punto de entrada: pestañas, lista, ficha, dirección de la página
+frontend/js/catalog-view.js     HTML de la lista, la cuadrícula y la ficha de carta
+frontend/js/card-types.js       Tipos de carta por niveles, en español, y sus filtros
+frontend/js/auth.js, account-menu.js, profile.js, wantlists.js   Cuenta y sus datos
+frontend/js/admin.js            Panel de administración
 frontend/js/config.js           Valores ajustables del frontend (paginación, tiempos, cachés)
+frontend/pages/, assets/        Páginas legales y 404; íconos e imagen Open Graph
 frontend/demo/data.js           Datos inventados de la tienda demo (vendedores, productos, monedas, envío)
 frontend/demo/store.js          Tienda demo y piezas compartidas (pestañas, moneda, ventanas, carrito)
-backend/app/core/               Configuración y logging JSON
-backend/app/models/             Catálogo, procedencia y mantenimiento
+backend/app/core/               Configuración, logging JSON, cabeceras de seguridad y caché
+backend/app/models/             Catálogo, procedencia, cuentas, wantlists y estadísticas
 backend/app/repositories/       SQL paginado y upserts
-backend/app/services/           Reconciliación, precedencia, consultas e imágenes
+backend/app/services/           Reconciliación, tipos de carta, cuentas, correo, precios e imágenes
 backend/app/integrations/       HTTP respetuoso, YGOPRODeck y Yugipedia
 backend/app/ingestion/          Normalización, checkpoints y worker
-backend/app/api/                API pública y administración autenticada
+backend/app/api/                Catálogo, cuentas, administración, estadísticas y páginas HTML
 backend/alembic/                Migraciones versionadas
 backend/tests/                  Dominio, HTTP simulado, API y navegador
 ```

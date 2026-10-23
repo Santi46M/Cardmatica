@@ -101,7 +101,7 @@ element("cnt").before(viewToggle);
 function renderViewToggle() {
     viewToggle.innerHTML = [
         ["list", "Lista"],
-        ["grid", "Grilla"]
+        ["grid", "Cuadrícula"]
     ]
         .map(
             ([value, label]) =>
