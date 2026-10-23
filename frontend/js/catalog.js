@@ -5,13 +5,14 @@ import {
     catalogGrid,
     catalogRows,
     detailHtml,
-    escapeHtml,
     homeHtml,
     pager,
     previewHtml,
     skeletonRows,
     skeletonTiles
 } from "./catalog-view.js";
+import { BACK_TO_TOP_PX, CATALOG, HOVER_PREVIEW } from "./config.js";
+import { escapeHtml } from "./html.js";
 import { priceChartHtml } from "./price-chart.js";
 import { installProfile, renderProfile } from "./profile.js";
 import { readJson, writeJson } from "./storage.js";
@@ -20,8 +21,8 @@ import { installWantlists, refreshAlerts, renderWantlists } from "./wantlists.js
 const api = new CatalogApi();
 const h = escapeHtml;
 const element = (id) => document.getElementById(id);
-const commerceList = window.list;
-const commerceInit = window.init;
+const demoRefreshList = window.refreshList;
+const demoShowTab = window.showTab;
 let page = 1;
 let pendingPage = null;
 let generation = 0;
@@ -108,7 +109,7 @@ function readUrl() {
 function applyUrl(state) {
     const tabs = [...window.TABS, "Carrito"];
     window.tab = tabs.includes(state.tab) ? state.tab : "Inicio";
-    if (["TCG", "OCG"].includes(state.mk)) window.mk = state.mk;
+    if (["TCG", "OCG"].includes(state.mk)) window.market = state.mk;
     element("q").value = state.q;
     Object.assign(wanted, { sub: state.sub, rar: state.rar, stp: state.stp, srt: state.srt });
     pendingPage = state.page;
@@ -135,7 +136,7 @@ function openCardId() {
 function writeUrl(mode = "replace") {
     const params = new URLSearchParams();
     if (window.tab !== "Inicio") params.set("tab", window.tab);
-    if (window.mk !== "TCG") params.set("mk", window.mk);
+    if (window.market !== "TCG") params.set("mk", window.market);
     const q = element("q").value.trim();
     if (q) params.set("q", q);
     if (isCatalog()) {
@@ -156,12 +157,12 @@ function writeUrl(mode = "replace") {
 window.addEventListener("popstate", () => {
     const state = readUrl();
     applyUrl(state);
-    window.seg();
+    window.updateMarketButtons();
     if (!state.card && openCardId()) {
         closingFromHistory = true;
         element("md").classList.remove("on");
     }
-    window.init();
+    window.showTab();
     if (state.card && openCardId() !== state.card) openCard(state.card, { push: false });
 });
 
@@ -198,7 +199,7 @@ async function loadFacets() {
 
 function renderDetail() {
     element("mb").innerHTML = detailHtml(detail, printingPage, selectedPrinting, {
-        market: window.mk
+        market: window.market
     });
     renderChart();
 }
@@ -213,7 +214,7 @@ async function loadHomeBanlist() {
     const slot = element("home-banlist");
     if (!slot) return;
     try {
-        slot.innerHTML = homeBanlistHtml(await api.get("banlists"), window.mk);
+        slot.innerHTML = homeBanlistHtml(await api.get("banlists"), window.market);
         startCountdowns();
     } catch (error) {
         slot.innerHTML = `<p class="catalog-status" role="alert">No se pudo cargar la banlist: ${h(
@@ -255,10 +256,10 @@ let lastData = null;
 
 async function loadCards(reset = false) {
     clearTimeout(timer);
-    if (isCommerce()) return commerceList();
+    if (isCommerce()) return demoRefreshList();
     if ((window.tab === "Inicio" || isLocal()) && element("q").value.trim()) {
         window.tab = "Todas";
-        return window.init();
+        return window.showTab();
     }
     if (isLocal()) return;
     if (reset) page = pendingPage || 1;
@@ -270,7 +271,10 @@ async function loadCards(reset = false) {
     status("Consultando catálogo…", { quiet: true });
     element(home ? "home" : "cat").setAttribute("aria-busy", "true");
     // Cached answers arrive at once; only slower ones show placeholders.
-    const skeleton = setTimeout(() => current === generation && showSkeleton(home), 120);
+    const skeleton = setTimeout(
+        () => current === generation && showSkeleton(home),
+        CATALOG.skeletonDelayMs
+    );
     try {
         await loadFacets();
         applyWanted();
@@ -279,8 +283,8 @@ async function loadCards(reset = false) {
             "cards",
             {
                 page: home ? 1 : page,
-                page_size: home ? 8 : 24,
-                market: window.mk,
+                page_size: home ? CATALOG.homeSize : CATALOG.pageSize,
+                market: window.market,
                 q: element("q").value.trim(),
                 card_type: cardTypes[window.tab],
                 subtype: home ? undefined : element("sub").value,
@@ -326,19 +330,19 @@ async function loadCards(reset = false) {
     }
 }
 
-window.list = function () {
-    if (isCommerce()) return commerceList();
+window.refreshList = function () {
+    if (isCommerce()) return demoRefreshList();
     if (isLocal() && !element("q").value.trim()) return;
     clearTimeout(timer);
-    timer = setTimeout(() => loadCards(true), 250);
+    timer = setTimeout(() => loadCards(true), CATALOG.searchDelayMs);
 };
 
-window.init = function () {
+window.showTab = function () {
     ++generation;
     controller?.abort();
     clearTimeout(timer);
     try {
-        localStorage.setItem("cm_market", window.mk);
+        localStorage.setItem("cm_market", window.market);
     } catch {
         /* Preference is optional. */
     }
@@ -347,12 +351,12 @@ window.init = function () {
     if (isCommerce()) {
         status("");
         writeUrl();
-        return commerceInit();
+        return demoShowTab();
     }
     element("tabs").innerHTML = window.TABS.map(
         (tab) =>
             `<button aria-pressed="${tab === window.tab}" data-g="${h(tab)}">${h(
-                window.TN[tab]
+                window.TAB_LABELS[tab]
             )}</button>`
     ).join("");
     const panel = localPanels[window.tab] || (window.tab === "Inicio" ? "home" : "cat");
@@ -383,19 +387,19 @@ async function openCard(id, { push = true } = {}) {
     element("md").dataset.catalogId = id;
     element("mb").innerHTML =
         '<div class="top"><h2>Cargando ficha…</h2><button class="ghost" data-close="md">Cerrar</button></div>';
-    window.pad();
+    window.alignDialogs();
     element("md").classList.add("on");
     hidePreview();
     writeUrl(push ? "push" : "replace");
     try {
         priceHistory = undefined;
-        const market = window.mk;
+        const market = window.market;
         const history = api
-            .get(`cards/${id}/price-history`, { market, days: 3650 })
+            .get(`cards/${id}/price-history`, { market, days: CATALOG.historyDays })
             .catch(() => null);
         const [card, printings] = await Promise.all([
             api.get(`cards/${id}`),
-            api.get(`cards/${id}/printings`, { page: 1, page_size: 24, market })
+            api.get(`cards/${id}/printings`, { page: 1, page_size: CATALOG.pageSize, market })
         ]);
         if (
             current !== detailGeneration ||
@@ -458,8 +462,8 @@ document.addEventListener(
             try {
                 const data = await api.get(`cards/${detail.id}/printings`, {
                     page: Number(target.dataset.printingPage),
-                    page_size: 24,
-                    market: window.mk
+                    page_size: CATALOG.pageSize,
+                    market: window.market
                 });
                 if (current !== detailGeneration || element("md").dataset.mode !== "catalog")
                     return;
@@ -475,6 +479,12 @@ document.addEventListener(
     },
     true
 );
+
+// Search box and list filters. The demo store's product list also reads the
+// search box, so this goes through window.refreshList for every tab.
+element("q").addEventListener("input", () => window.refreshList());
+for (const id of ["sub", "rar", "stp", "srt"])
+    element(id).addEventListener("change", () => window.refreshList());
 
 document.addEventListener("change", (event) => {
     if (event.target.id === "catalog-printing" && detail) {
@@ -518,9 +528,15 @@ function hidePreview() {
 
 function placePreview(x, y) {
     const box = preview.getBoundingClientRect();
-    const left = x + 24 + box.width > window.innerWidth - 12 ? x - box.width - 24 : x + 24;
-    const top = Math.min(Math.max(12, y - box.height / 2), window.innerHeight - box.height - 12);
-    preview.style.left = `${Math.max(12, left)}px`;
+    const { offsetPx, marginPx } = HOVER_PREVIEW;
+    // Prefer the right of the pointer; flip to the left near the window edge.
+    const fitsRight = x + offsetPx + box.width <= window.innerWidth - marginPx;
+    const left = fitsRight ? x + offsetPx : x - box.width - offsetPx;
+    const top = Math.min(
+        Math.max(marginPx, y - box.height / 2),
+        window.innerHeight - box.height - marginPx
+    );
+    preview.style.left = `${Math.max(marginPx, left)}px`;
     preview.style.top = `${top}px`;
 }
 
@@ -535,7 +551,7 @@ document.addEventListener("pointerover", (event) => {
         preview.innerHTML = previewHtml(card);
         preview.hidden = false;
         placePreview(event.clientX, event.clientY);
-    }, 250);
+    }, HOVER_PREVIEW.delayMs);
 });
 document.addEventListener("pointermove", (event) => {
     if (!preview.hidden && previewTarget) placePreview(event.clientX, event.clientY);
@@ -578,13 +594,12 @@ toTop.addEventListener("click", () => {
 window.addEventListener(
     "scroll",
     () => {
-        // After one screen (or 600 px on tall screens) the button earns its place.
-        toTop.hidden = window.scrollY < Math.min(600, window.innerHeight);
+        toTop.hidden = window.scrollY < Math.min(BACK_TO_TOP_PX, window.innerHeight);
     },
     { passive: true }
 );
 
-// ---- Local panels and the demo storefront -------------------------------------
+// ---- Local panels and the demo store ------------------------------------------
 
 installWantlists({
     api,
@@ -599,7 +614,7 @@ installCart({
     panel: () => element("cartv"),
     open: () => {
         window.tab = "Carrito";
-        window.init();
+        window.showTab();
         window.scrollTo(0, 0);
     }
 });
@@ -619,7 +634,7 @@ document.addEventListener(
     true
 );
 
-for (const name of ["detail", "vendor", "popen", "showCart"]) {
+for (const name of ["openDemoCard", "openSeller", "openProduct", "showCart"]) {
     const original = window[name];
     window[name] = function (...args) {
         const result = original(...args);
@@ -631,21 +646,21 @@ for (const name of ["detail", "vendor", "popen", "showCart"]) {
         return result;
     };
 }
-window.TN.Productos = "Productos (demo)";
-window.TN.Vendedores = "Vendedores (demo)";
+window.TAB_LABELS.Productos = "Productos (demo)";
+window.TAB_LABELS.Vendedores = "Vendedores (demo)";
 // The cart page opens from the cart popup, so it has no tab of its own.
 for (const name of ["Wantlists", "Perfil"]) if (!window.TABS.includes(name)) window.TABS.push(name);
-window.TN.Wantlists = "Wantlists";
-window.TN.Perfil = "Perfil";
+window.TAB_LABELS.Wantlists = "Wantlists";
+window.TAB_LABELS.Perfil = "Perfil";
 try {
     const market = localStorage.getItem("cm_market");
-    if (["TCG", "OCG"].includes(market)) window.mk = market;
+    if (["TCG", "OCG"].includes(market)) window.market = market;
 } catch {
     /* Storage can be disabled by the browser. */
 }
 const initial = readUrl();
 applyUrl(initial);
-window.seg();
-window.init();
+window.updateMarketButtons();
+window.showTab();
 if (initial.card) openCard(initial.card, { push: false });
 refreshAlerts();

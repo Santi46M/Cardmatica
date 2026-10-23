@@ -33,17 +33,21 @@ class CatalogRepository:
         language="es",
     ):
         query = select(Card)
-        conditions = [CardPrinting.card_id == Card.id]
+        printing_filters = []
         if market:
-            conditions.append(CardPrinting.market == market)
+            printing_filters.append(CardPrinting.market == market)
         if rarity:
-            conditions.append(Rarity.name == rarity)
+            printing_filters.append(Rarity.name == rarity)
         if set_id:
-            conditions.append(CardPrinting.set_id == set_id)
+            printing_filters.append(CardPrinting.set_id == set_id)
         if product_type:
-            conditions.append(CardSet.product_type == product_type)
+            printing_filters.append(CardSet.product_type == product_type)
         printing_query = (
-            select(1).select_from(CardPrinting).join(CardSet).join(Rarity).where(*conditions)
+            select(1)
+            .select_from(CardPrinting)
+            .join(CardSet)
+            .join(Rarity)
+            .where(CardPrinting.card_id == Card.id, *printing_filters)
         )
         if market:
             query = query.where(
@@ -57,7 +61,15 @@ class CatalogRepository:
                 )
             )
         if rarity or set_id or product_type:
-            query = query.where(exists(printing_query))
+            # Evaluated once for the whole query. A per-card EXISTS made the planner
+            # walk every printing of a common rarity for each card (seconds, not ms).
+            matching_cards = (
+                select(CardPrinting.card_id)
+                .join(CardSet)
+                .join(Rarity)
+                .where(*printing_filters)
+            )
+            query = query.where(Card.id.in_(matching_cards))
         if card_type:
             query = query.where(Card.card_type == card_type)
         if subtype:

@@ -1,11 +1,7 @@
-import { formatDate, money, toEuro } from "./storage.js";
+import { escapeHtml } from "./html.js";
+import { formatDate, money, toEuro } from "./format.js";
 
-const h = (value) =>
-    String(value ?? "").replace(
-        /[&<>"']/g,
-        (character) =>
-            ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character])
-    );
+const h = escapeHtml;
 
 export const RANGES = [
     ["1M", 30],
@@ -87,7 +83,7 @@ export function priceChartHtml(history, { printingId = "", days = 365 } = {}) {
             value
         )}" stroke="rgba(170,215,255,.15)"/><text x="${left - 6}" y="${
             y(value) + 4
-        }" text-anchor="end" font-size="11" fill="#9db0c6">${h(window.eur(value))}</text>`;
+        }" text-anchor="end" font-size="11" fill="#9db0c6">${h(window.formatPrice(value))}</text>`;
     }
     svg += `<text x="${left}" y="${height - 5}" font-size="11" fill="#9db0c6">${h(
         formatDate(start)
@@ -144,10 +140,10 @@ export function priceChartHtml(history, { printingId = "", days = 365 } = {}) {
         last,
         !printingId
     )}<div><small>Media del periodo</small><b>${h(
-        window.eur(values.reduce((sum, value) => sum + value, 0) / values.length)
+        window.formatPrice(values.reduce((sum, value) => sum + value, 0) / values.length)
     )}</b><small>${points.length} ${points.length === 1 ? "venta" : "ventas"}</small></div><div><small>Mínimo / máximo</small><b>${h(
-        window.eur(Math.min(...values))
-    )} / ${h(window.eur(Math.max(...values)))}</b></div><div><small>Variación</small><b class="${
+        window.formatPrice(Math.min(...values))
+    )} / ${h(window.formatPrice(Math.max(...values)))}</b></div><div><small>Variación</small><b class="${
         change >= 0 ? "up" : "down"
     }">${change >= 0 ? "+" : ""}${change.toFixed(1)}%</b></div></div><small class="catalog-status">Ventas completadas en Cardmática, convertidas a la moneda elegida con tipos de cambio aproximados.</small>`;
 }

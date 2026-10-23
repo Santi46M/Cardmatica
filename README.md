@@ -28,8 +28,11 @@ procedencia histórica y parsers de importaciones autorizadas, sin consultas aut
 ## Organización
 
 ```text
-index.html, styles.css, script.js  Interfaz y comercio original
-frontend/js/                    Cliente API, vistas y adaptador del catálogo
+index.html, styles.css          Página y estilos
+frontend/js/                    Catálogo real: cliente API, vistas, banlist, wantlists, perfil y carrito
+frontend/js/config.js           Valores ajustables del frontend (paginación, tiempos, cachés)
+frontend/demo/data.js           Datos inventados de la tienda demo (vendedores, productos, monedas, envío)
+frontend/demo/store.js          Tienda demo y piezas compartidas (pestañas, moneda, ventanas, carrito)
 backend/app/core/               Configuración y logging JSON
 backend/app/models/             Catálogo, procedencia y mantenimiento
 backend/app/repositories/       SQL paginado y upserts

@@ -1,3 +1,5 @@
+import { API_CACHE } from "./config.js";
+
 export class CatalogApi {
     constructor(
         base = document.querySelector('meta[name="cardmatica-api"]')?.content || location.origin
@@ -23,8 +25,9 @@ export class CatalogApi {
         }
         if (!response.ok)
             throw new Error(data.error?.message || "No se pudo consultar el catálogo.");
-        if (this.cache.size >= 100) this.cache.delete(this.cache.keys().next().value);
-        this.cache.set(url.href, { data, expires: Date.now() + 30000 });
+        if (this.cache.size >= API_CACHE.maxEntries)
+            this.cache.delete(this.cache.keys().next().value);
+        this.cache.set(url.href, { data, expires: Date.now() + API_CACHE.ttlMs });
         return data;
     }
 }

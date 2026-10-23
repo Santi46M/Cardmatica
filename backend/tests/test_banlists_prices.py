@@ -133,6 +133,17 @@ def test_price_history_last_sale_and_admin_recording(factory, client, record, se
     # Outside the window the last sale is still reported, as for cards nobody sells now.
     short = client.get(f"/api/v1/cards/{card_id}/price-history", params={"days": 1}).json()
     assert short["points"] == [] and short["last_sale"]["price"] == "12.50"
+    # The light form used by wantlist alerts: only the latest matching sale.
+    light = client.get(
+        f"/api/v1/cards/{card_id}/price-history",
+        params={"points": "false", "language": "EN", "edition": "1st"},
+    ).json()
+    assert light["points"] == [] and light["last_sale"]["price"] == "12.50"
+    other_edition = client.get(
+        f"/api/v1/cards/{card_id}/price-history",
+        params={"points": "false", "edition": "Limited"},
+    ).json()
+    assert other_edition["last_sale"] is None
     other = client.get(f"/api/v1/cards/{card_id}/price-history", params={"market": "OCG"}).json()
     assert other["points"] == [] and other["last_sale"] is None
     # The catalogue list shows the latest sale per card for the market in view.

@@ -107,7 +107,7 @@ def test_existing_product_cart_add_remove_checkout(live_server, browser_page):
     page.locator("#pl tr[data-pd]").first.click()
     button = page.locator("#pt [data-add]").first
     item_id = int(button.get_attribute("data-add"))
-    initial = page.evaluate("id => ITEMS[id].q", item_id)
+    initial = page.evaluate("id => LISTINGS[id].quantity", item_id)
     button.click()
     expect(page.locator("#cc")).to_have_text("1")
     page.locator("#cb").click()
@@ -119,9 +119,33 @@ def test_existing_product_cart_add_remove_checkout(live_server, browser_page):
     page.locator("#cb").click()
     page.locator("#cbx [data-buy]").click()
     expect(page.locator("#cbx")).to_contain_text("Pedido recibido")
-    assert page.evaluate("id => ITEMS[id].q", item_id) == initial - 1
+    assert page.evaluate("id => LISTINGS[id].quantity", item_id) == initial - 1
     assert not errors
 
+
+
+def test_demo_seller_inventory_card_and_currency(live_server, browser_page):
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(live_server)
+    page.locator('[data-g="Vendedores"]').click()
+    expect(page.locator("#vl tr[data-v]")).to_have_count(8)
+    page.locator("#vl tr[data-v]").first.click()
+    expect(page.locator("#mb")).to_contain_text("Comercio de demostración")
+    page.locator("#vk").select_option("Producto")
+    expect(page.locator("#vt [data-pd]").first).to_be_visible()
+    page.locator("#vk").select_option("Monstruo")
+    page.locator("#vt [data-card]").first.click()
+    expect(page.locator("#mb")).to_contain_text("Historial de precio")
+    expect(page.locator("#mb")).to_contain_text("ATK / DEF")
+    page.locator('[data-cr="90"]').click()
+    expect(page.locator('[data-cr="90"]')).to_have_attribute("aria-pressed", "true")
+    page.locator("#cur").select_option("ARS")
+    expect(page.locator("#ot")).to_contain_text("ARS")
+    page.keyboard.press("Escape")
+    expect(page.locator("#md")).not_to_have_class("on")
+    assert not errors
 
 def test_banlist_price_history_wantlists_and_profile(live_server, browser_page, factory):
     """Synthetic list and sales; the bundled official lists are validated elsewhere."""
@@ -226,7 +250,7 @@ def test_cart_page_from_popup(live_server, browser_page):
     page.locator("#pl tr[data-pd]").first.click()
     button = page.locator("#pt [data-add]").first
     item_id = int(button.get_attribute("data-add"))
-    stock = page.evaluate("id => ITEMS[id].q", item_id)
+    stock = page.evaluate("id => LISTINGS[id].quantity", item_id)
     button.click()
     page.keyboard.press("Escape")
     page.locator("#cb").click()
@@ -246,7 +270,7 @@ def test_cart_page_from_popup(live_server, browser_page):
     cart.locator("[data-cart-buy]").click()
     expect(cart).to_contain_text("Pedido recibido")
     expect(page.locator("#cc")).to_have_text("0")
-    assert page.evaluate("id => ITEMS[id].q", item_id) == stock - 1
+    assert page.evaluate("id => LISTINGS[id].quantity", item_id) == stock - 1
     assert not errors
 
 

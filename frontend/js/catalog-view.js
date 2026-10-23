@@ -1,12 +1,7 @@
 import { badgeHtml, banlistSectionHtml, statusFor } from "./banlist.js";
-import { formatDate, money } from "./storage.js";
+import { formatDate, money } from "./format.js";
+import { escapeHtml } from "./html.js";
 
-export const escapeHtml = (value) =>
-    String(value ?? "").replace(
-        /[&<>"']/g,
-        (character) =>
-            ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character])
-    );
 
 const h = escapeHtml;
 const kinds = {

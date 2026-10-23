@@ -11,6 +11,13 @@ TCG/OCG filtra cartas duplicadas de ejemplo; las monedas se guardan en localStor
 Las fichas, precios e historiales originales son ilustrativos. Hay declaraciones
 duplicadas de init, inv, add y showCart y una extensión final de list/init.
 
+Actualización (23 de octubre de 2026): script.js se reescribió como
+frontend/demo/data.js (datos de la demo en tablas con nombre) y
+frontend/demo/store.js (lógica legible, sin duplicados ni código
+inalcanzable). Los nombres globales pasaron a ser descriptivos: LISTINGS,
+SELLERS, PRODUCTS, market, currency, formatPrice, showTab y refreshList. Con
+la misma semilla la demo genera exactamente los mismos datos que antes.
+
 Se conservan los controles, diseño de vidrio, modal, navegación, carrito y flujos
 comerciales anteriores. Un adaptador explícito conecta las vistas del catálogo
 con la API; los UUID del catálogo jamás se interpretan como índices de ITEMS.

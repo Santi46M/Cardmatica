@@ -29,10 +29,22 @@ def point(observation, printing, rarity) -> PricePoint:
 
 
 def price_history(
-    session, card_id, *, market=None, printing_id=None, days=365, now=None
+    session,
+    card_id,
+    *,
+    market=None,
+    printing_id=None,
+    language=None,
+    edition=None,
+    days=365,
+    include_points=True,
+    now=None,
 ) -> PriceHistoryView:
     """Sales recorded on Cardmática. The last sale ignores the window on purpose:
-    a card nobody is selling still shows when and for how much it last sold."""
+    a card nobody is selling still shows when and for how much it last sold.
+
+    Without points the answer is just the latest matching sale, which is all a
+    wantlist price alert needs."""
     now = now or datetime.now(timezone.utc)
     base = (
         select(PriceObservation, CardPrinting, Rarity.name)
@@ -44,14 +56,22 @@ def price_history(
         base = base.where(CardPrinting.market == market)
     if printing_id:
         base = base.where(CardPrinting.id == printing_id)
+    if language:
+        base = base.where(func.lower(CardPrinting.language) == language.lower())
+    if edition:
+        base = base.where(func.lower(CardPrinting.edition) == edition.lower())
     last = session.execute(
         base.order_by(PriceObservation.observed_at.desc(), PriceObservation.id).limit(1)
     ).first()
-    rows = session.execute(
-        base.where(PriceObservation.observed_at >= now - timedelta(days=days))
-        .order_by(PriceObservation.observed_at, PriceObservation.id)
-        .limit(MAX_POINTS)
-    ).all()
+    rows = (
+        session.execute(
+            base.where(PriceObservation.observed_at >= now - timedelta(days=days))
+            .order_by(PriceObservation.observed_at, PriceObservation.id)
+            .limit(MAX_POINTS)
+        ).all()
+        if include_points
+        else []
+    )
     return PriceHistoryView(
         card_id=card_id,
         market=market,

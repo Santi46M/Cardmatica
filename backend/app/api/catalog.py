@@ -121,12 +121,22 @@ def card_price_history(
     session: SessionDep,
     market: Market | None = None,
     printing_id: UUID | None = None,
+    language: Annotated[str | None, Query(min_length=2, max_length=12)] = None,
+    edition: Annotated[str | None, Query(max_length=80)] = None,
     days: Annotated[int, Query(ge=1, le=3650)] = 365,
+    points: bool = True,
 ):
     """Sales completed on Cardmática; never external price guides."""
     require_card_exists(session, card_id)
     return price_history(
-        session, card_id, market=market, printing_id=printing_id, days=days
+        session,
+        card_id,
+        market=market,
+        printing_id=printing_id,
+        language=language,
+        edition=edition,
+        days=days,
+        include_points=points,
     )
 
 

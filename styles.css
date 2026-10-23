@@ -549,13 +549,7 @@ small {
     color: #ffd98a;
 }
 
-/* Secciones y tarjetas */
-.sec {
-    margin: 22px 0 10px;
-    font-size: 18px;
-    font-weight: 600;
-}
-
+/* Tarjetas */
 .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
@@ -576,12 +570,6 @@ small {
 
 .tile:hover {
     filter: brightness(1.15);
-}
-
-.tile.col {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 3px;
 }
 
 .hero2 {

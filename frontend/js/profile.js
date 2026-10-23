@@ -1,12 +1,8 @@
+import { escapeHtml } from "./html.js";
 import { countItems, listCount } from "./wantlists.js";
 import { readJson, writeJson } from "./storage.js";
 
-const h = (value) =>
-    String(value ?? "").replace(
-        /[&<>"']/g,
-        (character) =>
-            ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character])
-    );
+const h = escapeHtml;
 
 const KEY = "cm_profile_v1";
 const ROLES = [

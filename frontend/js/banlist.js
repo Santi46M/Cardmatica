@@ -1,11 +1,8 @@
-import { formatDate } from "./storage.js";
+import { escapeHtml } from "./html.js";
+import { NEXT_BANLIST } from "./config.js";
+import { formatDate } from "./format.js";
 
-const h = (value) =>
-    String(value ?? "").replace(
-        /[&<>"']/g,
-        (character) =>
-            ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character])
-    );
+const h = escapeHtml;
 
 const STATUS = {
     forbidden: { label: "Prohibida", mark: "✕", tone: "forbidden" },
@@ -13,16 +10,6 @@ const STATUS = {
     semi_limited: { label: "Semi-limitada", mark: "2", tone: "semi" },
     unlimited: { label: "Permitida", mark: "✓", tone: "ok" },
     unknown: { label: "Sin estado verificado", mark: "?", tone: "unknown" }
-};
-
-// Konami has not announced the next lists. The OCG regulation has changed every
-// quarter (1 Jan, 1 Apr, 1 Jul, 1 Oct), so its next date is shown as an estimate.
-const NEXT = {
-    OCG: {
-        date: "2027-01-01T00:00:00+09:00",
-        note: "Estimado según el calendario trimestral de la OCG. Konami suele anunciarla unas semanas antes."
-    },
-    TCG: null
 };
 
 function safeUrl(value) {
@@ -94,7 +81,7 @@ export function banlistSectionHtml(card, market) {
 export function homeBanlistHtml(lists, market) {
     const panel = (format) => {
         const current = lists.find((item) => item.format === format);
-        const next = NEXT[format];
+        const next = NEXT_BANLIST[format];
         const url = current && safeUrl(current.source_url);
         const since = current
             ? `<small>Lista vigente desde el ${h(formatDate(current.effective_date))}: ${

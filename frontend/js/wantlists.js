@@ -1,11 +1,9 @@
-import { formatDate, money, newId, readJson, toEuro, writeJson } from "./storage.js";
+import { escapeHtml } from "./html.js";
+import { WANTLIST } from "./config.js";
+import { formatDate, money, toEuro } from "./format.js";
+import { newId, readJson, writeJson } from "./storage.js";
 
-const h = (value) =>
-    String(value ?? "").replace(
-        /[&<>"']/g,
-        (character) =>
-            ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character])
-    );
+const h = escapeHtml;
 
 const KEY = "cm_wantlists_v1";
 export const LANGUAGES = {
@@ -41,7 +39,6 @@ let pendingDelete = null;
 let api = null;
 let alerts = new Map();
 let alertsAnnounced = false;
-const MAX_ALERT_CHECKS = 30;
 
 function save() {
     if (!writeJson(KEY, state))
@@ -112,7 +109,7 @@ export function pickerHtml(card, printings, selectedId, market) {
         EDITIONS,
         "",
         "Cualquier edición"
-    )}</select><label class="qty">Cantidad <input id="wl-quantity" type="number" min="1" max="99" value="1"></label><button class="btn s" data-wl-add>Añadir</button></div>`;
+    )}</select><label class="qty">Cantidad <input id="wl-quantity" type="number" min="1" max="${WANTLIST.maxQuantity}" value="1"></label><button class="btn s" data-wl-add>Añadir</button></div>`;
 }
 
 function addFromForm(card, printings, market) {
@@ -143,7 +140,7 @@ function addFromForm(card, printings, market) {
         rarity: printing?.rarity || null,
         language: document.getElementById("wl-language").value,
         edition: document.getElementById("wl-edition").value,
-        quantity: Math.min(99, Math.max(1, Number(document.getElementById("wl-quantity").value) || 1)),
+        quantity: Math.min(WANTLIST.maxQuantity, Math.max(1, Number(document.getElementById("wl-quantity").value) || 1)),
         addedAt: new Date().toISOString()
     };
     const same = list.items.find(
@@ -153,7 +150,7 @@ function addFromForm(card, printings, market) {
             item.language === entry.language &&
             item.edition === entry.edition
     );
-    if (same) same.quantity = Math.min(99, same.quantity + entry.quantity);
+    if (same) same.quantity = Math.min(WANTLIST.maxQuantity, same.quantity + entry.quantity);
     else list.items.push(entry);
     state.active = list.id;
     save();
@@ -199,7 +196,7 @@ function rowsHtml(list) {
                               : "Cualquier impresión"
                       }</td><td>${h(LANGUAGE_NAMES[item.language] || "Cualquiera")}</td><td>${h(
                           EDITION_NAMES[item.edition] || "Cualquiera"
-                      )}</td><td class="num"><input class="wl-qty" type="number" min="1" max="99" value="${
+                      )}</td><td class="num"><input class="wl-qty" type="number" min="1" max="${WANTLIST.maxQuantity}" value="${
                           item.quantity
                       }" data-wl-qty="${h(item.id)}" aria-label="Cantidad de ${h(
                           item.name
@@ -217,7 +214,7 @@ function rowsHtml(list) {
 
 function alertCell(item) {
     const target = item.alert;
-    const currency = target?.currency || window.cur;
+    const currency = target?.currency || window.currency;
     const hit = alerts.get(item.id);
     return `<label class="wl-alert"><input type="number" min="0" step="0.01" inputmode="decimal" value="${
         target ? h(target.amount) : ""
@@ -251,21 +248,14 @@ function alertsHtml() {
 
 function updateBadge() {
     const count = alerts.size;
-    window.TN.Wantlists = count ? `Wantlists (${count})` : "Wantlists";
+    window.TAB_LABELS.Wantlists = count ? `Wantlists (${count})` : "Wantlists";
     const tab = document.querySelector('#tabs [data-g="Wantlists"]');
-    if (tab) tab.textContent = window.TN.Wantlists;
+    if (tab) tab.textContent = window.TAB_LABELS.Wantlists;
 }
 
 const API_LANGUAGE = Object.fromEntries(
     Object.entries(API_LANGUAGES).map(([code, label]) => [label, code])
 );
-
-function matches(item, point) {
-    if (item.printingId && point.printing_id !== item.printingId) return false;
-    if (item.language && point.language.toLowerCase() !== API_LANGUAGE[item.language]) return false;
-    if (item.edition && point.edition.toLowerCase() !== item.edition.toLowerCase()) return false;
-    return true;
-}
 
 // Checks every item with a target price against its latest matching sale.
 export async function refreshAlerts() {
@@ -273,17 +263,21 @@ export async function refreshAlerts() {
     const items = allItems()
         .map(({ item }) => item)
         .filter((item) => item.alert)
-        .slice(0, MAX_ALERT_CHECKS);
+        .slice(0, WANTLIST.maxAlertChecks);
     const next = new Map();
     await Promise.all(
         items.map(async (item) => {
             try {
+                // The server filters and returns only the latest matching sale.
                 const history = await api.get(`cards/${item.cardId}/price-history`, {
                     market: item.market,
                     printing_id: item.printingId || undefined,
-                    days: 3650
+                    language: item.language ? API_LANGUAGE[item.language] : undefined,
+                    edition: item.edition || undefined,
+                    days: 1,
+                    points: false
                 });
-                const sale = history.points.filter((point) => matches(item, point)).pop();
+                const sale = history.last_sale;
                 if (!sale) return;
                 const price = toEuro(sale.price, sale.currency);
                 const target = toEuro(item.alert.amount, item.alert.currency);
@@ -367,13 +361,13 @@ export function installWantlists({ panel, detail, api: client }) {
                 if (!slot || !current) return;
                 slot.innerHTML = slot.innerHTML
                     ? ""
-                    : pickerHtml(current.card, current.printings, current.selectedId, window.mk);
+                    : pickerHtml(current.card, current.printings, current.selectedId, window.market);
                 slot.querySelector("select")?.focus();
                 return;
             }
             if (target.hasAttribute("data-wl-add")) {
                 const current = detail();
-                if (current && addFromForm(current.card, current.printings, window.mk))
+                if (current && addFromForm(current.card, current.printings, window.market))
                     document.getElementById("wl-picker").innerHTML = "";
                 return;
             }
@@ -425,7 +419,7 @@ export function installWantlists({ panel, detail, api: client }) {
             const list = activeList();
             const item = list?.items.find((entry) => entry.id === event.target.dataset.wlQty);
             if (item) {
-                item.quantity = Math.min(99, Math.max(1, Number(event.target.value) || 1));
+                item.quantity = Math.min(WANTLIST.maxQuantity, Math.max(1, Number(event.target.value) || 1));
                 event.target.value = item.quantity;
                 save();
             }
@@ -441,7 +435,7 @@ export function installWantlists({ panel, detail, api: client }) {
                 } else {
                     item.alert = {
                         amount: Math.round(amount * 100) / 100,
-                        currency: item.alert?.currency || window.cur
+                        currency: item.alert?.currency || window.currency
                     };
                     delete item.seenSaleAt;
                     window.toast?.(

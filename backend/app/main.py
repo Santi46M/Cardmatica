@@ -3,6 +3,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
@@ -22,6 +23,8 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Authorization", "Content-Type"],
 )
+# JSON and the frontend files shrink to about a quarter of their size.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.include_router(catalog.router)
 app.include_router(admin.router)
 
@@ -86,11 +89,6 @@ def index():
 @app.get("/styles.css", include_in_schema=False)
 def styles():
     return FileResponse(ROOT / "styles.css", media_type="text/css")
-
-
-@app.get("/script.js", include_in_schema=False)
-def legacy_script():
-    return FileResponse(ROOT / "script.js", media_type="text/javascript")
 
 
 frontend = ROOT / "frontend"
