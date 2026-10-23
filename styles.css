@@ -1345,3 +1345,73 @@ button:disabled {
 [hidden] {
     display: none !important;
 }
+
+/* Imagen provisional (vista de prueba sin licencia): aviso rojo con explicación */
+.img-wrap {
+    position: relative;
+    display: inline-block;
+    flex: none;
+    max-width: 100%;
+    line-height: 0;
+}
+
+.card-tile .img-wrap {
+    display: block;
+}
+
+.img-warn {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    background: #d93a35;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: 0 0 0 2px rgba(5, 10, 18, .85);
+    cursor: help;
+}
+
+.img-warn.inline {
+    position: static;
+    display: inline-grid;
+    vertical-align: -3px;
+    box-shadow: none;
+}
+
+.img-warn[data-tip]:hover::after,
+.img-warn[data-tip]:focus-visible::after {
+    content: attr(data-tip);
+    position: absolute;
+    top: 22px;
+    left: -6px;
+    width: 240px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(8, 16, 30, .97);
+    border: 1px solid rgba(217, 58, 53, .6);
+    color: var(--tx);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.4;
+    text-align: left;
+    white-space: normal;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
+}
+
+.warn-text {
+    color: #ff9b92 !important;
+}
+
+/* En la tabla el globo se abre al costado para no cortarse en el borde inferior */
+#list .img-warn[data-tip]:hover::after,
+#list .img-warn[data-tip]:focus-visible::after {
+    top: -6px;
+    left: 24px;
+}

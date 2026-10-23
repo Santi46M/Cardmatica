@@ -39,6 +39,22 @@ function assetUrl(value) {
         : null;
 }
 
+// Artwork shown only by the private preview has no commercial licence: mark it
+// so nobody mistakes it for an image that can ship.
+const PROVISIONAL =
+    "Imagen provisional: ilustración sin licencia comercial, visible solo en la vista de prueba privada. No publicar.";
+
+function provisional(image) {
+    return image?.usage_scope === "local_preview_only";
+}
+
+function withWarning(html, image) {
+    if (!provisional(image)) return html;
+    return `<span class="img-wrap">${html}<span class="img-warn" tabindex="0" role="img" aria-label="${h(
+        PROVISIONAL
+    )}" data-tip="${h(PROVISIONAL)}">!</span></span>`;
+}
+
 function imageHtml(image, name, large = false) {
     const url = assetUrl(large ? image?.url : image?.thumbnail_url || image?.url);
     if (!url)
@@ -49,9 +65,14 @@ function imageHtml(image, name, large = false) {
                 ? "Imagen de esta impresión no disponible con asociación y derechos verificados"
                 : "Sin imagen"
         }</div>`;
-    return `<img class="catalog-image ${large ? "large" : ""}" src="${h(url)}" alt="${h(
-        name
-    )}" loading="lazy" decoding="async" width="${large ? 240 : 48}" height="${large ? 350 : 70}">`;
+    return withWarning(
+        `<img class="catalog-image ${large ? "large" : ""}" src="${h(url)}" alt="${h(
+            name
+        )}" loading="lazy" decoding="async" width="${large ? 240 : 48}" height="${
+            large ? 350 : 70
+        }">`,
+        image
+    );
 }
 
 export function pager(data, kind = "catalog") {
@@ -131,7 +152,10 @@ export function catalogRows(data) {
 function gridImage(card) {
     const url = assetUrl(card.image?.url || card.image?.thumbnail_url);
     return url
-        ? `<img class="catalog-image grid" src="${h(url)}" alt="${h(card.name)}" loading="lazy" decoding="async" width="168" height="245">`
+        ? withWarning(
+              `<img class="catalog-image grid" src="${h(url)}" alt="${h(card.name)}" loading="lazy" decoding="async" width="168" height="245">`,
+              card.image
+          )
         : '<div class="catalog-image-fallback grid" role="img" aria-label="Sin imagen verificada">Sin imagen</div>';
 }
 
@@ -182,7 +206,11 @@ export function previewHtml(card) {
         image
             ? `<img src="${h(image)}" alt="" width="200" height="292">`
             : '<div class="catalog-image-fallback preview-fallback">Sin imagen verificada</div>'
-    }<div class="preview-body"><b>${badgeHtml(card.market_banlist)}${h(card.name)}</b><small>${h(
+    }<div class="preview-body"><b>${badgeHtml(card.market_banlist)}${h(card.name)}</b>${
+        image && provisional(card.image)
+            ? '<small class="warn-text"><span class="img-warn inline" aria-hidden="true">!</span> Imagen provisional, sin licencia</small>'
+            : ""
+    }<small>${h(
         cardMeta(card)
     )}</small><small>${card.printing_count} ${
         card.printing_count === 1 ? "impresión" : "impresiones"

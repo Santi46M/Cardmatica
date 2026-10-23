@@ -3,8 +3,9 @@
     // La imagen universal es la predeterminada de Codespaces y ya incluye Docker y Python.
     "name": "Cardmática",
     "image": "mcr.microsoft.com/devcontainers/universal:2",
-    // Genera .env con credenciales aleatorias solo la primera vez.
-    "postCreateCommand": "test -f .env || python3 backend/scripts/init_env.py",
+    // Genera .env con credenciales aleatorias solo la primera vez y activa la vista
+    // provisional de imágenes (sin licencia): mantener el puerto 8000 privado.
+    "postCreateCommand": "(test -f .env || python3 backend/scripts/init_env.py) && python3 backend/scripts/enable_preview_images.py",
     // Cada vez que el entorno arranca: base de datos, migraciones, banlists y API.
     "postStartCommand": "docker compose up --build -d db api",
     "forwardPorts": [8000],

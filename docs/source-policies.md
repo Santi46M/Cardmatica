@@ -96,6 +96,15 @@ Galerías ambiguas, edición/arte desconocidos o metadatos insuficientes se regi
 para revisión. Se descargaron ilustraciones generales de YGOPRODeck para la
 prueba local; no se descargaron ni aprobaron escaneos de Yugipedia.
 
+## Vista provisional de imágenes en desarrollo
+
+`LOCAL_PREVIEW_HOST_SUFFIXES` permite tratar un dominio privado de desarrollo (por ejemplo
+`.app.github.dev` de un Codespace con el puerto privado) igual que localhost para la vista local
+de prueba. Solo funciona con DEPLOYMENT_MODE=local y ALLOW_LOCAL_IMAGE_PREVIEW=true, no concede
+derechos y la interfaz marca cada ilustración así servida con un aviso de imagen provisional.
+`cardmatica preview-images` descarga las ilustraciones generales de las cartas del catálogo con
+el mismo límite de una solicitud por segundo. No habilitarlo en un despliegue público.
+
 ## Banlists
 
 Revisado: 2026-10-23. Las listas incluidas contienen únicamente nombres de cartas y su

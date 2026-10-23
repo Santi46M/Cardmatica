@@ -10,7 +10,7 @@ import pytest
 import uvicorn
 from app.db.session import get_session
 from app.main import app
-from app.models import CardPrinting, PriceObservation
+from app.models import Card, CardArtwork, CardPrinting, PriceObservation
 from app.schemas.ingestion import PrintingInput
 from app.services.banlists import BanlistFile, import_banlist
 from app.services.ingestion import IngestionService
@@ -335,4 +335,43 @@ def test_list_url_state_grid_preview_shortcut_and_price_alerts(
     expect(page.locator("#to-top")).to_be_visible()
     page.locator("#to-top").click()
     expect(page.locator("#to-top")).to_be_hidden()
+    assert not errors
+
+
+def test_provisional_artwork_is_marked_everywhere(
+    live_server, browser_page, factory, settings, monkeypatch
+):
+    """Synthetic image file; marks unlicensed preview artwork with a red warning."""
+    from PIL import Image
+
+    monkeypatch.setattr(settings, "deployment_mode", "local")
+    monkeypatch.setattr(settings, "allow_local_image_preview", True)
+    settings.image_directory.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (59, 86), "teal").save(settings.image_directory / "art.png")
+    with factory.begin() as session:
+        card = session.scalar(select(Card))
+        session.add(
+            CardArtwork(
+                card_id=card.id,
+                source_slug="ygoprodeck",
+                external_id="synthetic-art",
+                source_url="https://images.ygoprodeck.com/images/cards/0.jpg",
+                local_path="art.png",
+                thumbnail_path="art.png",
+            )
+        )
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(f"{live_server}/?tab=Todas")
+    warning = page.locator("#list .img-warn")
+    expect(warning).to_be_visible()
+    expect(warning).to_have_attribute("data-tip", re.compile("provisional.*sin licencia"))
+    expect(page.locator("#list img.catalog-image")).to_have_js_property("complete", True)
+    page.locator("#list [data-preview]").first.hover()
+    expect(page.locator("#card-preview")).to_contain_text("Imagen provisional")
+    page.locator('[data-view="grid"]').click()
+    expect(page.locator("#catalog-grid .img-warn")).to_be_visible()
+    page.locator("#catalog-grid .card-tile").first.click()
+    expect(page.locator("#mb .hero .img-warn")).to_be_visible()
     assert not errors

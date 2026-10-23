@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     ygoprodeck_request_interval: float = Field(default=1.0, ge=0.05)
     deployment_mode: str = "production"
     allow_local_image_preview: bool = False
+    # Private development hosts treated like localhost for the image preview,
+    # e.g. [".app.github.dev"] for a Codespace whose port stays private.
+    local_preview_host_suffixes: list[str] = []
     konami_enabled: bool = False
     konami_authorization_reference: str = ""
     yugipedia_enabled: bool = False
@@ -34,6 +37,17 @@ class Settings(BaseSettings):
     @property
     def local_image_preview(self) -> bool:
         return self.deployment_mode == "local" and self.allow_local_image_preview
+
+    def is_preview_host(self, hostname: str | None) -> bool:
+        if not hostname:
+            return False
+        hostname = hostname.lower()
+        if hostname in {"localhost", "127.0.0.1", "::1", "testserver"}:
+            return True
+        return any(
+            suffix.startswith(".") and hostname.endswith(suffix.lower())
+            for suffix in self.local_preview_host_suffixes
+        )
 
 
 @lru_cache

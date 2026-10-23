@@ -612,7 +612,8 @@ document.addEventListener(
                 event.target.classList.contains("grid") ? " grid" : ""
             }`;
             fallback.textContent = "Imagen no disponible";
-            event.target.replaceWith(fallback);
+            // A broken image takes its provisional warning with it.
+            (event.target.closest(".img-wrap") || event.target).replaceWith(fallback);
         }
     },
     true

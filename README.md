@@ -65,8 +65,18 @@ El catálogo empieza vacío; para cargar cartas, en la terminal del Codespace:
 docker compose exec api cardmatica sync ygoprodeck initial --max-cards 20
 ```
 
-Las ilustraciones no se muestran en Codespaces: la vista local de imágenes solo acepta
-localhost. Los Codespaces consumen la cuota mensual de la cuenta de GitHub; detenerlos al terminar.
+Para ver ilustraciones (vista provisional, sin licencia comercial), tras cargar cartas:
+
+```bash
+docker compose exec api cardmatica preview-images
+```
+
+El Codespace activa esa vista al crearse (`backend/scripts/enable_preview_images.py`, que
+acepta el dominio privado `.app.github.dev`). En un Codespace creado antes, ejecutar ese script
+y luego `docker compose up -d api`. Cada imagen así mostrada lleva un aviso rojo «!» que explica
+que es provisional. **Mantener el puerto 8000 privado** (valor por defecto): si se hace público,
+cualquiera vería ilustraciones sin licencia. Los Codespaces consumen la cuota mensual de la
+cuenta de GitHub; detenerlos al terminar.
 
 ## Windows 11 — PowerShell
 

@@ -267,12 +267,14 @@ def artwork(image_id: UUID, request: Request, session: SessionDep, thumbnail: bo
     row = session.get(CardArtwork, image_id)
     settings = get_settings()
     commercial = row and row.rights_status == "approved" and bool(row.authorization_reference)
-    local = settings.local_image_preview and request.url.hostname in {
-        "localhost",
-        "127.0.0.1",
-        "::1",
-        "testserver",
-    }
+    # Codespaces forwards the private port under its own domain.
+    forwarded = request.headers.get("x-forwarded-host", "").split(",")[0].strip()
+    forwarded_host = forwarded.rsplit(":", 1)[0] if forwarded else None
+    local = settings.local_image_preview and (
+        settings.is_preview_host(request.url.hostname)
+        if not forwarded_host
+        else settings.is_preview_host(forwarded_host)
+    )
     if not row or row.rights_status == "denied" or not (commercial or local):
         raise HTTPException(404, "Ilustración no disponible para este uso")
     relative = row.thumbnail_path if thumbnail else row.local_path
