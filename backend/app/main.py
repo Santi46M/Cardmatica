@@ -12,6 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 
 from app.api import account, admin, analytics, auth, catalog, pages
+from app.core.caching import CacheControlMiddleware
 from app.core.config import ROOT, get_settings
 from app.core.logging import configure_logging
 from app.core.security import SecurityHeadersMiddleware
@@ -27,6 +28,7 @@ app.add_middleware(
 )
 # JSON and the frontend files shrink to about a quarter of their size.
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+app.add_middleware(CacheControlMiddleware)
 app.add_middleware(SecurityHeadersMiddleware, hsts=get_settings().deployment_mode == "production")
 # Added last so it runs first: requests for an unknown host are refused early.
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=get_settings().allowed_hosts)

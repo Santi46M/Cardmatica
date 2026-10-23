@@ -16,7 +16,7 @@ from app.models import Card, CardArtwork, CardImage, SyncError, SyncJob, User
 from app.models.accounts import ROLES
 from app.schemas.catalog import JobRequest
 from app.schemas.ingestion import CardRecord
-from app.services.accounts import normalize_email
+from app.services.accounts import normalize_email, remove_expired
 from app.services.banlists import bundled_files, import_banlist, load_file
 from app.services.ingestion import IngestionService
 
@@ -163,6 +163,9 @@ def main():
         help="Descargar ilustraciones de las cartas del catálogo para la vista local de prueba",
     )
     images.add_argument("--max-cards", type=int, default=100)
+    commands.add_parser(
+        "cleanup", help="Borrar sesiones vencidas y enlaces de correo usados o vencidos"
+    )
     role = commands.add_parser(
         "set-role", help="Dar o quitar un rol a una cuenta (p. ej. el primer administrador)"
     )
@@ -182,6 +185,10 @@ def main():
         if not 1 <= args.max_cards <= 5000:
             parser.error("max-cards debe estar entre 1 y 5000")
         return preview_images(args.max_cards)
+    if args.command == "cleanup":
+        with session_factory().begin() as session:
+            print(json.dumps(remove_expired(session)))
+        return 0
     if args.command == "set-role":
         with session_factory().begin() as session:
             user = session.scalar(select(User).where(User.email == normalize_email(args.email)))

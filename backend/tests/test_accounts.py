@@ -219,3 +219,18 @@ def test_a_failing_mail_server_does_not_block_registration(client, monkeypatch):
 
     monkeypatch.setattr("app.services.mail.send", broken)
     assert register(client).status_code == 201
+
+
+def test_cleanup_removes_expired_sessions_and_spent_links(client, factory, outbox):
+    from datetime import timedelta
+
+    from app.db.base import utcnow
+    from app.models.accounts import AccountToken
+
+    register(client)
+    with factory.begin() as session:
+        for row in session.scalars(select(UserSession)):
+            row.expires_at = utcnow() - timedelta(minutes=1)
+        session.scalar(select(AccountToken)).used_at = utcnow()
+    with factory.begin() as session:
+        assert accounts.remove_expired(session) == {"sessions": 1, "tokens": 1}

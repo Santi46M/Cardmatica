@@ -1179,4 +1179,68 @@ document.addEventListener("keydown", (event) => {
         else if (row.dataset.pd) openProduct(Number(row.dataset.pd));
     }
 });
+// ---------------------------------------------------------------------------
+// Foco en las ventanas emergentes (ficha y carrito)
+// ---------------------------------------------------------------------------
+
+// Al abrirse, el foco entra en la ventana; Tab no sale de ella mientras está
+// abierta; al cerrarse, el foco vuelve a lo que la abrió.
+const FOCUSABLE =
+    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea, [tabindex]:not([tabindex="-1"])';
+const openedFrom = new Map();
+// Frames to wait for a list that is redrawn after closing (about one second).
+const REFOCUS_FRAMES = 60;
+
+// The catalogue list may be redrawn just after the card closes (the address
+// goes back), replacing the row that opened it. For about a second, if focus
+// falls to the page body, it moves to the new row of the same card.
+function returnFocus(origin) {
+    if (!origin) return;
+    if (origin.isConnected) origin.focus({ preventScroll: true });
+    const card = origin.dataset?.catalogCard;
+    if (!card) return;
+    let frames = REFOCUS_FRAMES;
+    const watch = () => {
+        const lost = document.activeElement === document.body || !document.activeElement;
+        const twin = lost && document.querySelector(`[data-catalog-card="${CSS.escape(card)}"]`);
+        if (twin) twin.focus({ preventScroll: true });
+        if (--frames > 0) requestAnimationFrame(watch);
+    };
+    requestAnimationFrame(watch);
+}
+
+for (const id of ["md", "cart"]) {
+    const dialog = byId(id);
+    const box = dialog.querySelector(".box");
+    box.tabIndex = -1;
+    new MutationObserver(() => {
+        const open = dialog.classList.contains("on");
+        if (open && !openedFrom.has(id)) {
+            openedFrom.set(id, document.activeElement);
+            // The content is drawn right after the class changes.
+            requestAnimationFrame(() => box.focus({ preventScroll: true }));
+        } else if (!open && openedFrom.has(id)) {
+            const origin = openedFrom.get(id);
+            openedFrom.delete(id);
+            returnFocus(origin);
+        }
+    }).observe(dialog, { attributes: true, attributeFilter: ["class"] });
+}
+
+document.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab") return;
+    const dialog = ["cart", "md"].map(byId).find((element) => element.classList.contains("on"));
+    if (!dialog) return;
+    const items = [...dialog.querySelectorAll(FOCUSABLE)].filter((item) => item.offsetParent);
+    if (!items.length) return;
+    const first = items[0];
+    const last = items.at(-1);
+    if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+    }
+});
 // La vista inicial la pinta catalog.js cuando carga sus módulos.

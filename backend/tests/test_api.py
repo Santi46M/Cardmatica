@@ -196,3 +196,17 @@ def test_card_page_title_legal_pages_and_404(client, factory, record):
     assert client.get("/favicon.ico").status_code == 200
     legal = client.get("/terminos").text
     assert '<link rel="canonical" href="http://testserver/terminos">' in legal
+
+
+def test_cache_control_by_kind_of_file(client):
+    assert (
+        client.get("/frontend/assets/favicon.svg").headers["Cache-Control"]
+        == "public, max-age=86400"
+    )
+    script = client.get("/frontend/js/catalog.js")
+    assert script.headers["Cache-Control"] == "no-cache" and script.headers.get("etag")
+    # An unchanged file is answered with 304 and no body.
+    again = client.get("/frontend/js/catalog.js", headers={"If-None-Match": script.headers["etag"]})
+    assert again.status_code == 304
+    assert client.get("/api/v1/cards").headers["Cache-Control"] == "private, no-store"
+    assert client.get("/").headers["Cache-Control"] == "no-cache"

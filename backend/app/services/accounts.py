@@ -275,3 +275,15 @@ def reset_password(session: Session, token: str, new_password: str) -> User:
     user.email_verified_at = user.email_verified_at or utcnow()
     end_all_sessions(session, user)
     return user
+
+
+def remove_expired(session: Session) -> dict:
+    """Deletes ended sessions and spent or expired email links."""
+    now = utcnow()
+    sessions = session.execute(delete(UserSession).where(UserSession.expires_at < now)).rowcount
+    tokens = session.execute(
+        delete(AccountToken).where(
+            (AccountToken.expires_at < now) | AccountToken.used_at.is_not(None)
+        )
+    ).rowcount
+    return {"sessions": sessions, "tokens": tokens}

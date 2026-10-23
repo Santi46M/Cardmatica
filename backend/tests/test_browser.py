@@ -659,3 +659,18 @@ def test_launch_checklist(live_server, browser_page, factory):
         keys = {row.key for row in session.scalars(select(UsageCount))}
     assert {"tab:Inicio", "tab:Trampa", "carta"} <= keys
     assert not errors
+
+
+def test_dialog_keeps_and_returns_focus(live_server, browser_page):
+    page = browser_page
+    page.goto(f"{live_server}/?tab=Todas")
+    row = page.locator("#list [data-catalog-card]").first
+    row.focus()
+    page.keyboard.press("Enter")
+    expect(page.locator("#mb")).to_contain_text("Synthetic official test text.")
+    expect(page.locator("#md .box")).to_be_focused()
+    for _ in range(40):
+        page.keyboard.press("Tab")
+        assert page.evaluate("document.getElementById('md').contains(document.activeElement)")
+    page.keyboard.press("Escape")
+    expect(page.locator("#list [data-catalog-card]").first).to_be_focused()

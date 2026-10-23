@@ -2033,3 +2033,8 @@ button.acc-avatar:hover,
     border-bottom: 1px solid rgba(170, 215, 255, .1);
     padding: 3px 0;
 }
+
+/* La ventana recibe el foco al abrirse; el contorno sobraría. */
+.box:focus {
+    outline: none;
+}
