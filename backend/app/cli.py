@@ -6,13 +6,17 @@ from datetime import date, datetime
 from pathlib import Path
 from uuid import UUID
 
+from sqlalchemy import select
+
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.db.session import session_factory
 from app.ingestion.sync import SyncRunner, worker
-from app.models import Card, CardArtwork, CardImage, SyncError, SyncJob
+from app.models import Card, CardArtwork, CardImage, SyncError, SyncJob, User
+from app.models.accounts import ROLES
 from app.schemas.catalog import JobRequest
 from app.schemas.ingestion import CardRecord
+from app.services.accounts import normalize_email
 from app.services.banlists import bundled_files, import_banlist, load_file
 from app.services.ingestion import IngestionService
 
@@ -88,7 +92,7 @@ def preview_images(max_cards: int, runner=None):
     Only for private development environments: the artwork stays unverified and
     is never served in production (see docs/source-policies.md).
     """
-    from sqlalchemy import exists, select
+    from sqlalchemy import exists
 
     settings = get_settings()
     if not settings.local_image_preview:
@@ -159,6 +163,11 @@ def main():
         help="Descargar ilustraciones de las cartas del catálogo para la vista local de prueba",
     )
     images.add_argument("--max-cards", type=int, default=100)
+    role = commands.add_parser(
+        "set-role", help="Dar o quitar un rol a una cuenta (p. ej. el primer administrador)"
+    )
+    role.add_argument("email")
+    role.add_argument("role", choices=list(ROLES))
     approval = commands.add_parser("image-rights")
     approval.add_argument("image_id", type=UUID)
     approval.add_argument("status", choices=["approved", "denied", "unverified"])
@@ -173,6 +182,14 @@ def main():
         if not 1 <= args.max_cards <= 5000:
             parser.error("max-cards debe estar entre 1 y 5000")
         return preview_images(args.max_cards)
+    if args.command == "set-role":
+        with session_factory().begin() as session:
+            user = session.scalar(select(User).where(User.email == normalize_email(args.email)))
+            if not user:
+                parser.error("No existe una cuenta con ese correo")
+            user.role = args.role
+        print(json.dumps({"email": normalize_email(args.email), "role": args.role}))
+        return 0
     if args.command == "import-banlist":
         return import_banlists(args.paths)
     if args.command == "worker":

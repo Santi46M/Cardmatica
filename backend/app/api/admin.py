@@ -1,11 +1,24 @@
+from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import func, or_, select
 
 from app.api.dependencies import SessionDep, require_admin
-from app.models import DataConflict, SyncError, SyncJob
+from app.models import (
+    Card,
+    CardPrinting,
+    DataConflict,
+    PriceObservation,
+    SyncError,
+    SyncJob,
+    User,
+    UserSession,
+    Wantlist,
+)
 from app.schemas.catalog import JobRequest, JobView, PriceObservationInput, PricePoint
+from app.services.accounts import as_aware
 from app.services.prices import record_sale
 
 router = APIRouter(
@@ -102,3 +115,85 @@ def record_price(data: PriceObservationInput, session: SessionDep):
         raise HTTPException(404, "Impresión inexistente")
     session.commit()
     return result
+
+
+# ---- Panel: overview, accounts and recent sync jobs ----------------------------
+
+Admin = Annotated[User | None, Depends(require_admin)]
+
+
+@router.get("/overview")
+def overview(session: SessionDep):
+    def count(model):
+        return session.scalar(select(func.count()).select_from(model))
+
+    return {
+        "cards": count(Card),
+        "printings": count(CardPrinting),
+        "users": count(User),
+        "active_sessions": count(UserSession),
+        "wantlists": count(Wantlist),
+        "sales": count(PriceObservation),
+        "pending_jobs": session.scalar(
+            select(func.count()).select_from(SyncJob).where(SyncJob.status == "pending")
+        ),
+    }
+
+
+@router.get("/sync-jobs", response_model=list[JobView])
+def recent_jobs(session: SessionDep, limit: Annotated[int, Query(ge=1, le=100)] = 20):
+    return session.scalars(select(SyncJob).order_by(SyncJob.created_at.desc()).limit(limit)).all()
+
+
+@router.get("/users")
+def users(
+    session: SessionDep,
+    q: Annotated[str | None, Query(max_length=100)] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 25,
+):
+    query = select(User)
+    if q:
+        query = query.where(
+            or_(
+                User.email.icontains(q, autoescape=True),
+                User.display_name.icontains(q, autoescape=True),
+            )
+        )
+    total = session.scalar(select(func.count()).select_from(query.subquery()))
+    rows = session.scalars(
+        query.order_by(User.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    ).all()
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "items": [
+            {
+                "id": str(user.id),
+                "email": user.email,
+                "display_name": user.display_name,
+                "role": user.role,
+                "created_at": as_aware(user.created_at),
+                "locked": bool(user.locked_until),
+            }
+            for user in rows
+        ],
+    }
+
+
+class RoleInput(BaseModel):
+    role: Literal["user", "moderator", "admin"]
+
+
+@router.post("/users/{user_id}/role")
+def set_role(user_id: UUID, payload: RoleInput, session: SessionDep, admin: Admin):
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(404, "Cuenta inexistente")
+    # An administrator cannot remove their own access by mistake.
+    if admin is not None and admin.id == user.id and payload.role != "admin":
+        raise HTTPException(409, "No puedes quitarte tu propio rol de administrador")
+    user.role = payload.role
+    session.commit()
+    return {"id": str(user.id), "role": user.role}

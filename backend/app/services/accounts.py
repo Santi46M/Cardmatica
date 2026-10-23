@@ -18,7 +18,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.base import utcnow
-from app.models.accounts import User, UserSession
+from app.models.accounts import AccountToken, User, UserSession
+from app.services import mail
 from app.services.passwords import hash_password, needs_rehash, password_problem, verify_password
 
 TOKEN_BYTES = 32
@@ -182,3 +183,95 @@ class AttemptLimiter:
 
 
 limiter = AttemptLimiter()
+
+
+# ---- Links sent by email: confirm the address, reset the password -----------
+
+CONFIRM_EMAIL = "confirm_email"
+RESET_PASSWORD = "reset_password"
+INVALID_LINK = "El enlace no es válido o ya venció. Pide uno nuevo."
+
+
+def issue_token(session: Session, user: User, purpose: str, lifetime: timedelta) -> str:
+    """A new single-use link; earlier unused ones for the same purpose stop working."""
+    session.execute(
+        delete(AccountToken).where(
+            AccountToken.user_id == user.id,
+            AccountToken.purpose == purpose,
+            AccountToken.used_at.is_(None),
+        )
+    )
+    token = secrets.token_urlsafe(TOKEN_BYTES)
+    session.add(
+        AccountToken(
+            user_id=user.id,
+            purpose=purpose,
+            token_hash=token_hash(token),
+            expires_at=utcnow() + lifetime,
+        )
+    )
+    session.flush()
+    return token
+
+
+def consume_token(session: Session, token: str, purpose: str) -> User:
+    row = session.scalar(
+        select(AccountToken).where(
+            AccountToken.token_hash == token_hash(token), AccountToken.purpose == purpose
+        )
+    )
+    if not row or row.used_at or as_aware(row.expires_at) <= utcnow():
+        raise AccountError(INVALID_LINK)
+    row.used_at = utcnow()
+    return session.get(User, row.user_id)
+
+
+def send_confirmation(session: Session, user: User, base_url: str) -> None:
+    hours = get_settings().email_confirmation_hours
+    token = issue_token(session, user, CONFIRM_EMAIL, timedelta(hours=hours))
+    mail.send(
+        user.email,
+        "Confirma tu correo en Cardmática",
+        f"Hola, {user.display_name}:\n\n"
+        f"Para confirmar que este correo es tuyo, abre este enlace:\n"
+        f"{base_url}/verificar?token={token}\n\n"
+        f"El enlace funciona durante {hours} horas. Si no creaste una cuenta, ignora este correo.",
+    )
+
+
+def confirm_email(session: Session, token: str) -> User:
+    user = consume_token(session, token, CONFIRM_EMAIL)
+    user.email_verified_at = user.email_verified_at or utcnow()
+    return user
+
+
+def request_password_reset(session: Session, email: str, base_url: str) -> None:
+    """Sends the link if the account exists. The answer is the same either way."""
+    user = session.scalar(select(User).where(User.email == normalize_email(email)))
+    if not user:
+        return
+    minutes = get_settings().password_reset_minutes
+    token = issue_token(session, user, RESET_PASSWORD, timedelta(minutes=minutes))
+    mail.send(
+        user.email,
+        "Restablecer tu contraseña de Cardmática",
+        f"Hola, {user.display_name}:\n\n"
+        f"Para elegir una contraseña nueva, abre este enlace:\n"
+        f"{base_url}/restablecer?token={token}\n\n"
+        f"El enlace funciona durante {minutes} minutos y una sola vez. "
+        f"Si no lo pediste, ignora este correo: tu contraseña no cambia.",
+    )
+
+
+def reset_password(session: Session, token: str, new_password: str) -> User:
+    user = consume_token(session, token, RESET_PASSWORD)
+    if problem := password_problem(new_password, user.email):
+        raise AccountError(problem)
+    user.password_hash = hash_password(new_password)
+    user.password_changed_at = utcnow()
+    user.failed_logins = 0
+    user.locked_until = None
+    # Opening the link proves the address is theirs.
+    user.email_verified_at = user.email_verified_at or utcnow()
+    end_all_sessions(session, user)
+    return user

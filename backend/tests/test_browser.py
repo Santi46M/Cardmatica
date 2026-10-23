@@ -26,6 +26,10 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture
 def live_server(factory, settings, record):
+    # Each test starts with a fresh per-IP attempt budget (all tests share 127.0.0.1).
+    from app.services import accounts
+
+    accounts.limiter.clear()
     record.printings.append(
         PrintingInput(
             code="TST-EN002",
@@ -507,6 +511,7 @@ def test_browser_data_moves_into_the_account(live_server, browser_page):
     page.locator("#auth-terms").check()
     page.locator("#auth-register button[type=submit]").click()
     expect(page.locator("#ts")).to_contain_text("se guardaron en tu cuenta")
+    page.wait_for_load_state("networkidle")
     # A fresh browser profile: the lists and the currency come from the account.
     page.context.clear_cookies()
     page.evaluate("localStorage.clear()")
@@ -545,4 +550,78 @@ def test_card_address_and_legal_pages(live_server, browser_page):
     expect(page.locator("h1")).to_have_text("Política de privacidad")
     page.goto(f"{live_server}/pagina-inventada")
     expect(page.locator("h1")).to_have_text("Esta página no existe")
+    assert not errors
+
+
+def test_admin_panel_for_admin_accounts(live_server, browser_page, factory):
+    from sqlalchemy import select
+
+    from app.models import User
+
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(live_server)
+    page.locator("#account-button").click()
+    page.locator('#account-menu [data-auth-mode="register"]').click()
+    page.locator("#auth-name").fill("Admin")
+    page.locator("#auth-email").fill("admin@example.com")
+    page.locator("#auth-password").fill("una frase larga de prueba")
+    page.locator("#auth-terms").check()
+    page.locator("#auth-register button[type=submit]").click()
+    expect(page.locator("#ts")).to_contain_text("Cuenta creada")
+    page.locator("#account-button").click()
+    expect(page.locator('#account-menu [data-go="Admin"]')).to_have_count(0)
+    with factory.begin() as session:
+        session.scalar(select(User).where(User.email == "admin@example.com")).role = "admin"
+    page.reload()
+    page.locator("#account-button").click()
+    page.locator('#account-menu [data-go="Admin"]').click()
+    expect(page.locator("#admv .admin-stats")).to_contain_text("Cuentas")
+    expect(page.locator("#admin-users")).to_contain_text("admin@example.com")
+    page.locator("#admin-search").fill("nadie")
+    expect(page.locator("#admin-users")).to_contain_text("Ninguna cuenta coincide")
+    assert not errors
+
+
+def test_email_links_confirm_and_reset(live_server, browser_page, monkeypatch):
+    sent = []
+    monkeypatch.setattr("app.services.mail.send", lambda to, subject, body: sent.append(body))
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(live_server)
+    page.locator("#account-button").click()
+    page.locator('#account-menu [data-auth-mode="register"]').click()
+    page.locator("#auth-name").fill("Sofía")
+    page.locator("#auth-email").fill("sofia@example.com")
+    page.locator("#auth-password").fill("una frase larga de prueba")
+    page.locator("#auth-terms").check()
+    page.locator("#auth-register button[type=submit]").click()
+    expect(page.locator("#ts")).to_contain_text("Cuenta creada")
+    page.locator("#account-button").click()
+    expect(page.locator("#account-menu")).to_contain_text("sin confirmar")
+    page.keyboard.press("Escape")
+    confirm = re.search(r"/verificar\?token=[\w-]+", sent[-1]).group(0)
+    page.goto(live_server + confirm)
+    expect(page.locator("#authv")).to_contain_text("Correo confirmado")
+    assert "token=" not in page.url
+    page.locator("#account-button").click()
+    expect(page.locator("#account-menu")).not_to_contain_text("sin confirmar")
+    page.locator("#account-menu [data-auth-logout]").click()
+    page.locator("#account-button").click()
+    page.locator('#account-menu [data-auth-mode="login"]').click()
+    page.locator('#authv [data-auth-mode="forgot"]').click()
+    page.locator("#auth-email").fill("sofia@example.com")
+    page.locator("#auth-forgot button[type=submit]").click()
+    expect(page.locator("#authv")).to_contain_text("te enviamos un enlace")
+    reset = re.search(r"/restablecer\?token=[\w-]+", sent[-1]).group(0)
+    page.goto(live_server + reset)
+    page.locator("#auth-password").fill("otra frase larga nueva")
+    page.locator("#auth-reset button[type=submit]").click()
+    expect(page.locator("#authv")).to_contain_text("Contraseña cambiada")
+    page.locator("#auth-email").fill("sofia@example.com")
+    page.locator("#auth-password").fill("otra frase larga nueva")
+    page.locator("#auth-login button[type=submit]").click()
+    expect(page.locator("#ts")).to_contain_text("Hola, Sofía")
     assert not errors

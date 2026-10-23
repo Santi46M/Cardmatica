@@ -79,6 +79,8 @@ function whoHtml() {
     const profile = currentProfile();
     if (user)
         return `<b>${h(user.display_name)}</b><small>${h(user.email)}${
+            user.email_verified ? "" : ' · <span class="warn-text">sin confirmar</span>'
+        }${
             profile?.store ? ` · ${h(profile.store)}` : ""
         }</small>`;
     // Without an account, the profile kept in this browser still names the person.
@@ -96,6 +98,15 @@ function accessHtml() {
     return '<div class="acc-access"><button role="menuitem" class="btn s acc-item-main" data-go="Acceso" data-auth-mode="login">Iniciar sesión</button><button role="menuitem" class="ghost acc-item-main" data-go="Acceso" data-auth-mode="register">Crear cuenta</button></div>';
 }
 
+// Only administrators see the way into the panel.
+function adminHtml() {
+    if (currentUser()?.role !== "admin") return "";
+    return `<div class="acc-section" role="group" aria-label="Administración"><span class="acc-title">Administración</span>${itemHtml([
+        "Panel de administración",
+        "Admin"
+    ])}</div>`;
+}
+
 function menuHtml() {
     const role = currentProfile() ? ROLE_LABELS[currentProfile().role] : "";
     return `<div class="acc-who"><span class="acc-avatar big" aria-hidden="true">${avatarHtml()}</span><div>${whoHtml()}${
@@ -105,7 +116,7 @@ function menuHtml() {
             `<div class="acc-section" role="group" aria-label="${h(title)}"><span class="acc-title">${h(
                 title
             )}</span>${items.map(itemHtml).join("")}</div>`
-    ).join("")}${currentUser() ? accessHtml() : ""}<p class="acc-note">${
+    ).join("")}${adminHtml()}${currentUser() ? accessHtml() : ""}<p class="acc-note">${
         currentUser()
             ? "Tu perfil, wantlists y preferencias se guardan en tu cuenta. El carrito es de la tienda de demostración y queda en este navegador."
             : "Sin cuenta, el perfil y las wantlists se guardan solo en este navegador."

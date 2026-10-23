@@ -46,7 +46,14 @@ jobs:
       - name: Pruebas (incluye navegador)
         env:
           CARDMATICA_BROWSER_TESTS: "1"
-        run: python -m pytest -q
+        # Failed tests also show as annotations on the pull request.
+        run: |
+          set -o pipefail
+          python -m pytest -q -rf --tb=short 2>&1 | tee pytest.txt || {
+            grep -E "^FAILED" pytest.txt | sed 's/^/::error::/'
+            grep -E "^E +(AssertionError|Actual value|.*Error)" pytest.txt | head -20 | sed 's/^/::warning::/'
+            exit 1
+          }
 
   postgres:
     runs-on: ubuntu-latest

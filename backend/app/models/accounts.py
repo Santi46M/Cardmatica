@@ -18,7 +18,15 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, Entity
 
-__all__ = ["ROLES", "User", "UserProfile", "UserSession", "Wantlist", "WantlistItem"]
+__all__ = [
+    "ROLES",
+    "AccountToken",
+    "User",
+    "UserProfile",
+    "UserSession",
+    "Wantlist",
+    "WantlistItem",
+]
 
 # Who can do what. "admin" replaces the shared ADMIN_TOKEN once an admin panel exists.
 ROLES = ("user", "moderator", "admin")
@@ -109,3 +117,14 @@ class WantlistItem(Entity, Base):
     seen_sale_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     wantlist: Mapped[Wantlist] = relationship(back_populates="items")
+
+
+class AccountToken(Entity, Base):
+    """A single-use link sent by email: confirm the address or reset the password."""
+
+    __tablename__ = "account_tokens"
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    purpose: Mapped[str] = mapped_column(String(20))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

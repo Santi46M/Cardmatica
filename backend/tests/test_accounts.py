@@ -155,3 +155,67 @@ def test_codespace_origin_is_accepted_in_local_mode(client, settings, monkeypatc
     )
     # Reaches the login check (401), instead of the cross-site refusal (403).
     assert response.status_code == 401
+
+
+@pytest.fixture
+def outbox(monkeypatch):
+    sent = []
+    monkeypatch.setattr(
+        "app.services.mail.send", lambda to, subject, body: sent.append((to, subject, body))
+    )
+    return sent
+
+
+def link_token(body, path):
+    import re
+
+    return re.search(rf"{path}\?token=([\w-]+)", body).group(1)
+
+
+def test_registration_sends_a_confirmation_link(client, outbox):
+    register(client)
+    to, subject, body = outbox[-1]
+    assert to == "ana@example.com" and "Confirma" in subject
+    assert "http://testserver/verificar?token=" in body
+    token = link_token(body, "/verificar")
+    assert client.get("/api/v1/auth/me").json()["email_verified"] is False
+    confirmed = client.post("/api/v1/auth/confirm-email", json={"token": token})
+    assert confirmed.status_code == 200 and confirmed.json()["email_verified"] is True
+    # A link works once.
+    assert client.post("/api/v1/auth/confirm-email", json={"token": token}).status_code == 400
+    resend = client.post("/api/v1/auth/confirm-email/request", headers=csrf_headers(client))
+    assert resend.status_code == 409
+
+
+def test_password_reset_by_email(client, outbox):
+    register(client)
+    client.cookies.clear()
+    unknown = client.post("/api/v1/auth/password-reset/request", json={"email": "x@example.com"})
+    known = client.post("/api/v1/auth/password-reset/request", json={"email": "ANA@example.com"})
+    # Same answer either way; only the real account gets a message.
+    assert unknown.json() == known.json() and known.status_code == 202
+    assert len([mail for mail in outbox if "Restablecer" in mail[1]]) == 1
+    token = link_token(outbox[-1][2], "/restablecer")
+    weak = client.post(
+        "/api/v1/auth/password-reset", json={"token": token, "new_password": "corta"}
+    )
+    assert weak.status_code == 400
+    done = client.post(
+        "/api/v1/auth/password-reset",
+        json={"token": token, "new_password": "una clave nueva larga"},
+    )
+    assert done.status_code == 204
+    old = client.post("/api/v1/auth/login", json={"email": "ana@example.com", "password": PASSWORD})
+    assert old.status_code == 401
+    new = client.post(
+        "/api/v1/auth/login", json={"email": "ana@example.com", "password": "una clave nueva larga"}
+    )
+    assert new.status_code == 200 and new.json()["email_verified"] is True
+
+
+def test_a_failing_mail_server_does_not_block_registration(client, monkeypatch):
+    def broken(*args):
+        raise ConnectionRefusedError
+
+    monkeypatch.setattr("app.services.mail.send", broken)
+    assert register(client).status_code == 201

@@ -56,9 +56,10 @@ function save() {
     if (remote) {
         clearTimeout(saveTimer);
         saveTimer = setTimeout(() => {
-            request(ACCOUNT_WANTLISTS, { method: "PUT", body: state }).catch((error) =>
-                window.toast?.(`No se pudo guardar la wantlist: ${error.message}`)
-            );
+            if (!currentUser()) return;
+            request(ACCOUNT_WANTLISTS, { method: "PUT", body: state }).catch((error) => {
+                if (currentUser()) window.toast?.(`No se pudo guardar la wantlist: ${error.message}`);
+            });
         }, SAVE_DELAY_MS);
         return;
     }
@@ -84,7 +85,7 @@ async function syncWithAccount(panel) {
             } else state = saved;
             remote = true;
         } catch {
-            window.toast?.("No se pudieron leer tus wantlists de la cuenta");
+            if (currentUser()) window.toast?.("No se pudieron leer tus wantlists de la cuenta");
         }
     }
     alerts = new Map();

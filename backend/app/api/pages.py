@@ -39,6 +39,13 @@ def styles():
     return FileResponse(ROOT / "styles.css", media_type="text/css")
 
 
+# Links from account emails open the page, which shows the matching form.
+@router.get("/verificar")
+@router.get("/restablecer")
+def account_link():
+    return FileResponse(ROOT / "index.html")
+
+
 @router.get("/carta/{card_id}")
 @router.get("/carta/{card_id}/{slug}")
 def card_page(card_id: UUID, session: SessionDep, slug: str | None = None):

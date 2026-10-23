@@ -1969,3 +1969,36 @@ button.acc-avatar:hover,
     text-align: center;
     padding: 40px 20px;
 }
+
+/* Panel de administración */
+#admv .pnl + .pnl,
+#admv .admin-stats + .pnl {
+    margin-top: 12px;
+}
+
+.admin-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.admin-stats b {
+    display: block;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+#admin-search {
+    width: 100%;
+    margin: 10px 0;
+}
+
+#admin-users td small {
+    display: block;
+    color: var(--mu);
+}
+
+.auth-notice {
+    margin: 0 0 10px;
+    border-color: rgba(120, 220, 160, .35);
+}

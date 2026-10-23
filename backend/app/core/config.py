@@ -45,6 +45,21 @@ class Settings(BaseSettings):
     login_lock_minutes: int = Field(default=15, ge=1, le=1440)
     # Login and registration attempts allowed per IP address per minute.
     auth_attempts_per_minute: int = Field(default=10, ge=1, le=120)
+    # How long the links in account emails work.
+    email_confirmation_hours: int = Field(default=48, ge=1, le=336)
+    password_reset_minutes: int = Field(default=60, ge=10, le=1440)
+    # Email (app/services/mail.py). "console" writes each message to the log,
+    # for development; "smtp" sends it through the server below.
+    email_backend: str = Field(default="console", pattern="^(console|smtp)$")
+    email_from: str = "Cardmática <no-responder@localhost>"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = Field(default="", repr=False)
+    smtp_starttls: bool = True
+    # Address used in links inside emails, e.g. "https://cardmatica.com".
+    # Empty: the address of the request that triggered the email.
+    public_base_url: str = ""
 
     @property
     def local_image_preview(self) -> bool:

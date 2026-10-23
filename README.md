@@ -324,8 +324,13 @@ Cuentas (`/api/v1/auth`): `POST /register`, `/login`, `/logout`, `/password`,
 hash del token. Los cambios exigen la cabecera `X-CSRF-Token` con el valor de la
 cookie `cm_csrf` y se rechazan si llegan de otro sitio. Contraseñas con scrypt;
 bloqueo temporal tras `LOGIN_MAX_FAILURES` intentos y límite por IP
-(`AUTH_ATTEMPTS_PER_MINUTE`, en memoria: válido para un solo proceso). Falta el
-envío de correos (confirmación de cuenta y recuperación de contraseña).
+(`AUTH_ATTEMPTS_PER_MINUTE`, en memoria: válido para un solo proceso). Al registrarse
+se envía un enlace para confirmar el correo (`/verificar`) y desde el inicio de
+sesión se puede pedir uno para restablecer la contraseña (`/restablecer`); los
+enlaces son de un solo uso y vencen (`EMAIL_CONFIRMATION_HOURS`,
+`PASSWORD_RESET_MINUTES`). Con `EMAIL_BACKEND=console` (valor por defecto) los
+correos no salen del equipo: aparecen en `docker compose logs api`, con su enlace.
+En producción, `EMAIL_BACKEND=smtp` y los datos del servidor de correo.
 
 Datos de la cuenta (`/api/v1/account`): `GET` perfil y preferencias; `PUT /profile`,
 `/preferences` (moneda, mercado, vista); `GET`/`PUT /wantlists`. Las wantlists se
@@ -339,7 +344,16 @@ propio sitio), `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` y,
 en producción bajo HTTPS, HSTS (`backend/app/core/security.py`). En producción,
 definir `ALLOWED_HOSTS` con el dominio real.
 
-Administración exige `Authorization: Bearer ADMIN_TOKEN` de al menos 32 caracteres.
+Administración (`/api/v1/admin`): acepta la sesión de una cuenta con rol `admin`
+(con CSRF, como el resto de cambios) o el token para scripts. El panel está en el
+menú de cuenta de los administradores: resumen, cuentas con su rol y últimas
+sincronizaciones. El primer administrador se nombra desde la terminal:
+
+```bash
+docker compose exec api cardmatica set-role tu@correo.com admin
+```
+
+Para scripts, administración también acepta `Authorization: Bearer ADMIN_TOKEN` de al menos 32 caracteres.
 Sin token configurado, queda deshabilitada. La API solo encola; no ejecuta scraping
 en background de una petición. Mantener el token fuera del frontend y del navegador
 de clientes. El despliegue público debe usar HTTPS y rotación del token operativo.

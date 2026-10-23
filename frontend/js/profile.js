@@ -166,15 +166,18 @@ function savePreferencesSoon() {
     clearTimeout(preferenceTimer);
     // The market button changes window.market after this click handler runs.
     preferenceTimer = setTimeout(() => {
-        request(`${ACCOUNT}/preferences`, { method: "PUT", body: currentPreferences() }).catch(() =>
-            window.toast?.("No se pudieron guardar tus preferencias en la cuenta")
-        );
+        if (!currentUser()) return;
+        request(`${ACCOUNT}/preferences`, { method: "PUT", body: currentPreferences() }).catch(() => {
+            // Signing out meanwhile is not an error worth announcing.
+            if (currentUser()) window.toast?.("No se pudieron guardar tus preferencias en la cuenta");
+        });
     }, 300);
 }
 
 // On sign-in: the account's data replaces the browser's. The first time, what
 // the browser had is moved into the account so nothing is lost.
 async function syncWithAccount(panel) {
+    clearTimeout(preferenceTimer);
     if (!currentUser()) {
         profile = readJson(KEY, null);
     } else {
@@ -188,9 +191,10 @@ async function syncWithAccount(panel) {
             profile = data.profile;
             const saved = Object.values(data.preferences).some(Boolean);
             if (saved) applyPreferences(data.preferences);
-            else savePreferencesSoon();
+            // First sign-in: keep what this browser had chosen, right away.
+            else await request(`${ACCOUNT}/preferences`, { method: "PUT", body: currentPreferences() });
         } catch {
-            window.toast?.("No se pudo leer tu perfil de la cuenta");
+            if (currentUser()) window.toast?.("No se pudo leer tu perfil de la cuenta");
         }
     }
     document.dispatchEvent(new CustomEvent("cm:profile"));

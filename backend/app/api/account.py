@@ -2,8 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
-from app.api.auth import Current, csrf, same_origin
-from app.api.dependencies import SessionDep
+from app.api.dependencies import Current, SessionDep, csrf, same_origin
 from app.schemas.accounts import AccountData, Preferences, ProfileData, WantlistsData
 from app.services import account_data
 from app.services.accounts import AccountError
