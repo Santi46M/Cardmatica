@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 
 from app.models import CardPrinting, PriceObservation, Rarity
 from app.schemas.catalog import PriceHistoryView, PriceObservationInput, PricePoint
@@ -79,3 +79,37 @@ def record_sale(session, data: PriceObservationInput) -> PricePoint | None:
     session.flush()
     rarity = session.scalar(select(Rarity.name).where(Rarity.id == printing.rarity_id))
     return point(row, printing, rarity)
+
+
+def last_sales(session, card_ids, market=None) -> dict:
+    """Latest sale per card for a page of the catalogue, in one query."""
+    if not card_ids:
+        return {}
+    scope = [CardPrinting.card_id.in_(card_ids)]
+    if market:
+        scope.append(CardPrinting.market == market)
+    latest = (
+        select(CardPrinting.card_id, func.max(PriceObservation.observed_at).label("at"))
+        .join(PriceObservation, PriceObservation.printing_id == CardPrinting.id)
+        .where(*scope)
+        .group_by(CardPrinting.card_id)
+        .subquery()
+    )
+    rows = session.execute(
+        select(PriceObservation, CardPrinting, Rarity.name)
+        .join(CardPrinting, PriceObservation.printing_id == CardPrinting.id)
+        .join(Rarity, CardPrinting.rarity_id == Rarity.id)
+        .join(
+            latest,
+            and_(
+                CardPrinting.card_id == latest.c.card_id,
+                PriceObservation.observed_at == latest.c.at,
+            ),
+        )
+        .where(*scope)
+        .order_by(PriceObservation.id)
+    ).all()
+    result = {}
+    for observation, printing, rarity in rows:
+        result.setdefault(printing.card_id, point(observation, printing, rarity))
+    return result

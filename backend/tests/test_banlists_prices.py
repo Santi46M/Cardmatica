@@ -131,6 +131,11 @@ def test_price_history_last_sale_and_admin_recording(factory, client, record, se
     assert short["points"] == [] and short["last_sale"]["price"] == "12.50"
     other = client.get(f"/api/v1/cards/{card_id}/price-history", params={"market": "OCG"}).json()
     assert other["points"] == [] and other["last_sale"] is None
+    # The catalogue list shows the latest sale per card for the market in view.
+    (summary,) = client.get("/api/v1/cards", params={"market": "TCG"}).json()["items"]
+    assert summary["last_sale"]["price"] == "12.50"
+    assert summary["last_sale"]["code"] == "TST-EN001"
+    assert client.get("/api/v1/cards", params={"market": "OCG"}).json()["items"] == []
 
 
 def test_price_validation(factory, client, record, settings):

@@ -1,4 +1,5 @@
 import { badgeHtml, banlistSectionHtml, statusFor } from "./banlist.js";
+import { formatDate, money } from "./storage.js";
 
 export const escapeHtml = (value) =>
     String(value ?? "").replace(
@@ -66,35 +67,62 @@ export function pager(data, kind = "catalog") {
     }>Siguiente</button></div>`;
 }
 
+// Spanish labels for the subtypes the API reports; races such as "Dragon" stay as given.
+const SUBTYPES = {
+    Effect: "Efecto",
+    Fusion: "Fusión",
+    Synchro: "Sincro",
+    Pendulum: "Péndulo",
+    "Quick-Play": "Juego rápido",
+    Continuous: "Continua",
+    Equip: "Equipo",
+    Field: "Campo",
+    Counter: "Contraefecto"
+};
+
+// Type, subtypes and attribute matter less than price to a buyer who knows the
+// card, so they share one muted line under the name instead of a column of chips.
+function cardMeta(card) {
+    return [
+        kinds[card.card_type] || card.card_type || "Sin clasificar",
+        ...card.subtypes.map((value) => SUBTYPES[value] || value),
+        card.attribute
+    ]
+        .filter(Boolean)
+        .join(" · ");
+}
+
+function saleCell(sale) {
+    if (!sale) return '<td class="num"><span class="muted">Sin ventas</span></td>';
+    return `<td class="num"><b class="price">${h(money(sale.price, sale.currency))}</b><small>${h(
+        formatDate(sale.observed_at)
+    )}</small></td>`;
+}
+
 export function catalogRows(data) {
     if (!data.items.length)
-        return '<tr><td colspan="5" class="empty">No hay cartas almacenadas que coincidan con estos filtros.</td></tr>';
+        return '<tr><td colspan="3" class="empty">No hay cartas almacenadas que coincidan con estos filtros.</td></tr>';
     return data.items
-        .map(
-            (card) =>
-                `<tr class="catalog-row" tabindex="0" data-catalog-card="${h(
-                    card.id
-                )}"><td><div class="nm">${imageHtml(
-                    card.image,
-                    `${card.name} — ${
-                        card.image?.association === "card_artwork"
-                            ? "ilustración general"
-                            : "imagen de impresión"
-                    }`
-                )}<div><b>${h(card.name)}</b><small>${h(card.attribute || "")}${
-                    card.name_is_official
-                        ? ""
-                        : ` · Fuente: ${h(card.name_source || "comunitaria")}`
-                }</small></div></div></td><td>${chip(
-                    kinds[card.card_type] || card.card_type || "Sin clasificar"
-                )}${card.subtypes.map(chip).join("")}</td><td class="hide">${
-                    card.printing_count
-                } impresiones</td><td class="num">${card.markets
-                    .map(chip)
-                    .join("")}</td><td><button class="lk" data-catalog-card="${h(
-                    card.id
-                )}">Ver ficha</button></td></tr>`
-        )
+        .map((card) => {
+            const meta = cardMeta(card);
+            const source = card.name_is_official
+                ? ""
+                : ` · Fuente: ${card.name_source || "comunitaria"}`;
+            return `<tr class="catalog-row" tabindex="0" data-catalog-card="${h(
+                card.id
+            )}" aria-label="${h(`${card.name}, ${meta}`)}"><td><div class="nm">${imageHtml(
+                card.image,
+                `${card.name} — ${
+                    card.image?.association === "card_artwork"
+                        ? "ilustración general"
+                        : "imagen de impresión"
+                }`
+            )}<div class="nm-text"><b>${h(card.name)}</b><small class="meta" title="${h(
+                meta + source
+            )}">${h(meta)}${h(source)}</small></div></div></td><td class="num hide">${
+                card.printing_count
+            }</td>${saleCell(card.last_sale)}</tr>`;
+        })
         .join("");
 }
 

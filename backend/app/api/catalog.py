@@ -22,7 +22,7 @@ from app.schemas.catalog import (
 )
 from app.services.banlists import current_lists, list_view
 from app.services.catalog import card_detail, card_summary, errata_views, printing_view
-from app.services.prices import price_history
+from app.services.prices import last_sales, price_history
 
 router = APIRouter(prefix="/api/v1", tags=["Catálogo"])
 PageNumber = Annotated[int, Query(ge=1, le=1000000)]
@@ -60,12 +60,13 @@ def cards(
         sort=sort,
         language=language,
     )
-    return Page(
-        items=[card_summary(row, language, market) for row in rows],
-        total=total,
-        page=page,
-        page_size=page_size,
-    )
+    sales = last_sales(session, [row.id for row in rows], market)
+    items = []
+    for row in rows:
+        item = card_summary(row, language, market)
+        item.last_sale = sales.get(row.id)
+        items.append(item)
+    return Page(items=items, total=total, page=page, page_size=page_size)
 
 
 def require_card(session, card_id):

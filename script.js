@@ -1827,6 +1827,47 @@ function inv() {
 }
 
 // Carrito con cartas y productos
+// Cada vendedor envía por separado: el envío se calcula por vendedor, como en Cardmarket.
+var FREE_SHIPPING = 25,
+    SHIPPING = 2.5;
+
+function cartTotals() {
+    var groups = {},
+        sub = 0;
+    Object.keys(cart).forEach(function (k) {
+        var i = ITEMS[k],
+            line = i.pr * cart[k];
+        if (!groups[i.v]) groups[i.v] = { v: V[i.v], keys: [], sub: 0, units: 0 };
+        groups[i.v].keys.push(k);
+        groups[i.v].sub += line;
+        groups[i.v].units += cart[k];
+        sub += line;
+    });
+    var sellers = Object.keys(groups).map(function (id) {
+        var g = groups[id];
+        g.ship = g.sub >= FREE_SHIPPING ? 0 : SHIPPING;
+        return g;
+    });
+    var ship = sellers.reduce(function (t, g) {
+        return t + g.ship;
+    }, 0);
+    return { sellers: sellers, sub: sub, ship: ship, total: sub + ship };
+}
+
+function cartLine(k) {
+    var i = ITEMS[k];
+    if (i.c < 0) {
+        var p = PR[i.pd];
+        return { name: p.n, tag: ptag(p), meta: p.cat + (i.l ? " · " + LN[i.l] : "") };
+    }
+    var c = CARDS[i.c];
+    return {
+        name: c.n,
+        tag: tg(c),
+        meta: c.pr[i.p].c + " · " + c.pr[i.p].r + " · " + COND[i.k][0] + " · " + LN[i.l]
+    };
+}
+
 function add(id) {
     var i = ITEMS[id],
         cur = cart[id] || 0;
@@ -1900,17 +1941,20 @@ function showCart() {
                 })
                 .join("") +
             "</tbody></table>";
-        var sh = sub >= 25 ? 0 : 2.5;
+        var totals = cartTotals();
         h +=
             '<div class="tot sm"><span>Subtotal</span><span>' +
-            eur(sub) +
-            '</span></div><div class="tot sm" style="padding-top:4px"><span>Envío' +
-            (sh ? " (gratis desde " + eur(25) + ")" : "") +
-            "</span><span>" +
-            (sh ? eur(sh) : "Gratis") +
+            eur(totals.sub) +
+            '</span></div><div class="tot sm" style="padding-top:4px"><span>Envío (' +
+            totals.sellers.length +
+            (totals.sellers.length === 1 ? " vendedor" : " vendedores") +
+            ", gratis desde " +
+            eur(FREE_SHIPPING) +
+            " por vendedor)</span><span>" +
+            (totals.ship ? eur(totals.ship) : "Gratis") +
             '</span></div><div class="tot"><span>Total</span><span>' +
-            eur(sub + sh) +
-            '</span></div><p style="text-align:right"><button class="btn" data-buy="1">Finalizar compra</button></p>';
+            eur(totals.total) +
+            '</span></div><p class="cart-actions"><button class="ghost" data-cart-expand>Ampliar carrito</button><button class="btn" data-buy="1">Finalizar compra</button></p>';
     }
     $("cbx").innerHTML = h;
     $("cart").classList.add("on");

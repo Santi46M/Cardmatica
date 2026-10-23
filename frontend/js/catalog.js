@@ -1,5 +1,6 @@
 import { CatalogApi } from "./api.js";
 import { homeBanlistHtml, startCountdowns } from "./banlist.js";
+import { installCart, renderCart } from "./cart-page.js";
 import { catalogRows, detailHtml, escapeHtml, homeHtml, pager } from "./catalog-view.js";
 import { priceChartHtml } from "./price-chart.js";
 import { installProfile, renderProfile } from "./profile.js";
@@ -24,7 +25,8 @@ let chartDays = 365;
 const cardTypes = { Monstruo: "Monster", Magia: "Spell", Trampa: "Trap" };
 const isCommerce = () => ["Productos", "Vendedores"].includes(window.tab);
 // Panels stored in this browser only; they never query the catalogue list.
-const localPanels = { Wantlists: "wlv", Perfil: "pfv" };
+const localPanels = { Wantlists: "wlv", Perfil: "pfv", Carrito: "cartv" };
+const renderLocal = { Wantlists: renderWantlists, Perfil: renderProfile, Carrito: renderCart };
 const isLocal = () => window.tab in localPanels;
 const pagination = document.createElement("div");
 pagination.id = "catalog-pagination";
@@ -133,7 +135,7 @@ async function loadCards(reset = false) {
         else {
             element(
                 "list"
-            ).innerHTML = `<tr><td colspan="5" class="empty" role="alert">${message}</td></tr>`;
+            ).innerHTML = `<tr><td colspan="3" class="empty" role="alert">${message}</td></tr>`;
             pagination.innerHTML = "";
         }
         status("No se pudo cargar el catálogo.");
@@ -173,8 +175,7 @@ window.init = function () {
         element(id).style.display = id === panel ? "" : "none";
     if (isLocal()) {
         status("");
-        if (window.tab === "Wantlists") renderWantlists(element("wlv"));
-        else renderProfile(element("pfv"));
+        renderLocal[window.tab](element(localPanels[window.tab]));
         if (element("md").classList.contains("on") && element("md").dataset.mode === "catalog")
             openCard(element("md").dataset.catalogId);
         return;
@@ -302,6 +303,14 @@ installWantlists({
             : null
 });
 installProfile({ panel: () => element("pfv") });
+installCart({
+    panel: () => element("cartv"),
+    open: () => {
+        window.tab = "Carrito";
+        window.init();
+        window.scrollTo(0, 0);
+    }
+});
 document.addEventListener("keydown", (event) => {
     const row = event.target.closest("[data-catalog-card]");
     if (row && ["Enter", " "].includes(event.key) && event.target.tagName !== "BUTTON") {
@@ -336,7 +345,8 @@ for (const name of ["detail", "vendor", "popen", "showCart"]) {
 }
 window.TN.Productos = "Productos (demo)";
 window.TN.Vendedores = "Vendedores (demo)";
-for (const name of Object.keys(localPanels)) if (!window.TABS.includes(name)) window.TABS.push(name);
+// The cart page opens from the cart popup, so it has no tab of its own.
+for (const name of ["Wantlists", "Perfil"]) if (!window.TABS.includes(name)) window.TABS.push(name);
 window.TN.Wantlists = "Wantlists";
 window.TN.Perfil = "Perfil";
 try {

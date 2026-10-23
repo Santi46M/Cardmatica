@@ -162,6 +162,9 @@ def test_banlist_price_history_wantlists_and_profile(live_server, browser_page, 
     expect(page.locator("#home-banlist")).to_contain_text("Sin fecha anunciada")
     expect(page.locator("#home-banlist [data-countdown]")).to_contain_text("días")
     page.locator('[data-go="Todas"]').click()
+    # Type details sit on one muted line; the latest sale is the prominent column.
+    expect(page.locator("#list .meta")).to_contain_text("Monstruo · Dragon · Efecto · LIGHT")
+    expect(page.locator("#list")).to_contain_text("14,00")
     page.locator("#list [data-catalog-card]").first.click()
     expect(page.locator("#mb h2 .bn-forbidden")).to_be_visible()
     expect(page.locator("#mb")).to_contain_text("TCG · Prohibida")
@@ -210,4 +213,37 @@ def test_banlist_price_history_wantlists_and_profile(live_server, browser_page, 
     page.locator('[data-g="Perfil"]').click()
     expect(page.locator("#pfv .profile-card")).to_contain_text("Ana Pérez")
     expect(page.locator("#pfv")).to_contain_text("1 lista · 1 cartas")
+    assert not errors
+
+
+def test_cart_page_from_popup(live_server, browser_page):
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(live_server)
+    page.locator('[data-g="Productos"]').click()
+    page.locator("#pl tr[data-pd]").first.click()
+    button = page.locator("#pt [data-add]").first
+    item_id = int(button.get_attribute("data-add"))
+    stock = page.evaluate("id => ITEMS[id].q", item_id)
+    button.click()
+    page.keyboard.press("Escape")
+    page.locator("#cb").click()
+    page.locator("#cbx [data-cart-expand]").click()
+    expect(page.locator("#cart")).not_to_have_class("on")
+    cart = page.locator("#cartv")
+    expect(cart).to_contain_text("Tu carrito · 1 artículo")
+    expect(cart.locator(".cart-seller")).to_have_count(1)
+    plus = cart.locator('[data-cart-step="1"]')
+    if stock > 1:
+        plus.click()
+        expect(cart.locator(".stepper output")).to_have_text("2")
+        cart.locator('[data-cart-step="-1"]').click()
+    else:
+        expect(plus).to_be_disabled()
+    expect(cart.locator(".stepper output")).to_have_text("1")
+    cart.locator("[data-cart-buy]").click()
+    expect(cart).to_contain_text("Pedido recibido")
+    expect(page.locator("#cc")).to_have_text("0")
+    assert page.evaluate("id => ITEMS[id].q", item_id) == stock - 1
     assert not errors

@@ -58,6 +58,8 @@ class CardSummary(BaseModel):
     printing_count: int
     image: ImageView | None
     updated_at: datetime
+    # Latest storefront sale for the requested market; only filled by the card list.
+    last_sale: "PricePoint | None" = None
 
 
 class NameView(BaseModel):
@@ -258,3 +260,7 @@ class JobView(BaseModel):
     cursor: dict
     started_at: datetime | None
     finished_at: datetime | None
+
+
+CardSummary.model_rebuild()
+CardDetail.model_rebuild()

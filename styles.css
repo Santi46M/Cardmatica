@@ -918,3 +918,216 @@ button:disabled {
     margin-top: 4px;
     color: var(--mu);
 }
+
+/* Catálogo compacto: tipo y subtipos en una línea discreta bajo el nombre */
+.nm-text {
+    min-width: 0;
+}
+
+.nm-text .meta {
+    display: block;
+    max-width: 46ch;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 12px;
+}
+
+.muted {
+    color: var(--mu);
+}
+
+#list td.num small {
+    display: block;
+    color: var(--mu);
+    font-size: 12px;
+}
+
+/* Carrito: pop-up y página ampliada */
+.cart-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.cart-page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 14px;
+    align-items: start;
+}
+
+.cart-main {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+}
+
+.cart-main h3,
+.cart-main .catalog-status {
+    margin: 0;
+}
+
+.cart-seller-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.cart-seller-head small {
+    display: block;
+    color: var(--mu);
+}
+
+.cart-seller-head .num b {
+    display: block;
+}
+
+.cart-seller-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 8px 0 0;
+    color: var(--mu);
+    font-size: 13px;
+}
+
+.cart-seller-foot b {
+    color: var(--tx);
+    font-size: 15px;
+}
+
+.cart-summary {
+    position: sticky;
+    top: 150px;
+    display: grid;
+    gap: 8px;
+}
+
+.cart-summary .tot {
+    padding-top: 0;
+}
+
+.stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.stepper button {
+    min-width: 30px;
+    padding: 3px 8px;
+}
+
+.stepper output {
+    min-width: 26px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.stepper + small {
+    display: block;
+    color: var(--mu);
+    font-size: 12px;
+}
+
+button:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+
+/* Misma grilla en todas las tablas de vendedores para que las columnas se alineen */
+.cart-seller table {
+    table-layout: fixed;
+}
+
+.cart-seller .col-price,
+.cart-seller .col-total {
+    width: 96px;
+}
+
+.cart-seller .col-qty {
+    width: 132px;
+}
+
+.cart-seller .col-action {
+    width: 88px;
+}
+
+.cart-seller td:first-child {
+    overflow-wrap: break-word;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+    .cart-page {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cart-seller .col-qty {
+        width: 108px;
+    }
+
+    .cart-seller .col-total,
+    .cart-seller .col-action {
+        width: 76px;
+    }
+
+    .cart-summary {
+        position: static;
+    }
+}
+
+/* En el móvil, cada artículo del carrito se apila: nombre arriba, controles debajo */
+@media (max-width: 640px) {
+    .cart-seller table,
+    .cart-seller tbody {
+        display: block;
+    }
+
+    .cart-seller thead {
+        display: none;
+    }
+
+    .cart-seller tr {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 8px 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(170, 215, 255, .08);
+    }
+
+    .cart-seller td {
+        display: block;
+        padding: 0;
+        border: 0;
+    }
+
+    .cart-seller td:first-child {
+        grid-column: 1 / -1;
+    }
+
+    .cart-seller td.hide {
+        display: none;
+    }
+
+    .cart-seller td.num {
+        text-align: left;
+    }
+
+    .cart-seller td:last-child {
+        text-align: right;
+    }
+}

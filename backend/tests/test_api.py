@@ -126,6 +126,7 @@ def test_fixed_query_count_instead_of_n_plus_one(factory, client, record):
         queries.clear()
         assert client.get("/api/v1/cards", params={"page_size": 8}).status_code == 200
         assert len(queries) == one
-        assert one <= 6
+        # Six catalogue queries plus one for the latest sale of every card on the page.
+        assert one <= 7
     finally:
         event.remove(engine, "before_cursor_execute", before_execute)
