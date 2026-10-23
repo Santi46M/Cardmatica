@@ -1,8 +1,11 @@
+from datetime import date
+
+from app.ingestion.selection import pick_printings
 from app.ingestion.sync import SyncRunner
 from app.integrations.http import AccessDenied, ExternalError
-from app.models import Card, SyncError, SyncJob
+from app.models import Card, CardPrinting, SyncError, SyncJob
 from app.schemas.catalog import JobRequest
-from app.schemas.ingestion import CardRecord
+from app.schemas.ingestion import CardRecord, PrintingInput
 from sqlalchemy import func, select
 
 
@@ -89,3 +92,52 @@ async def test_record_transaction_rolls_back_on_sync_failure(factory, settings, 
     with factory() as session:
         assert session.scalar(select(func.count()).select_from(Card)) == 0
         assert session.get(SyncJob, job_id).failures == 1
+
+
+def printing(code, rarity, released=None):
+    return PrintingInput(
+        code=code,
+        set_key=code[:3],
+        set_name=code[:3],
+        rarity=rarity,
+        language="en",
+        market="TCG",
+        set_release_date=released,
+    )
+
+
+def test_pick_printings_keeps_original_and_newest_other_rarity():
+    printings = [
+        printing("NEW-EN001", "Ultra Rare", date(2024, 1, 1)),
+        printing("OLD-EN001", "Common", date(2002, 1, 1)),
+        printing("MID-EN001", "Super Rare", date(2010, 1, 1)),
+        printing("REP-EN001", "Common", date(2025, 1, 1)),
+    ]
+    chosen = pick_printings(printings, 2)
+    assert [item.code for item in chosen] == ["OLD-EN001", "NEW-EN001"]
+    assert len({item.rarity for item in chosen}) == 2
+    # A card printed in a single rarity keeps one printing, never two of the same.
+    assert len(pick_printings([printings[1], printings[3]], 2)) == 1
+    assert pick_printings([], 2) == []
+
+
+async def test_initial_sync_limits_printings_per_card(factory, settings, record):
+    record = record.model_copy(
+        update={
+            "printings": [
+                printing("AAA-EN001", "Common", date(2003, 1, 1)),
+                printing("BBB-EN001", "Common", date(2005, 1, 1)),
+                printing("CCC-EN001", "Secret Rare", date(2020, 1, 1)),
+            ]
+        }
+    )
+    runner = SyncRunner(factory, settings, {"ygoprodeck": FixtureSource(record)})
+    job_id = runner.enqueue(
+        JobRequest(source="ygoprodeck", mode="initial", max_cards=10, max_printings=2)
+    )
+    await runner.run(job_id)
+    with factory() as session:
+        codes = sorted(session.scalars(select(CardPrinting.code)).all())
+    # Three cards, each with its original Common and the Secret Rare.
+    assert codes.count("AAA-EN001") == 3 and codes.count("CCC-EN001") == 3
+    assert "BBB-EN001" not in codes

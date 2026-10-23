@@ -229,6 +229,9 @@ class JobRequest(BaseModel):
     since: datetime | None = None
     retry_job_id: UUID | None = None
     max_cards: int = Field(default=3, ge=1, le=100000)
+    # Keep only this many printings per card, each of a different rarity
+    # (see app/ingestion/selection.py). None imports every printing.
+    max_printings: int | None = Field(default=None, ge=1, le=50)
     banlist_format: Literal["TCG", "OCG"] | None = None
     effective_date: date | None = None
 

@@ -135,6 +135,11 @@ def main():
     sync.add_argument("--since", type=datetime.fromisoformat)
     sync.add_argument("--retry-job", type=UUID)
     sync.add_argument("--max-cards", type=int, default=3)
+    sync.add_argument(
+        "--max-printings",
+        type=int,
+        help="Importar como máximo N impresiones por carta, cada una de una rareza distinta",
+    )
     sync.add_argument("--banlist-format", choices=["TCG", "OCG"])
     sync.add_argument("--effective-date", type=date.fromisoformat)
     sync.add_argument("--enqueue-only", action="store_true")
@@ -207,6 +212,7 @@ def main():
             since=args.since,
             retry_job_id=args.retry_job,
             max_cards=args.max_cards,
+            max_printings=args.max_printings,
             banlist_format=args.banlist_format,
             effective_date=args.effective_date,
         )

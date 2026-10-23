@@ -10,6 +10,7 @@ from app.core.config import get_settings
 from app.db.base import utcnow
 from app.db.session import session_factory
 from app.integrations.http import AccessDenied, PoliteHttpClient
+from app.ingestion.selection import pick_printings
 from app.integrations.ygoprodeck.client import YgoprodeckClient
 from app.integrations.yugipedia.client import YugipediaClient
 from app.models import CardArtwork, CardImage, SyncError, SyncJob
@@ -209,6 +210,10 @@ class SyncRunner:
                         if record is None and mode in {"card", "errata", "images_metadata"}:
                             raise ValueError(
                                 "La página indicada no contiene una carta CardTable2 reconocida"
+                            )
+                        if record and request.max_printings:
+                            record.printings = pick_printings(
+                                record.printings, request.max_printings
                             )
                         if record and mode == "banlist":
                             record.banlist = [BanlistInput.model_validate(item["banlist"])]

@@ -62,16 +62,22 @@ El resultado de las pruebas y los pendientes de producción están en
 No requiere instalar nada. En GitHub: **Code → Codespaces → Create codespace** sobre la rama
 deseada. El entorno (`.devcontainer/`) crea `.env`, levanta PostgreSQL y la API con Docker e
 importa las banlists. Cuando el puerto 8000 aparece en la pestaña **Ports**, abrir su dirección.
-El catálogo empieza vacío; para cargar cartas, en la terminal del Codespace:
+El catálogo empieza vacío. Para cargar unas 1000 cartas, cada una con dos impresiones de
+rarezas distintas (la original y la más reciente en otra rareza), en la terminal del Codespace:
 
 ```bash
-docker compose exec api cardmatica sync ygoprodeck initial --max-cards 20
+docker compose exec api cardmatica sync ygoprodeck initial --max-cards 1000 --max-printings 2
 ```
 
-Para ver ilustraciones (vista provisional, sin licencia comercial), tras cargar cartas:
+Tarda unos minutos y termina con `"status": "paused"`: es lo esperado, se detuvo al llegar al
+límite. Sin `--max-printings` se importan todas las impresiones de cada carta.
+
+Para ver ilustraciones (vista provisional, sin licencia comercial), tras cargar cartas.
+Respeta un ritmo de una petición por segundo (dos por carta), así que 1000 cartas tardan
+alrededor de media hora; se puede cortar y retomar, solo baja las que faltan:
 
 ```bash
-docker compose exec api cardmatica preview-images
+docker compose exec api cardmatica preview-images --max-cards 1000
 ```
 
 El Codespace activa esa vista al crearse (`backend/scripts/enable_preview_images.py`, que
