@@ -1,0 +1,23 @@
+{
+    // Codespaces / Dev Containers: levanta PostgreSQL y la API con Docker al abrir el entorno.
+    "name": "Cardmática",
+    "image": "mcr.microsoft.com/devcontainers/python:3.13",
+    "features": {
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+    },
+    // Genera .env con credenciales aleatorias solo la primera vez.
+    "postCreateCommand": "test -f .env || python3 backend/scripts/init_env.py",
+    // Cada vez que el entorno arranca: base de datos, migraciones, banlists y API.
+    "postStartCommand": "docker compose up --build -d db api",
+    "forwardPorts": [8000],
+    "portsAttributes": {
+        "8000": {
+            "label": "Cardmática",
+            "onAutoForward": "openBrowser"
+        }
+    },
+    "hostRequirements": {
+        "cpus": 2,
+        "memory": "4gb"
+    }
+}

@@ -54,6 +54,20 @@ El resultado de las pruebas y los pendientes de producción están en
 - El rol de migraciones debe poder crear tablas e instalar `pg_trgm`. En un servicio
   administrado, solicitar al administrador que instale esa extensión previamente.
 
+## Probar en el navegador con GitHub Codespaces
+
+No requiere instalar nada. En GitHub: **Code → Codespaces → Create codespace** sobre la rama
+deseada. El entorno (`.devcontainer/`) crea `.env`, levanta PostgreSQL y la API con Docker e
+importa las banlists. Cuando el puerto 8000 aparece en la pestaña **Ports**, abrir su dirección.
+El catálogo empieza vacío; para cargar cartas, en la terminal del Codespace:
+
+```bash
+docker compose exec api cardmatica sync ygoprodeck initial --max-cards 20
+```
+
+Las ilustraciones no se muestran en Codespaces: la vista local de imágenes solo acepta
+localhost. Los Codespaces consumen la cuota mensual de la cuenta de GitHub; detenerlos al terminar.
+
 ## Windows 11 — PowerShell
 
 Ejecutar desde la raíz del repositorio. No es necesario activar el entorno virtual.
