@@ -179,5 +179,9 @@ export function installAccountMenu() {
         items.at(next % items.length)?.focus();
     });
     document.addEventListener("cm:profile", refreshAvatar);
-    document.addEventListener("cm:account", refreshAvatar);
+    document.addEventListener("cm:account", () => {
+        refreshAvatar();
+        // Opened before the page knew who is signed in: show the right entries.
+        if (!menu.hidden) menu.innerHTML = menuHtml();
+    });
 }

@@ -356,13 +356,6 @@ small {
     margin-bottom: 12px;
 }
 
-.hero {
-    display: flex;
-    gap: 18px;
-    flex-wrap: wrap;
-    margin-bottom: 14px;
-}
-
 .facts {
     flex: 1;
     min-width: 220px;
@@ -688,17 +681,6 @@ button:disabled {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     line-height: 1.6;
-}
-
-.catalog-printing-label {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.catalog-printing-label select {
-    min-width: 0;
-    max-width: 100%;
 }
 
 .catalog-erratum {

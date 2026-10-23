@@ -93,20 +93,20 @@ def import_banlist(session, data: BanlistFile) -> dict:
     }
 
 
+def list_in_force(session, market: str, today: date | None = None) -> BanlistList | None:
+    """The latest list of one format whose date has already arrived."""
+    return session.scalar(
+        select(BanlistList)
+        .where(BanlistList.format == market, BanlistList.effective_date <= (today or date.today()))
+        .order_by(BanlistList.effective_date.desc())
+        .limit(1)
+    )
+
+
 def current_lists(session, today: date | None = None) -> list[BanlistList]:
     """Latest list already in force for each format."""
-    today = today or date.today()
-    rows = []
-    for market in ("TCG", "OCG"):
-        row = session.scalar(
-            select(BanlistList)
-            .where(BanlistList.format == market, BanlistList.effective_date <= today)
-            .order_by(BanlistList.effective_date.desc())
-            .limit(1)
-        )
-        if row:
-            rows.append(row)
-    return rows
+    rows = (list_in_force(session, market, today) for market in ("TCG", "OCG"))
+    return [row for row in rows if row]
 
 
 def list_view(session, row: BanlistList) -> BanlistListView:
@@ -169,12 +169,7 @@ def statuses_for_cards(session, cards, market, today: date | None = None) -> dic
     """Status of a page of cards on the list in force for one market, in two queries."""
     if not market or not cards:
         return {}
-    row = session.scalar(
-        select(BanlistList)
-        .where(BanlistList.format == market, BanlistList.effective_date <= (today or date.today()))
-        .order_by(BanlistList.effective_date.desc())
-        .limit(1)
-    )
+    row = list_in_force(session, market, today)
     if row is None:
         return {}
     names = {card.id: english_names(card) for card in cards}

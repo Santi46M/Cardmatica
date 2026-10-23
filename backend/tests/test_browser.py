@@ -576,6 +576,7 @@ def test_admin_panel_for_admin_accounts(live_server, browser_page, factory):
         session.scalar(select(User).where(User.email == "admin@example.com")).role = "admin"
     page.reload()
     page.locator("#account-button").click()
+    # The menu fills in the admin entry as soon as the account is known.
     page.locator('#account-menu [data-go="Admin"]').click()
     expect(page.locator("#admv .admin-stats")).to_contain_text("Cuentas")
     expect(page.locator("#admin-users")).to_contain_text("admin@example.com")

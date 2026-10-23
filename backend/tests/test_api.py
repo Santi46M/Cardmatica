@@ -210,3 +210,45 @@ def test_cache_control_by_kind_of_file(client):
     assert again.status_code == 304
     assert client.get("/api/v1/cards").headers["Cache-Control"] == "private, no-store"
     assert client.get("/").headers["Cache-Control"] == "no-cache"
+
+
+def test_every_module_is_used_and_preloaded():
+    """New modules must be imported somewhere and listed for parallel loading."""
+    import re
+
+    from app.core.config import ROOT
+
+    folder = ROOT / "frontend" / "js"
+    modules = {path.name for path in folder.glob("*.js")}
+    imported = set()
+    for path in folder.glob("*.js"):
+        imported |= set(re.findall(r'from "\./([\w-]+\.js)"', path.read_text(encoding="utf-8")))
+    page = (ROOT / "index.html").read_text(encoding="utf-8")
+    preloaded = set(re.findall(r'rel="modulepreload" href="/frontend/js/([\w-]+\.js)"', page))
+    assert modules - imported == {"catalog.js"}, "módulos sin usar"
+    assert preloaded == imported
+
+
+def test_every_css_class_is_used():
+    """Styles for removed markup should go with it."""
+    import re
+
+    from app.core.config import ROOT
+
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    classes = set(re.findall(r"\.([a-zA-Z][\w-]*)", re.sub(r"url\([^)]*\)|\d+\.\d+", "", css)))
+    sources = [
+        *ROOT.glob("frontend/**/*.js"),
+        *ROOT.glob("frontend/pages/*.html"),
+        ROOT / "index.html",
+    ]
+    text = "".join(path.read_text(encoding="utf-8") for path in sources)
+    # Built at run time from a status: `bn-${tone}` (frontend/js/banlist.js).
+    dynamic = ("bn-",)
+    unused = {
+        name
+        for name in classes
+        if not name.startswith(dynamic)
+        and not re.search(rf"(?<![\w-]){re.escape(name)}(?![\w-])", text)
+    }
+    assert not unused, sorted(unused)
