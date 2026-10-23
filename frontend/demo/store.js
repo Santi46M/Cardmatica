@@ -518,37 +518,75 @@ function inventoryRow(listing) {
 // Ficha de una carta de la demo (se abre desde el inventario de un vendedor)
 // ---------------------------------------------------------------------------
 
+// Misma disposición que la ficha del catálogo real (catalog-view.js): cabecera,
+// imagen, panel de información con gráfico y, debajo, la tabla de ofertas con
+// sus filtros a la izquierda.
 function openDemoCard(id) {
     const card = CARDS[id];
-    const facts =
-        card.kind === "Monstruo"
-            ? `<div><span>Atributo</span>${card.attribute}</div><div><span>Nivel / Rango / Link</span>${levelText(
-                  card
-              )}</div><div><span>ATK / DEF</span>${card.atk} / ${
-                  card.subtypes.includes("Link") ? "—" : card.def
-              }</div>`
-            : `<div><span>Tipo</span>${card.kind} ${card.subtypes[0].toLowerCase()}</div>`;
     const languages = card.ocg ? DEMO.ocgLanguages : DEMO.tcgLanguages;
-    byId("mb").innerHTML = `<div class="top"><div><h2>${escapeText(card.name)}</h2>${cardChips(
-        card
-    )}</div>${closeButton("md")}</div><div class="hero">${thumbnail(
-        card,
-        "thumb big"
-    )}<div class="facts">${facts}<div><span>Impresiones</span>${
-        card.printings.length
-    }</div></div></div><div id="ch" class="chart"></div><div class="sel"><select id="fp" aria-label="Impresión"><option value="">Todas las impresiones</option>${card.printings
+    const stats = [
+        card.kind,
+        card.subtypes.join(" / "),
+        card.attribute,
+        levelText(card),
+        card.kind === "Monstruo" ? `ATK ${card.atk} / DEF ${card.subtypes.includes("Link") ? "—" : card.def}` : ""
+    ]
+        .filter(Boolean)
+        .join(" · ");
+    const filters = `<label>Impresión<select id="fp"><option value="">Todas las impresiones</option>${card.printings
         .map((printing, index) => `<option value="${index}">${printing.code} · ${printing.rarity}</option>`)
         .join(
             ""
-        )}</select><select id="fc" aria-label="Estado mínimo"><option value="6">Cualquier estado</option>${conditionOptions()}</select><select id="fl" aria-label="Idioma"><option value="">Todos los idiomas</option>${languages
+        )}</select></label><label>Estado mínimo<select id="fc"><option value="6">Cualquier estado</option>${conditionOptions()}</select></label><label>Idioma<select id="fl"><option value="">Todos los idiomas</option>${languages
         .map((code) => `<option value="${code}">${DEMO.languages[code].name}</option>`)
-        .join(
-            ""
-        )}</select></div><div class="wrap"><table><thead><tr><th>Vendedor</th><th>Impresión</th><th>Estado</th><th>Idioma</th><th class="num">Disp.</th><th class="num">Precio</th><th></th></tr></thead><tbody id="ot"></tbody></table></div>`;
+        .join("")}</select></label>`;
+    byId("mb").innerHTML = `<div class="card-detail"><div class="cd-head"><div><h2>${escapeText(
+        card.name
+    )}</h2><p class="cd-sub" id="cd-sub"></p></div><div class="top-actions">${closeButton(
+        "md"
+    )}</div></div><div class="cd-top"><figure class="cd-image gl">${thumbnail(
+        card,
+        "thumb big"
+    )}<figcaption>${cardChips(
+        card
+    )}</figcaption></figure><div class="cd-info gl"><div class="cd-tabs" role="tablist"><button role="tab" aria-selected="true" data-cd-tab="info">ⓘ Info</button></div><div class="cd-panel" data-cd-panel="info"><div class="cd-cols"><div><dl class="cd-facts" id="cd-facts"></dl></div><div class="cd-chart"><div id="ch" class="chart"></div></div></div><div class="cd-text"><p class="cd-stats">${stats}</p></div></div></div></div><section class="cd-offers"><aside class="cd-filters gl" aria-label="Filtrar ofertas">${filters}</aside><div class="gl wrap"><table class="cd-table"><thead><tr><th>Vendedor</th><th>Información del producto</th><th class="num">Oferta</th></tr></thead><tbody id="ot"></tbody></table></div></section></div>`;
     openDialog("c", id);
     renderCardOffers();
     drawChart();
     byId("md").classList.add("on");
+}
+
+function factRow(label, html) {
+    return `<div><dt>${label}</dt><dd>${html}</dd></div>`;
+}
+
+// Datos de la impresión elegida (o de la primera) y resumen de precios.
+function renderDemoFacts(card, selected, summary) {
+    const printing = card.printings[selected === "" ? 0 : Number(selected)];
+    const offers = inStock(
+        (listing) => listing.card === card.id && (selected === "" || listing.printing === Number(selected))
+    );
+    const units = offers.reduce((sum, listing) => sum + listing.quantity, 0);
+    const lowest = lowestPrice(offers);
+    byId("cd-sub").textContent = `${printing.set} · Cartas sueltas`;
+    byId("cd-facts").innerHTML =
+        factRow("Rareza", rarityBadge(printing.rarity)) +
+        factRow("Número", printing.code) +
+        factRow("Impreso en", `${printing.set} <small>${DEMO.setTypes[printing.setType]}</small>`) +
+        factRow("Disponibles", units) +
+        factRow("Desde", lowest === null ? "Sin stock" : formatPrice(lowest)) +
+        factRow(
+            "Última venta",
+            `${formatPrice(summary.last.price)} <small>${formatDate(summary.last.time)}${
+                selected === "" && card.printings.length > 1 ? ` · ${card.printings[summary.last.printing].code}` : ""
+            }</small>`
+        ) +
+        factRow("Media del periodo", formatPrice(summary.average)) +
+        factRow("Mínimo / máximo", `${formatPrice(summary.low)} / ${formatPrice(summary.high)}`) +
+        factRow(
+            "Variación",
+            `<b style="color:${summary.change >= 0 ? "#8fe3a5" : "#ff9b92"}">${summary.change >= 0 ? "+" : ""}${summary.change.toFixed(1)}%</b>`
+        );
 }
 
 function renderCardOffers() {
@@ -565,16 +603,20 @@ function renderCardOffers() {
     ).sort((a, b) => a.price - b.price);
     byId("ot").innerHTML = listings.length
         ? listings
-              .map(
-                  (listing) =>
-                      `<tr><td>${sellerCell(listing)}</td><td>${printingCell(card, listing)}</td><td>${conditionCell(
-                          listing
-                      )}</td><td>${DEMO.languages[listing.language].name}</td><td class="num">${
-                          listing.quantity
-                      }</td><td class="num price">${formatPrice(listing.price)}</td>${ADD_BUTTON(listing)}</tr>`
-              )
+              .map((listing) => {
+                  const offer = card.printings[listing.printing];
+                  return `<tr><td>${sellerCell(listing)}</td><td><div class="cd-product">${conditionCell(
+                      listing
+                  )}<span>${DEMO.languages[listing.language].name}</span><small>${offer.code} · ${
+                      offer.rarity
+                  }</small></div></td><td class="num"><div class="cd-offer"><b class="price">${formatPrice(
+                      listing.price
+                  )}</b><span title="Unidades disponibles">${listing.quantity}</span><button class="btn s" data-add="${
+                      listing.id
+                  }" aria-label="Añadir al carrito">🛒</button></div></td></tr>`;
+              })
               .join("")
-        : '<tr><td colspan="7" class="empty">Sin ofertas con esos filtros. Prueba con otro estado, idioma o impresión.</td></tr>';
+        : '<tr><td colspan="3" class="empty">Sin ofertas con esos filtros. Prueba con otro estado, idioma o impresión.</td></tr>';
 }
 
 // ---------------------------------------------------------------------------
@@ -705,23 +747,20 @@ function drawChart() {
                   )
                   .join("")}</div>`
             : "";
-    container.innerHTML = `<div class="cht"><b>Historial de precio</b><div class="seg m">${rangeButtons}</div></div>${legend}<svg id="csv" viewBox="0 0 ${width} ${height}" role="img" aria-label="Gráfico del historial de precio">${svg}</svg><div class="tip" id="tip"></div><div class="cs"><div><small>Última venta</small><b>${formatPrice(
-        last.price
-    )}</b><small>${formatDate(last.time)}${
-        printings.length > 1 ? ` · ${card.printings[last.printing].code}` : ""
-    }</small></div><div><small>Media del periodo</small><b>${formatPrice(
-        average
-    )}</b></div><div><small>Mínimo / máximo</small><b>${formatPrice(Math.min(...prices))} / ${formatPrice(
-        Math.max(...prices)
-    )}</b></div><div><small>Variación</small><b style="color:${change >= 0 ? "#8fe3a5" : "#ff9b92"}">${
-        change >= 0 ? "+" : ""
-    }${change.toFixed(1)}%</b></div></div>${
+    container.innerHTML = `<div class="cht"><b>Historial de precio</b><div class="seg m">${rangeButtons}</div></div>${legend}<svg id="csv" viewBox="0 0 ${width} ${height}" role="img" aria-label="Gráfico del historial de precio">${svg}</svg><div class="tip" id="tip"></div>${
         stock
             ? ""
             : `<div class="warn">Nadie la tiene a la venta ahora. Última venta registrada: ${formatPrice(
                   last.price
               )} el ${formatDate(last.time)}.</div>`
     }`;
+    renderDemoFacts(card, selected, {
+        last,
+        average,
+        change,
+        low: Math.min(...prices),
+        high: Math.max(...prices)
+    });
 }
 
 // Tooltip del gráfico: muestra la venta más cercana al puntero en cada línea.
@@ -1075,6 +1114,13 @@ const CLICK_ACTIONS = [
         drawChart();
     }],
     ["[data-pd]", (button) => openProduct(Number(button.dataset.pd))],
+    ["[data-cd-tab]", (button) => {
+        const info = button.closest(".cd-info");
+        for (const other of info.querySelectorAll("[data-cd-tab]"))
+            other.setAttribute("aria-selected", other === button);
+        for (const panel of info.querySelectorAll("[data-cd-panel]"))
+            panel.hidden = panel.dataset.cdPanel !== button.dataset.cdTab;
+    }],
     ["[data-go]", (button) => {
         tab = button.dataset.go;
         showTab();

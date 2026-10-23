@@ -30,7 +30,31 @@ function lastSaleHtml(sale, withCode) {
     }</small></div>`;
 }
 
-export function priceChartHtml(history, { printingId = "", days = 365 } = {}) {
+// Averages shown next to the chart (last 30, 7 and 1 days), in euros, from the
+// sales of the selected printing (or of every printing). null means no sales.
+export const SUMMARY_WINDOWS = [
+    ["Media 30 días", 30],
+    ["Media 7 días", 7],
+    ["Media 1 día", 1]
+];
+
+export function priceSummary(history, printingId = "", now = Date.now()) {
+    if (!history) return null;
+    const sales = history.points
+        .filter((item) => !printingId || item.printing_id === printingId)
+        .map((item) => ({ time: Date.parse(item.observed_at), euro: toEuro(item.price, item.currency) }))
+        .filter((item) => item.euro !== null);
+    const last = printingId ? history.points.filter((item) => item.printing_id === printingId).at(-1) : history.last_sale;
+    const averages = SUMMARY_WINDOWS.map(([label, days]) => {
+        const recent = sales.filter((item) => item.time >= now - days * 864e5);
+        return [label, recent.length ? recent.reduce((sum, item) => sum + item.euro, 0) / recent.length : null];
+    });
+    return { last: last || null, averages };
+}
+
+// stats: false leaves out the figures under the chart, for layouts that show
+// priceSummary() elsewhere.
+export function priceChartHtml(history, { printingId = "", days = 365, stats = true } = {}) {
     if (history === undefined)
         return `${header(days)}<p class="catalog-status">Cargando historial…</p>`;
     if (history === null)
@@ -134,9 +158,11 @@ export function priceChartHtml(history, { printingId = "", days = 365 } = {}) {
                   )
                   .join("")}</div>`
             : "";
-    return `${header(days)}${legend}<svg id="ph-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Historial de precio: ${
+    const chart = `${header(days)}${legend}<svg id="ph-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Historial de precio: ${
         points.length
-    } ventas en el periodo">${svg}</svg><div class="tip" id="ph-tip"></div><div class="cs">${lastSaleHtml(
+    } ventas en el periodo">${svg}</svg><div class="tip" id="ph-tip"></div>`;
+    if (!stats) return chart;
+    return `${chart}<div class="cs">${lastSaleHtml(
         last,
         !printingId
     )}<div><small>Media del periodo</small><b>${h(

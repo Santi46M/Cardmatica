@@ -112,6 +112,28 @@ export function pickerHtml(card, printings, selectedId, market) {
     )}</select><label class="qty">Cantidad <input id="wl-quantity" type="number" min="1" max="${WANTLIST.maxQuantity}" value="1"></label><button class="btn s" data-wl-add>Añadir</button></div>`;
 }
 
+// "Wantlists" tab of a card's detail: the lists that already include it.
+export function cardWantsHtml(cardId) {
+    const entries = state.lists.flatMap((list) =>
+        list.items.filter((item) => item.cardId === cardId).map((item) => ({ list, item }))
+    );
+    const rows = entries
+        .map(
+            ({ list, item }) =>
+                `<li><b>${h(list.name)}</b> · ${item.quantity} × ${h(
+                    item.code ? `${item.code} · ${item.rarity}` : "Cualquier impresión"
+                )}${item.language ? ` · ${h(item.language)}` : ""}${
+                    item.edition ? ` · ${h(item.edition)}` : ""
+                }</li>`
+        )
+        .join("");
+    return `${
+        rows
+            ? `<p>Esta carta está en ${entries.length === 1 ? "1 de tus wantlists" : `${entries.length} entradas de tus wantlists`}:</p><ul class="cd-wants">${rows}</ul>`
+            : '<p class="catalog-status">Esta carta todavía no está en ninguna de tus wantlists.</p>'
+    }<p><button class="btn s" data-wl-open aria-controls="wl-picker">♥ Añadir a wantlist</button></p><small class="catalog-status">Las wantlists se gestionan en su pestaña, arriba.</small>`;
+}
+
 function addFromForm(card, printings, market) {
     let list;
     const choice = document.getElementById("wl-list").value;

@@ -1403,3 +1403,271 @@ button:disabled {
     top: -6px;
     left: 24px;
 }
+
+/* Ficha de carta (catálogo y demo): cabecera, imagen, panel de información
+   con pestañas y gráfico, y debajo la tabla de ofertas con sus filtros. */
+.box:has(> .card-detail) {
+    max-width: 1100px;
+}
+
+.cd-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--bd);
+}
+
+.cd-head h2 {
+    font-size: 26px;
+    line-height: 1.2;
+}
+
+.cd-sub {
+    margin: 2px 0 0;
+    color: var(--mu);
+    font-style: italic;
+}
+
+.cd-sub small {
+    font-style: normal;
+}
+
+.cd-top {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+}
+
+.cd-image {
+    margin: 0;
+    padding: 12px;
+    border-radius: 12px;
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+}
+
+.cd-image .catalog-image.large,
+.cd-image .catalog-image-fallback.large {
+    width: 100%;
+    max-width: 236px;
+}
+
+.cd-image figcaption {
+    color: var(--mu);
+    font-size: 12px;
+    text-align: center;
+}
+
+.cd-info {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.cd-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--bd);
+}
+
+.cd-tabs button {
+    flex: 1;
+    padding: 9px 12px;
+    border: 0;
+    background: rgba(0, 0, 0, .18);
+    color: var(--mu);
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.cd-tabs button + button {
+    border-left: 1px solid var(--bd);
+}
+
+.cd-tabs button[aria-selected="true"] {
+    background: rgba(255, 255, 255, .06);
+    color: var(--tx);
+    font-weight: 600;
+}
+
+.cd-panel {
+    padding: 14px;
+}
+
+.cd-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 16px;
+    align-items: start;
+}
+
+.cd-facts {
+    margin: 0;
+}
+
+.cd-facts > div {
+    display: grid;
+    grid-template-columns: 9.5em minmax(0, 1fr);
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 14px;
+}
+
+.cd-facts dt {
+    font-weight: 600;
+}
+
+.cd-facts dd {
+    margin: 0;
+    min-width: 0;
+}
+
+.cd-facts dd small {
+    color: var(--mu);
+}
+
+.cd-facts select {
+    width: 100%;
+    max-width: 100%;
+}
+
+.cd-facts + .cd-facts {
+    margin-top: 10px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(170, 215, 255, .1);
+}
+
+.cd-chart .chart {
+    margin-bottom: 10px;
+}
+
+.cd-want {
+    display: block;
+    margin: 0 auto;
+}
+
+.cd-text {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(170, 215, 255, .1);
+}
+
+.cd-stats {
+    margin: 0 0 6px;
+    color: var(--mu);
+    font-size: 14px;
+}
+
+.cd-text .catalog-section {
+    margin: 0;
+}
+
+#wl-picker:not(:empty) {
+    padding: 0 14px 14px;
+}
+
+.cd-wants {
+    margin: 6px 0 10px;
+    padding-left: 18px;
+}
+
+.cd-offers {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin: 14px 0;
+}
+
+.cd-offers > .wrap {
+    flex: 1;
+    min-width: 0;
+    border-radius: 12px;
+}
+
+.cd-filters {
+    width: 190px;
+    flex: none;
+    padding: 12px;
+    border-radius: 12px;
+    display: grid;
+    gap: 10px;
+}
+
+.cd-filters label {
+    display: grid;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--mu);
+}
+
+.cd-table {
+    width: 100%;
+}
+
+.cd-table th {
+    text-align: center;
+}
+
+.cd-product {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.cd-product small {
+    color: var(--mu);
+}
+
+.cd-offer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+}
+
+.cd-offer span {
+    min-width: 1.5em;
+    text-align: right;
+}
+
+@media (max-width: 860px) {
+    .cd-top,
+    .cd-cols {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cd-offers {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .cd-filters {
+        width: auto;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .cd-head h2 {
+        font-size: 21px;
+    }
+
+    .cd-facts > div {
+        grid-template-columns: 8em minmax(0, 1fr);
+    }
+}
+
+.cd-filters select {
+    width: 100%;
+    min-width: 0;
+}
+
+/* Rareza sin color propio (catálogo real). */
+.rr:not([style]) {
+    background: rgba(255, 255, 255, .1);
+    color: var(--tx);
+}

@@ -8,15 +8,16 @@ import {
     homeHtml,
     pager,
     previewHtml,
+    pricesHtml,
     skeletonRows,
     skeletonTiles
 } from "./catalog-view.js";
 import { BACK_TO_TOP_PX, CATALOG, HOVER_PREVIEW } from "./config.js";
 import { escapeHtml } from "./html.js";
-import { priceChartHtml } from "./price-chart.js";
+import { priceChartHtml, priceSummary } from "./price-chart.js";
 import { installProfile, renderProfile } from "./profile.js";
 import { readJson, writeJson } from "./storage.js";
-import { installWantlists, refreshAlerts, renderWantlists } from "./wantlists.js";
+import { cardWantsHtml, installWantlists, refreshAlerts, renderWantlists } from "./wantlists.js";
 
 const api = new CatalogApi();
 const h = escapeHtml;
@@ -207,8 +208,24 @@ function renderDetail() {
 function renderChart() {
     const slot = element("price-history");
     if (!slot) return;
-    slot.innerHTML = priceChartHtml(priceHistory, { printingId: selectedPrinting, days: chartDays });
+    slot.innerHTML = priceChartHtml(priceHistory, {
+        printingId: selectedPrinting,
+        days: chartDays,
+        stats: false
+    });
+    const prices = element("cd-prices");
+    if (prices)
+        prices.innerHTML = pricesHtml(
+            priceHistory === undefined ? undefined : priceSummary(priceHistory, selectedPrinting)
+        );
 }
+
+// The "Wantlists" tab is drawn when opened, so it reflects lists changed meanwhile.
+document.addEventListener("click", (event) => {
+    const tab = event.target.closest('[data-cd-tab="wants"]');
+    const panel = element("mb").querySelector('[data-cd-panel="wants"]');
+    if (tab && panel && detail) panel.innerHTML = cardWantsHtml(detail.id);
+});
 
 async function loadHomeBanlist() {
     const slot = element("home-banlist");

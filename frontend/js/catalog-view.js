@@ -18,6 +18,42 @@ const fact = (label, value) =>
         ? ""
         : `<div><span>${h(label)}</span><b>${h(value)}</b></div>`;
 
+// One row of the facts list beside the chart; empty values are left out.
+const factRow = (label, html) => (html ? `<div><dt>${h(label)}</dt><dd>${html}</dd></div>` : "");
+
+const BANLIST_LABELS = {
+    forbidden: "Prohibida",
+    limited: "Limitada",
+    semi_limited: "Semi-limitada",
+    unlimited: "Permitida"
+};
+const banlistLabel = (status) => BANLIST_LABELS[status.status] || "Sin estado verificado";
+
+function rarityBadge(rarity) {
+    return rarity ? `<span class="rr">${h(rarity)}</span>` : "";
+}
+
+// Tabs of the info panel. Cards from the API can go to a wantlist; demo cards
+// cannot, so they only show "Info".
+export function cardTabs(withWants) {
+    return `<div class="cd-tabs" role="tablist"><button role="tab" aria-selected="true" data-cd-tab="info">ⓘ Info</button>${
+        withWants ? '<button role="tab" aria-selected="false" data-cd-tab="wants">♥ Wantlists</button>' : ""
+    }</div>`;
+}
+
+// Prices beside the chart, from Cardmática's own sales.
+export function pricesHtml(summary) {
+    if (summary === undefined) return factRow("Última venta", "Cargando…");
+    if (!summary) return "";
+    const value = (euros) => (euros === null ? "—" : h(window.formatPrice(euros)));
+    return `${factRow(
+        "Última venta",
+        summary.last
+            ? `${h(money(summary.last.price, summary.last.currency))} <small>${h(formatDate(summary.last.observed_at))}</small>`
+            : "—"
+    )}${summary.averages.map(([label, euros]) => factRow(label, value(euros))).join("")}`;
+}
+
 function creditLink(value, label) {
     if (!value) return "";
     const url = new URL(value);
@@ -302,68 +338,7 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
                 }</summary><p class="card-text">${h(entry.text)}</p></details>`
         )
         .join("");
-    return `<div class="top"><div><h2>${badgeHtml(statusFor(card, market))}${h(
-        card.name
-    )}</h2><small>${[
-        card.ygoprodeck_id ? `YGOPRODeck ${card.ygoprodeck_id}` : "",
-        card.konami_id ? `CID ${card.konami_id}` : ""
-    ]
-        .filter(Boolean)
-        .join(
-            " · "
-        )}</small></div><div class="top-actions"><button class="btn s" data-wl-open aria-controls="wl-picker">+ Wantlist</button><button class="ghost" data-close="md">Cerrar</button></div></div><div id="wl-picker"></div><div class="hero"><div>${imageHtml(
-        image,
-        `${card.name} · ${
-            image?.association === "card_artwork" ? "ilustración general" : printing?.code || ""
-        }`,
-        true
-    )}${
-        image
-            ? `<small>${
-                  image.association === "card_artwork"
-                      ? "Ilustración general: no verifica la rareza, edición o set seleccionado.<br>"
-                      : ""
-              }${h(image.author || "Autor no indicado")} · ${h(
-                  image.usage_scope === "local_preview_only"
-                      ? "Vista local de prueba; derechos comerciales sin verificar"
-                      : image.license || "Permiso documentado"
-              )} · ${creditLink(image.source_url, "Origen")}${
-                  image.license_url ? ` · ${creditLink(image.license_url, "Licencia")}` : ""
-              }</small>`
-            : ""
-    }</div><div class="facts">${fact("Tipo", kinds[card.card_type] || card.card_type)}${fact(
-        "Subtipos",
-        card.subtypes.join(" / ")
-    )}${fact("Atributo", card.attribute)}${fact("Nivel", card.level)}${fact(
-        "Rango",
-        card.rank
-    )}${fact("Link", card.link_rating)}${fact("ATK", card.atk)}${fact("DEF", card.defense)}${fact(
-        "Escala Péndulo",
-        card.pendulum_scale
-    )}${fact("Set", printing?.set_name)}${fact("Código", printing?.code)}${fact(
-        "Rareza",
-        printing?.rarity
-    )}${fact("Idioma", printing?.language)}${fact(
-        "Edición",
-        printing?.edition === "unknown" ? null : printing?.edition
-    )}${fact("Variante", printing?.artwork === "unknown" ? null : printing?.artwork)}${fact(
-        "Lanzamiento",
-        printing?.release_date
-    )}</div></div>${
-        printing
-            ? `<label class="catalog-printing-label">Impresión <select id="catalog-printing">${printings.items
-                  .map(
-                      (item) =>
-                          `<option value="${h(item.id)}" ${
-                              item.id === printing.id ? "selected" : ""
-                          }>${h(
-                              [item.code, item.rarity, item.language, item.edition].join(" · ")
-                          )}</option>`
-                  )
-                  .join("")}</select></label>${pager(printings, "printing")}`
-            : '<p class="empty">No hay impresiones documentadas para este mercado.</p>'
-    }<div id="price-history" class="chart" aria-live="polite"></div>${
-        text
+    const textHtml = text
             ? section(
                   `${
                       text.is_official
@@ -378,8 +353,74 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
                           : ""
                   }`
               )
-            : '<p class="catalog-status">Texto vigente todavía no disponible.</p>'
-    }${section(
+            : '<p class="catalog-status">Texto vigente todavía no disponible.</p>';
+    const ids = [
+        card.ygoprodeck_id ? `YGOPRODeck ${card.ygoprodeck_id}` : "",
+        card.konami_id ? `CID ${card.konami_id}` : ""
+    ]
+        .filter(Boolean)
+        .join(" · ");
+    const credit = image
+        ? `<figcaption>${
+              image.association === "card_artwork"
+                  ? "Ilustración general: no verifica la rareza, edición o set seleccionado.<br>"
+                  : ""
+          }${h(image.author || "Autor no indicado")} · ${h(
+              image.usage_scope === "local_preview_only"
+                  ? "Vista local de prueba; derechos comerciales sin verificar"
+                  : image.license || "Permiso documentado"
+          )} · ${creditLink(image.source_url, "Origen")}${
+              image.license_url ? ` · ${creditLink(image.license_url, "Licencia")}` : ""
+          }</figcaption>`
+        : "";
+    const printingChoice =
+        printings.items.length > 1
+            ? `<select id="catalog-printing" aria-label="Impresión">${printings.items
+                  .map(
+                      (item) =>
+                          `<option value="${h(item.id)}" ${item.id === printing.id ? "selected" : ""}>${h(
+                              [item.code, item.rarity, item.language, item.edition].join(" · ")
+                          )}</option>`
+                  )
+                  .join("")}</select>${printings.total > printings.page_size ? pager(printings, "printing") : ""}`
+            : "";
+    const banlist = statusFor(card, market);
+    const facts = printing
+        ? `${factRow("Rareza", rarityBadge(printing.rarity))}${factRow("Número", h(printing.code))}${factRow(
+              "Impreso en",
+              h(printing.set_name)
+          )}${printingChoice ? factRow("Impresión", printingChoice) : ""}${factRow(
+              "Idioma",
+              h(printing.language)
+          )}${factRow("Edición", printing.edition === "unknown" ? "" : h(printing.edition))}${factRow(
+              "Lanzamiento",
+              printing.release_date ? h(formatDate(printing.release_date)) : ""
+          )}${factRow("Banlist", banlist ? `${badgeHtml(banlist)} ${h(banlistLabel(banlist))}` : "")}`
+        : '<p class="empty">No hay impresiones documentadas para este mercado.</p>';
+    const stats = [
+        kinds[card.card_type] || card.card_type,
+        card.subtypes.join(" / "),
+        card.attribute,
+        card.level ? `Nivel ${card.level}` : "",
+        card.rank ? `Rango ${card.rank}` : "",
+        card.link_rating ? `LINK-${card.link_rating}` : "",
+        card.pendulum_scale !== null && card.pendulum_scale !== undefined ? `Escala ${card.pendulum_scale}` : "",
+        card.atk !== null && card.atk !== undefined
+            ? `ATK ${card.atk}${card.defense !== null && card.defense !== undefined ? ` / DEF ${card.defense}` : ""}`
+            : ""
+    ]
+        .filter(Boolean)
+        .map(h)
+        .join(" · ");
+    return `<div class="card-detail"><div class="cd-head"><div><h2>${badgeHtml(banlist)}${h(card.name)}</h2><p class="cd-sub">${
+        printing ? `${h(printing.set_name)} · Cartas sueltas` : "Cartas sueltas"
+    }${ids ? `<br><small>${h(ids)}</small>` : ""}</p></div><div class="top-actions"><button class="ghost" data-close="md">Cerrar</button></div></div><div class="cd-top"><figure class="cd-image gl">${imageHtml(
+        image,
+        `${card.name} · ${image?.association === "card_artwork" ? "ilustración general" : printing?.code || ""}`,
+        true
+    )}${credit}</figure><div class="cd-info gl">${cardTabs(true)}<div class="cd-panel" data-cd-panel="info"><div class="cd-cols"><div><dl class="cd-facts">${facts}</dl><dl class="cd-facts" id="cd-prices"></dl></div><div class="cd-chart"><div id="price-history" class="chart" aria-live="polite"></div><button class="btn s cd-want" data-wl-open aria-controls="wl-picker">♥ Añadir a wantlist</button></div></div><div class="cd-text">${
+        stats ? `<p class="cd-stats">${stats}</p>` : ""
+    }${textHtml}</div></div><div class="cd-panel" data-cd-panel="wants" hidden></div><div id="wl-picker"></div></div></div><section class="cd-offers"><div class="gl wrap"><table class="cd-table"><thead><tr><th>Vendedor</th><th>Información del producto</th><th class="num">Oferta</th></tr></thead><tbody><tr><td colspan="3" class="empty">Todavía no hay ofertas de esta impresión en Cardmática.</td></tr></tbody></table></div></section>${section(
         "Arquetipos · clasificación comunitaria",
         groups(card.archetypes, "member")
     )}${section("Series · clasificación comunitaria", groups(card.series, "member"))}${section(
@@ -407,5 +448,5 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
     )}${banlistSectionHtml(card, market)}${section(
         "Procedencia",
         sourceLinks ? `<ul>${sourceLinks}</ul>` : ""
-    )}<p class="catalog-status">No hay publicaciones comerciales vinculadas a esta impresión.</p>`;
+    )}</div>`;
 }
