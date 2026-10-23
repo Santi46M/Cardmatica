@@ -21,6 +21,38 @@ const PAYMENTS = [
 ];
 let profile = readJson(KEY, null);
 
+export const ROLE_LABELS = Object.fromEntries(ROLES);
+
+// The saved profile, or null before the first save. The account menu reads it.
+export function currentProfile() {
+    return profile;
+}
+
+// "Personalización": preferences that already exist elsewhere on the page,
+// gathered here. Each control drives the original one, so both stay in sync.
+function preferencesHtml() {
+    const view = readJson("cm_view", "list");
+    const currencies = (window.CURRENCIES || [])
+        .map(
+            (item) =>
+                `<option value="${h(item.code)}"${item.code === window.currency ? " selected" : ""}>${h(
+                    item.code
+                )} · ${h(item.name)}</option>`
+        )
+        .join("");
+    const option = (value, label, current) =>
+        `<option value="${value}"${value === current ? " selected" : ""}>${label}</option>`;
+    return `<section class="gl pnl" id="pf-prefs"><b>Personalización</b><div class="fm"><label>Moneda<select id="pf-pref-currency">${currencies}</select></label><label>Mercado<select id="pf-pref-market">${option(
+        "TCG",
+        "TCG (cartas occidentales)",
+        window.market
+    )}${option("OCG", "OCG (cartas asiáticas)", window.market)}</select></label><label>Vista del catálogo<select id="pf-pref-view">${option(
+        "list",
+        "Lista",
+        view
+    )}${option("grid", "Cuadrícula", view)}</select></label></div><small>Se guardan en este navegador y se aplican al instante.</small></section>`;
+}
+
 const sells = (role) => role === "seller" || role === "both";
 
 function summaryHtml() {
@@ -56,7 +88,7 @@ export function renderProfile(container) {
             }> ${h(method)}</label>`
     ).join("")}</div></fieldset></div><p id="pf-error" class="warn" role="alert" hidden></p><p><button class="btn" type="submit">Guardar perfil</button></p><small>Por ahora el perfil se guarda solo en este navegador: todavía no hay cuentas en el servidor, y un perfil de vendedor aún no publica una tienda.</small></form><div class="gl pnl" style="margin-top:12px"><b>Wantlists</b><small>${listCount()} ${
         listCount() === 1 ? "lista" : "listas"
-    } · ${countItems()} cartas</small><p><button class="btn s" data-go="Wantlists">Gestionar wantlists</button></p></div>`;
+    } · ${countItems()} cartas</small><p><button class="btn s" data-go="Wantlists">Gestionar wantlists</button></p></div>${preferencesHtml()}`;
 }
 
 function read() {
@@ -104,9 +136,21 @@ export function installProfile({ panel }) {
             return;
         }
         window.toast?.("Perfil guardado");
+        document.dispatchEvent(new CustomEvent("cm:profile"));
         renderProfile(panel());
     });
     document.addEventListener("change", (event) => {
+        const { id, value } = event.target;
+        if (id === "pf-pref-currency") {
+            const select = document.getElementById("cur");
+            select.value = value;
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        if (id === "pf-pref-market") document.querySelector(`[data-mk="${value}"]`)?.click();
+        if (id === "pf-pref-view") {
+            writeJson("cm_view", value);
+            document.dispatchEvent(new CustomEvent("cm:view", { detail: value }));
+        }
         if (event.target.id === "pf-role")
             document.getElementById("pf-store-field").hidden = !sells(event.target.value);
     });

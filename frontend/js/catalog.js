@@ -1,3 +1,4 @@
+import { installAccountMenu } from "./account-menu.js";
 import { CatalogApi } from "./api.js";
 import { homeBanlistHtml, startCountdowns } from "./banlist.js";
 import { installCart, renderCart } from "./cart-page.js";
@@ -108,7 +109,8 @@ function readUrl() {
 }
 
 function applyUrl(state) {
-    const tabs = [...window.TABS, "Carrito"];
+    // Profile and cart open from the account menu and the cart popup, not from a tab.
+    const tabs = [...window.TABS, "Perfil", "Carrito"];
     window.tab = tabs.includes(state.tab) ? state.tab : "Inicio";
     if (["TCG", "OCG"].includes(state.mk)) window.market = state.mk;
     element("q").value = state.q;
@@ -665,8 +667,9 @@ for (const name of ["openDemoCard", "openSeller", "openProduct", "showCart"]) {
 }
 window.TAB_LABELS.Productos = "Productos (demo)";
 window.TAB_LABELS.Vendedores = "Vendedores (demo)";
-// The cart page opens from the cart popup, so it has no tab of its own.
-for (const name of ["Wantlists", "Perfil"]) if (!window.TABS.includes(name)) window.TABS.push(name);
+// The cart page and the profile have no tab of their own: they open from the
+// cart popup and from the account menu (account-menu.js).
+if (!window.TABS.includes("Wantlists")) window.TABS.push("Wantlists");
 window.TAB_LABELS.Wantlists = "Wantlists";
 window.TAB_LABELS.Perfil = "Perfil";
 try {
@@ -675,6 +678,15 @@ try {
 } catch {
     /* Storage can be disabled by the browser. */
 }
+// "Vista del catálogo" in Personalización.
+document.addEventListener("cm:view", (event) => {
+    view = event.detail;
+    if (isCatalog()) {
+        renderViewToggle();
+        if (lastData) renderResults(lastData);
+    }
+});
+installAccountMenu();
 const initial = readUrl();
 applyUrl(initial);
 window.updateMarketButtons();
