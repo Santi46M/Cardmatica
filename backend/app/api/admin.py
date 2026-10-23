@@ -5,7 +5,8 @@ from sqlalchemy import select
 
 from app.api.dependencies import SessionDep, require_admin
 from app.models import DataConflict, SyncError, SyncJob
-from app.schemas.catalog import JobRequest, JobView
+from app.schemas.catalog import JobRequest, JobView, PriceObservationInput, PricePoint
+from app.services.prices import record_sale
 
 router = APIRouter(
     prefix="/api/v1/admin", tags=["Administración"], dependencies=[Depends(require_admin)]
@@ -91,3 +92,13 @@ def conflicts(session: SessionDep, offset: int = 0):
         }
         for row in rows
     ]
+
+
+@router.post("/price-observations", response_model=PricePoint, status_code=201)
+def record_price(data: PriceObservationInput, session: SessionDep):
+    """Record a completed storefront sale until the order backend writes them itself."""
+    result = record_sale(session, data)
+    if result is None:
+        raise HTTPException(404, "Impresión inexistente")
+    session.commit()
+    return result

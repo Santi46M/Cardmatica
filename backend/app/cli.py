@@ -13,6 +13,7 @@ from app.ingestion.sync import SyncRunner, worker
 from app.models import CardArtwork, CardImage, SyncError, SyncJob
 from app.schemas.catalog import JobRequest
 from app.schemas.ingestion import CardRecord
+from app.services.banlists import bundled_files, import_banlist, load_file
 from app.services.ingestion import IngestionService
 
 
@@ -66,6 +67,21 @@ def import_records(path: Path, authorization: str):
     return 1 if failures else 0
 
 
+def import_banlists(paths: list[Path]):
+    """Load dated lists from JSON files; without paths, the lists bundled with the app."""
+    files = paths or bundled_files()
+    if not files:
+        raise ValueError("No hay archivos de banlist para importar")
+    factory = session_factory()
+    results = []
+    for path in files:
+        data = load_file(path)
+        with factory.begin() as session:
+            results.append({"file": path.name, **import_banlist(session, data)})
+    print(json.dumps(results, ensure_ascii=False))
+    return 0
+
+
 def main():
     configure_logging()
     parser = argparse.ArgumentParser(prog="cardmatica")
@@ -92,6 +108,10 @@ def main():
     importing = commands.add_parser("import-jsonl")
     importing.add_argument("path", type=Path)
     importing.add_argument("--authorization-reference", required=True)
+    banlist = commands.add_parser(
+        "import-banlist", help="Importar listas Forbidden & Limited fechadas con su procedencia"
+    )
+    banlist.add_argument("paths", nargs="*", type=Path)
     approval = commands.add_parser("image-rights")
     approval.add_argument("image_id", type=UUID)
     approval.add_argument("status", choices=["approved", "denied", "unverified"])
@@ -102,6 +122,8 @@ def main():
     args = parser.parse_args()
     if args.command == "import-jsonl":
         return import_records(args.path, args.authorization_reference)
+    if args.command == "import-banlist":
+        return import_banlists(args.paths)
     if args.command == "worker":
         if args.poll_seconds < 1:
             parser.error("poll-seconds debe ser al menos 1")

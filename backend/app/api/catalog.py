@@ -10,15 +10,19 @@ from app.core.config import get_settings
 from app.models import Archetype, Card, CardArtwork, CardImage, CardPrinting, CardSet, Rarity
 from app.repositories.catalog import CatalogRepository, printing_loads
 from app.schemas.catalog import (
+    BanlistListView,
     CardDetail,
     CardSummary,
     ErratumView,
     NamedView,
     Page,
+    PriceHistoryView,
     PrintingView,
     SetView,
 )
+from app.services.banlists import current_lists, list_view
 from app.services.catalog import card_detail, card_summary, errata_views, printing_view
+from app.services.prices import price_history
 
 router = APIRouter(prefix="/api/v1", tags=["Catálogo"])
 PageNumber = Annotated[int, Query(ge=1, le=1000000)]
@@ -106,6 +110,27 @@ def printings(
 def errata(card_id: UUID, session: SessionDep):
     require_card_exists(session, card_id)
     return errata_views(session, card_id)
+
+
+@router.get("/cards/{card_id}/price-history", response_model=PriceHistoryView)
+def card_price_history(
+    card_id: UUID,
+    session: SessionDep,
+    market: Market | None = None,
+    printing_id: UUID | None = None,
+    days: Annotated[int, Query(ge=1, le=3650)] = 365,
+):
+    """Sales completed on Cardmática; never external price guides."""
+    require_card_exists(session, card_id)
+    return price_history(
+        session, card_id, market=market, printing_id=printing_id, days=days
+    )
+
+
+@router.get("/banlists", response_model=list[BanlistListView])
+def banlists(session: SessionDep):
+    """Lists in force today for TCG and OCG, with their source."""
+    return [list_view(session, row) for row in current_lists(session)]
 
 
 @router.get("/printings/{printing_id}", response_model=PrintingView)

@@ -9,6 +9,8 @@ __pycache__/
 !.env.example
 .cache/
 data/
+# Listas de banlist incluidas con la aplicación (no son datos de ejecución).
+!backend/app/data/
 coverage.xml
 .coverage
 htmlcov/

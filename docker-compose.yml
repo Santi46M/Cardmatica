@@ -31,7 +31,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    command: ["sh", "-c", "alembic upgrade head && cardmatica import-banlist && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
   worker:
     build: ./backend
     profiles: ["maintenance"]

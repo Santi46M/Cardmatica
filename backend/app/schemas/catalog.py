@@ -1,4 +1,5 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Generic, Literal, TypeVar
 from uuid import UUID
 
@@ -113,6 +114,75 @@ class ErratumView(BaseModel):
     new_text: TextView | None
 
 
+BanlistStatus = Literal["forbidden", "limited", "semi_limited", "unlimited", "unknown"]
+Currency = Literal["EUR", "USD", "ARS", "BRL", "PYG", "UYU", "BOB"]
+Condition = Literal["MT", "NM", "EX", "GD", "LP", "PL", "PO"]
+
+
+class BanlistStatusView(BaseModel):
+    """Status of one card on the list in force for a format, with its source."""
+
+    format: Literal["TCG", "OCG"]
+    effective_date: date
+    status: BanlistStatus
+    max_copies: int | None
+    complete: bool
+    source_name: str
+    source_url: str
+    scope_note: str | None = None
+
+
+class BanlistListView(BaseModel):
+    format: Literal["TCG", "OCG"]
+    effective_date: date
+    complete: bool
+    source_name: str
+    source_url: str
+    retrieved_on: date
+    scope_note: str | None
+    counts: dict[str, int]
+
+
+class PricePoint(BaseModel):
+    printing_id: UUID
+    code: str
+    rarity: str
+    language: str
+    edition: str
+    observed_at: datetime
+    price: Decimal
+    currency: Currency
+    quantity: int
+    condition: Condition | None
+
+
+class PriceHistoryView(BaseModel):
+    card_id: UUID
+    market: Literal["TCG", "OCG"] | None
+    printing_id: UUID | None
+    days: int
+    points: list[PricePoint]
+    last_sale: PricePoint | None
+
+
+class PriceObservationInput(BaseModel):
+    printing_id: UUID
+    price: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
+    currency: Currency
+    observed_at: datetime
+    quantity: int = Field(default=1, ge=1, le=999)
+    condition: Condition | None = None
+    source_reference: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_time(self):
+        if self.observed_at.tzinfo is None:
+            raise ValueError("observed_at debe incluir zona horaria")
+        if self.observed_at > datetime.now(timezone.utc):
+            raise ValueError("observed_at no puede estar en el futuro")
+        return self
+
+
 class CardDetail(CardSummary):
     artworks: list[ImageView] = []
     passcode: str | None
@@ -130,6 +200,7 @@ class CardDetail(CardSummary):
     provenance: list[FieldView]
     errata: list[ErratumView]
     banlist: list[dict]
+    banlist_status: list[BanlistStatusView] = []
     relations: list[dict]
 
 
