@@ -1,4 +1,4 @@
-import { formatDate, newId, readJson, writeJson } from "./storage.js";
+import { formatDate, money, newId, readJson, toEuro, writeJson } from "./storage.js";
 
 const h = (value) =>
     String(value ?? "").replace(
@@ -37,6 +37,11 @@ const TYPES = { Monster: "Monstruo", Spell: "Magia", Trap: "Trampa" };
 let state = readJson(KEY, null);
 if (!state || !Array.isArray(state.lists)) state = { lists: [], active: null };
 let pendingDelete = null;
+// Price alerts: item id -> latest matching sale at or below the target price.
+let api = null;
+let alerts = new Map();
+let alertsAnnounced = false;
+const MAX_ALERT_CHECKS = 30;
 
 function save() {
     if (!writeJson(KEY, state))
@@ -198,16 +203,110 @@ function rowsHtml(list) {
                           item.quantity
                       }" data-wl-qty="${h(item.id)}" aria-label="Cantidad de ${h(
                           item.name
-                      )}"></td><td class="num"><button class="ghost" data-wl-remove="${h(
+                      )}"></td><td class="num">${alertCell(item)}</td><td class="num"><button class="ghost" data-wl-remove="${h(
                           item.id
                       )}">Quitar</button></td></tr>`
               )
               .join("")
-        : `<tr><td colspan="6" class="empty">${
+        : `<tr><td colspan="7" class="empty">${
               list.items.length
                   ? "Ninguna carta de esta lista coincide con los filtros."
                   : "Esta lista está vacía. Abre una carta y usa «+ Wantlist»."
           }</td></tr>`;
+}
+
+function alertCell(item) {
+    const target = item.alert;
+    const currency = target?.currency || window.cur;
+    const hit = alerts.get(item.id);
+    return `<label class="wl-alert"><input type="number" min="0" step="0.01" inputmode="decimal" value="${
+        target ? h(target.amount) : ""
+    }" placeholder="Precio" data-wl-alert="${h(item.id)}" aria-label="Avisar si ${h(
+        item.name
+    )} baja de este precio en ${h(currency)}"><span>${h(currency)}</span></label>${
+        hit ? `<small class="wl-hit">Última venta ${h(money(hit.price, hit.currency))}</small>` : ""
+    }`;
+}
+
+function allItems() {
+    return state.lists.flatMap((list) => list.items.map((item) => ({ item, list })));
+}
+
+function alertsHtml() {
+    const hits = allItems().filter(({ item }) => alerts.has(item.id));
+    if (!hits.length) return "";
+    return `<section class="gl pnl wl-alerts" role="status"><b>Avisos de precio</b>${hits
+        .map(({ item, list }) => {
+            const sale = alerts.get(item.id);
+            return `<div class="wl-alert-row"><div><button class="lk" data-catalog-card="${h(
+                item.cardId
+            )}">${h(item.name)}</button><small>${h(list.name)} · última venta ${h(
+                money(sale.price, sale.currency)
+            )} el ${h(formatDate(sale.observed_at))} (${h(sale.code)}), por debajo de tu objetivo de ${h(
+                `${item.alert.amount} ${item.alert.currency}`
+            )}</small></div><button class="ghost" data-wl-seen="${h(item.id)}">Marcar como visto</button></div>`;
+        })
+        .join("")}<small>Se compara con la última venta registrada que coincide con la impresión, el idioma y la edición elegidos.</small></section>`;
+}
+
+function updateBadge() {
+    const count = alerts.size;
+    window.TN.Wantlists = count ? `Wantlists (${count})` : "Wantlists";
+    const tab = document.querySelector('#tabs [data-g="Wantlists"]');
+    if (tab) tab.textContent = window.TN.Wantlists;
+}
+
+const API_LANGUAGE = Object.fromEntries(
+    Object.entries(API_LANGUAGES).map(([code, label]) => [label, code])
+);
+
+function matches(item, point) {
+    if (item.printingId && point.printing_id !== item.printingId) return false;
+    if (item.language && point.language.toLowerCase() !== API_LANGUAGE[item.language]) return false;
+    if (item.edition && point.edition.toLowerCase() !== item.edition.toLowerCase()) return false;
+    return true;
+}
+
+// Checks every item with a target price against its latest matching sale.
+export async function refreshAlerts() {
+    if (!api) return;
+    const items = allItems()
+        .map(({ item }) => item)
+        .filter((item) => item.alert)
+        .slice(0, MAX_ALERT_CHECKS);
+    const next = new Map();
+    await Promise.all(
+        items.map(async (item) => {
+            try {
+                const history = await api.get(`cards/${item.cardId}/price-history`, {
+                    market: item.market,
+                    printing_id: item.printingId || undefined,
+                    days: 3650
+                });
+                const sale = history.points.filter((point) => matches(item, point)).pop();
+                if (!sale) return;
+                const price = toEuro(sale.price, sale.currency);
+                const target = toEuro(item.alert.amount, item.alert.currency);
+                const fresh = !item.seenSaleAt || sale.observed_at > item.seenSaleAt;
+                if (price !== null && target !== null && price <= target && fresh)
+                    next.set(item.id, sale);
+            } catch {
+                /* An unavailable card simply produces no alert. */
+            }
+        })
+    );
+    alerts = next;
+    updateBadge();
+    if (alerts.size && !alertsAnnounced) {
+        alertsAnnounced = true;
+        window.toast?.(
+            alerts.size === 1
+                ? "Una carta de tus wantlists bajó de tu precio objetivo"
+                : `${alerts.size} cartas de tus wantlists bajaron de tu precio objetivo`
+        );
+    }
+    const container = document.getElementById("wlv");
+    if (container && window.tab === "Wantlists") renderWantlists(container);
 }
 
 export function renderWantlists(container) {
@@ -218,7 +317,7 @@ export function renderWantlists(container) {
         return;
     }
     const sets = [...new Set(list.items.map((item) => item.setName).filter(Boolean))].sort();
-    container.innerHTML = `<h3>Mis wantlists</h3><div class="tools">${state.lists
+    container.innerHTML = `<h3>Mis wantlists</h3>${alertsHtml()}<div class="tools">${state.lists
         .map(
             (item) =>
                 `<button class="pill" aria-pressed="${item.id === list.id}" data-wl-select="${h(
@@ -241,7 +340,7 @@ export function renderWantlists(container) {
         EDITIONS,
         "",
         "Cualquier edición"
-    )}</select><span class="cnt" id="wl-count"></span></div><div class="pn gl wrap"><table><thead><tr><th>Carta</th><th>Impresión</th><th>Idioma</th><th>Edición</th><th class="num">Cant.</th><th></th></tr></thead><tbody id="wl-rows"></tbody></table></div><p><small>Creada el ${h(
+    )}</select><span class="cnt" id="wl-count"></span></div><div class="pn gl wrap"><table><thead><tr><th>Carta</th><th>Impresión</th><th>Idioma</th><th>Edición</th><th class="num">Cant.</th><th class="num">Avisar si baja de</th><th></th></tr></thead><tbody id="wl-rows"></tbody></table></div><p><small>Creada el ${h(
         formatDate(list.createdAt)
     )}. Las wantlists se guardan en este navegador.</small> <button class="ghost" data-wl-delete="${h(
         list.id
@@ -250,12 +349,13 @@ export function renderWantlists(container) {
 }
 
 // Hooks for the card detail, which owns the current card and printing page.
-export function installWantlists({ panel, detail }) {
+export function installWantlists({ panel, detail, api: client }) {
+    api = client;
     document.addEventListener(
         "click",
         (event) => {
             const target = event.target.closest(
-                "[data-wl-open], [data-wl-add], [data-wl-select], [data-wl-create], [data-wl-remove], [data-wl-delete]"
+                "[data-wl-open], [data-wl-add], [data-wl-select], [data-wl-create], [data-wl-remove], [data-wl-delete], [data-wl-seen]"
             );
             if (!target) return;
             event.preventDefault();
@@ -277,7 +377,14 @@ export function installWantlists({ panel, detail }) {
                     document.getElementById("wl-picker").innerHTML = "";
                 return;
             }
-            if (target.dataset.wlSelect) {
+            if (target.dataset.wlSeen) {
+                const found = allItems().find(({ item }) => item.id === target.dataset.wlSeen);
+                const sale = alerts.get(target.dataset.wlSeen);
+                if (found && sale) found.item.seenSaleAt = sale.observed_at;
+                alerts.delete(target.dataset.wlSeen);
+                save();
+                updateBadge();
+            } else if (target.dataset.wlSelect) {
                 state.active = target.dataset.wlSelect;
                 pendingDelete = null;
                 save();
@@ -321,6 +428,28 @@ export function installWantlists({ panel, detail }) {
                 item.quantity = Math.min(99, Math.max(1, Number(event.target.value) || 1));
                 event.target.value = item.quantity;
                 save();
+            }
+        }
+        if (event.target.dataset.wlAlert) {
+            const list = activeList();
+            const item = list?.items.find((entry) => entry.id === event.target.dataset.wlAlert);
+            if (item) {
+                const amount = Number(event.target.value);
+                if (event.target.value === "" || !Number.isFinite(amount) || amount <= 0) {
+                    delete item.alert;
+                    window.toast?.(`Aviso de precio quitado para ${item.name}`);
+                } else {
+                    item.alert = {
+                        amount: Math.round(amount * 100) / 100,
+                        currency: item.alert?.currency || window.cur
+                    };
+                    delete item.seenSaleAt;
+                    window.toast?.(
+                        `Te avisaremos si ${item.name} se vende por ${item.alert.amount} ${item.alert.currency} o menos`
+                    );
+                }
+                save();
+                refreshAlerts();
             }
         }
         if (["wl-type", "wl-set", "wl-filter-language", "wl-filter-edition"].includes(event.target.id))

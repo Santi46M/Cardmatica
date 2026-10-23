@@ -1,4 +1,5 @@
 import os
+import re
 import socket
 import threading
 import time
@@ -246,4 +247,92 @@ def test_cart_page_from_popup(live_server, browser_page):
     expect(cart).to_contain_text("Pedido recibido")
     expect(page.locator("#cc")).to_have_text("0")
     assert page.evaluate("id => ITEMS[id].q", item_id) == stock - 1
+    assert not errors
+
+
+def test_list_url_state_grid_preview_shortcut_and_price_alerts(
+    live_server, browser_page, factory
+):
+    with factory.begin() as session:
+        import_banlist(
+            session,
+            BanlistFile(
+                format="TCG",
+                effective_date=date(2026, 1, 1),
+                complete=True,
+                source_name="Synthetic test list",
+                source_url="https://example.com/synthetic-list",
+                retrieved_on=date(2026, 1, 2),
+                limited=["Synthetic Test Dragon"],
+            ),
+        )
+        printing = session.scalar(select(CardPrinting).where(CardPrinting.code == "TST-EN001"))
+        session.add(
+            PriceObservation(
+                printing_id=printing.id,
+                observed_at=datetime.now(timezone.utc) - timedelta(days=3),
+                price=Decimal("8.00"),
+                currency="EUR",
+                quantity=1,
+            )
+        )
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(live_server)
+    # "/" jumps to the search box from anywhere outside a form field.
+    page.locator("body").press("/")
+    expect(page.locator("#q")).to_be_focused()
+    page.locator("#q").fill("Synthetic")
+    expect(page.locator("#list .bn-limited")).to_be_visible()
+    page.locator("#rar").select_option("Ultra Rare")
+    expect(page).to_have_url(re.compile(r"tab=Todas.*q=Synthetic.*rar=Ultra\+Rare"))
+    # The filters survive a reload because they live in the URL.
+    page.reload()
+    expect(page.locator("#q")).to_have_value("Synthetic")
+    expect(page.locator("#rar")).to_have_value("Ultra Rare")
+    expect(page.locator("#list")).to_contain_text("Synthetic Test Dragon")
+    # Hovering the name shows a preview without opening the card.
+    page.locator("#list [data-preview]").first.hover()
+    expect(page.locator("#card-preview")).to_be_visible()
+    expect(page.locator("#card-preview")).to_contain_text("Última venta")
+    page.mouse.move(5, 5)
+    expect(page.locator("#card-preview")).to_be_hidden()
+    # Opening a card adds it to the URL; Back closes it and keeps the filters.
+    page.locator("#list [data-catalog-card]").first.click()
+    expect(page.locator("#md")).to_have_class(re.compile("on"))
+    expect(page).to_have_url(re.compile(r"card=[0-9a-f-]+"))
+    page.go_back()
+    expect(page.locator("#md")).not_to_have_class(re.compile("on"))
+    expect(page).not_to_have_url(re.compile("card="))
+    expect(page.locator("#rar")).to_have_value("Ultra Rare")
+    # Grid view, remembered in the URL.
+    page.locator('[data-view="grid"]').click()
+    expect(page.locator("#catalog-grid .card-tile")).to_have_count(1)
+    table = page.locator("#list").locator("xpath=ancestor::div[contains(@class,'pn')]")
+    expect(table).to_be_hidden()
+    expect(page).to_have_url(re.compile("view=grid"))
+    # A wantlist target price above the last sale raises an alert.
+    page.locator("#catalog-grid .card-tile").first.click()
+    page.locator("[data-wl-open]").click()
+    page.locator("#wl-list-name").fill("Objetivos")
+    first_printing = "TST-EN001 · Ultra Rare · Synthetic Test Set"
+    page.locator("#wl-printing").select_option(label=first_printing)
+    page.locator("[data-wl-add]").click()
+    page.keyboard.press("Escape")
+    page.locator('[data-g="Wantlists"]').click()
+    page.locator("[data-wl-alert]").fill("10")
+    page.locator("[data-wl-alert]").press("Tab")
+    expect(page.locator('#tabs [data-g="Wantlists"]')).to_have_text("Wantlists (1)")
+    expect(page.locator("#wlv .wl-alerts")).to_contain_text("Synthetic Test Dragon")
+    page.locator("[data-wl-seen]").click()
+    expect(page.locator('#tabs [data-g="Wantlists"]')).to_have_text("Wantlists")
+    expect(page.locator("#wlv .wl-alerts")).to_have_count(0)
+    # Back to top appears once the page is scrolled.
+    page.set_viewport_size({"width": 800, "height": 300})
+    page.locator('[data-g="Perfil"]').click()
+    page.mouse.wheel(0, 2000)
+    expect(page.locator("#to-top")).to_be_visible()
+    page.locator("#to-top").click()
+    expect(page.locator("#to-top")).to_be_hidden()
     assert not errors

@@ -60,6 +60,8 @@ class CardSummary(BaseModel):
     updated_at: datetime
     # Latest storefront sale for the requested market; only filled by the card list.
     last_sale: "PricePoint | None" = None
+    # Banlist status for the requested market; only filled by the card list.
+    market_banlist: "BanlistStatusView | None" = None
 
 
 class NameView(BaseModel):

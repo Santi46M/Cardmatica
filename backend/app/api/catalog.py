@@ -20,7 +20,7 @@ from app.schemas.catalog import (
     PrintingView,
     SetView,
 )
-from app.services.banlists import current_lists, list_view
+from app.services.banlists import current_lists, list_view, statuses_for_cards
 from app.services.catalog import card_detail, card_summary, errata_views, printing_view
 from app.services.prices import last_sales, price_history
 
@@ -61,10 +61,12 @@ def cards(
         language=language,
     )
     sales = last_sales(session, [row.id for row in rows], market)
+    bans = statuses_for_cards(session, rows, market)
     items = []
     for row in rows:
         item = card_summary(row, language, market)
         item.last_sale = sales.get(row.id)
+        item.market_banlist = bans.get(row.id)
         items.append(item)
     return Page(items=items, total=total, page=page, page_size=page_size)
 

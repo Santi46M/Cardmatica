@@ -67,6 +67,10 @@ def test_status_by_format_idempotent_import_and_late_cards(factory, client, reco
     assert statuses["TCG"]["source_url"] == "https://example.com/synthetic-list"
     assert statuses["OCG"]["status"] == "unlimited"
     assert statuses["OCG"]["max_copies"] == 3
+    # The list view carries the status for the market in view.
+    (row,) = client.get("/api/v1/cards", params={"market": "TCG"}).json()["items"]
+    assert row["market_banlist"]["status"] == "forbidden"
+    assert client.get("/api/v1/cards").json()["items"][0]["market_banlist"] is None
     lists = client.get("/api/v1/banlists").json()
     assert {item["format"]: item["counts"] for item in lists} == {
         "TCG": {"forbidden": 1, "limited": 0, "semi_limited": 0},

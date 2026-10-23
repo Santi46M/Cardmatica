@@ -117,13 +117,84 @@ export function catalogRows(data) {
                         ? "ilustración general"
                         : "imagen de impresión"
                 }`
-            )}<div class="nm-text"><b>${h(card.name)}</b><small class="meta" title="${h(
+            )}<div class="nm-text"><b data-preview="${h(card.id)}">${badgeHtml(
+                card.market_banlist
+            )}${h(card.name)}</b><small class="meta" title="${h(
                 meta + source
             )}">${h(meta)}${h(source)}</small></div></div></td><td class="num hide">${
                 card.printing_count
             }</td>${saleCell(card.last_sale)}</tr>`;
         })
         .join("");
+}
+
+function gridImage(card) {
+    const url = assetUrl(card.image?.url || card.image?.thumbnail_url);
+    return url
+        ? `<img class="catalog-image grid" src="${h(url)}" alt="${h(card.name)}" loading="lazy" decoding="async" width="168" height="245">`
+        : '<div class="catalog-image-fallback grid" role="img" aria-label="Sin imagen verificada">Sin imagen</div>';
+}
+
+// Image-first tiles for collectors; same data and click target as the table rows.
+export function catalogGrid(data) {
+    if (!data.items.length)
+        return '<p class="empty">No hay cartas almacenadas que coincidan con estos filtros.</p>';
+    return data.items
+        .map(
+            (card) =>
+                `<button class="card-tile gl" data-catalog-card="${h(card.id)}">${gridImage(
+                    card
+                )}<span class="card-tile-body"><b>${badgeHtml(card.market_banlist)}${h(
+                    card.name
+                )}</b><small class="meta">${h(cardMeta(card))}</small><span class="card-tile-price">${
+                    card.last_sale
+                        ? `<b class="price">${h(money(card.last_sale.price, card.last_sale.currency))}</b><small>${h(
+                              formatDate(card.last_sale.observed_at)
+                          )}</small>`
+                        : '<span class="muted">Sin ventas</span>'
+                }</span></span></button>`
+        )
+        .join("");
+}
+
+// Placeholders shaped like the content, so the layout does not jump while loading.
+export function skeletonRows(count = 8) {
+    return Array.from(
+        { length: count },
+        (_, index) =>
+            `<tr class="sk-row" aria-hidden="true"><td><div class="nm"><span class="sk sk-thumb"></span><div class="nm-text"><span class="sk sk-line" style="width:${
+                46 + ((index * 17) % 30)
+            }%"></span><span class="sk sk-line sk-small"></span></div></div></td><td class="num hide"><span class="sk sk-num"></span></td><td class="num"><span class="sk sk-num"></span></td></tr>`
+    ).join("");
+}
+
+export function skeletonTiles(count = 12) {
+    return Array.from(
+        { length: count },
+        () =>
+            '<div class="card-tile gl sk-tile" aria-hidden="true"><span class="sk sk-art"></span><span class="sk sk-line"></span><span class="sk sk-line sk-small"></span></div>'
+    ).join("");
+}
+
+export function previewHtml(card) {
+    const image = assetUrl(card.image?.url || card.image?.thumbnail_url);
+    return `${
+        image
+            ? `<img src="${h(image)}" alt="" width="200" height="292">`
+            : '<div class="catalog-image-fallback preview-fallback">Sin imagen verificada</div>'
+    }<div class="preview-body"><b>${badgeHtml(card.market_banlist)}${h(card.name)}</b><small>${h(
+        cardMeta(card)
+    )}</small><small>${card.printing_count} ${
+        card.printing_count === 1 ? "impresión" : "impresiones"
+    }</small>${
+        card.last_sale
+            ? `<div class="preview-price"><small>Última venta</small><b>${h(
+                  money(card.last_sale.price, card.last_sale.currency)
+              )}</b><small>${h(formatDate(card.last_sale.observed_at))} · ${h(
+                  card.last_sale.code
+              )}</small></div>`
+            : '<small class="muted">Sin ventas registradas</small>'
+    }</div>`;
 }
 
 export function homeHtml(data) {

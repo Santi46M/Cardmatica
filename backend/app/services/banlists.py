@@ -129,9 +129,26 @@ def list_view(session, row: BanlistList) -> BanlistListView:
     )
 
 
+def status_view(row: BanlistList, status: str) -> BanlistStatusView:
+    return BanlistStatusView(
+        format=row.format,
+        effective_date=row.effective_date,
+        status=status,
+        max_copies=MAX_COPIES[status],
+        complete=row.complete,
+        source_name=row.source_name,
+        source_url=row.source_url,
+        scope_note=row.scope_note,
+    )
+
+
+def english_names(card) -> set[str]:
+    return {name.normalized for name in card.names if name.language == "en"}
+
+
 def card_statuses(session, card, today: date | None = None) -> list[BanlistStatusView]:
     """Match by English name: lists are published by name, not by catalogue identifier."""
-    names = {name.normalized for name in card.names if name.language == "en"}
+    names = english_names(card)
     result = []
     for row in current_lists(session, today):
         entry = (
@@ -144,17 +161,40 @@ def card_statuses(session, card, today: date | None = None) -> list[BanlistStatu
             if names
             else None
         )
-        status = entry or ("unlimited" if row.complete else "unknown")
-        result.append(
-            BanlistStatusView(
-                format=row.format,
-                effective_date=row.effective_date,
-                status=status,
-                max_copies=MAX_COPIES[status],
-                complete=row.complete,
-                source_name=row.source_name,
-                source_url=row.source_url,
-                scope_note=row.scope_note,
-            )
-        )
+        result.append(status_view(row, entry or ("unlimited" if row.complete else "unknown")))
     return result
+
+
+def statuses_for_cards(session, cards, market, today: date | None = None) -> dict:
+    """Status of a page of cards on the list in force for one market, in two queries."""
+    if not market or not cards:
+        return {}
+    row = session.scalar(
+        select(BanlistList)
+        .where(BanlistList.format == market, BanlistList.effective_date <= (today or date.today()))
+        .order_by(BanlistList.effective_date.desc())
+        .limit(1)
+    )
+    if row is None:
+        return {}
+    names = {card.id: english_names(card) for card in cards}
+    wanted = set().union(*names.values())
+    entries = (
+        dict(
+            session.execute(
+                select(BanlistListEntry.normalized_name, BanlistListEntry.status).where(
+                    BanlistListEntry.banlist_id == row.id,
+                    BanlistListEntry.normalized_name.in_(wanted),
+                )
+            ).all()
+        )
+        if wanted
+        else {}
+    )
+    fallback = "unlimited" if row.complete else "unknown"
+    return {
+        card_id: status_view(
+            row, next((entries[name] for name in sorted(card_names) if name in entries), fallback)
+        )
+        for card_id, card_names in names.items()
+    }
