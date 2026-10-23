@@ -54,6 +54,30 @@ El resultado de las pruebas y los pendientes de producción están en
 - El rol de migraciones debe poder crear tablas e instalar `pg_trgm`. En un servicio
   administrado, solicitar al administrador que instale esa extensión previamente.
 
+## Probar en el navegador con GitHub Codespaces
+
+No requiere instalar nada. En GitHub: **Code → Codespaces → Create codespace** sobre la rama
+deseada. El entorno (`.devcontainer/`) crea `.env`, levanta PostgreSQL y la API con Docker e
+importa las banlists. Cuando el puerto 8000 aparece en la pestaña **Ports**, abrir su dirección.
+El catálogo empieza vacío; para cargar cartas, en la terminal del Codespace:
+
+```bash
+docker compose exec api cardmatica sync ygoprodeck initial --max-cards 20
+```
+
+Para ver ilustraciones (vista provisional, sin licencia comercial), tras cargar cartas:
+
+```bash
+docker compose exec api cardmatica preview-images
+```
+
+El Codespace activa esa vista al crearse (`backend/scripts/enable_preview_images.py`, que
+acepta el dominio privado `.app.github.dev`). En un Codespace creado antes, ejecutar ese script
+y luego `docker compose up -d api`. Cada imagen así mostrada lleva un aviso rojo «!» que explica
+que es provisional. **Mantener el puerto 8000 privado** (valor por defecto): si se hace público,
+cualquiera vería ilustraciones sin licencia. Los Codespaces consumen la cuota mensual de la
+cuenta de GitHub; detenerlos al terminar.
+
 ## Windows 11 — PowerShell
 
 Ejecutar desde la raíz del repositorio. No es necesario activar el entorno virtual.
@@ -227,18 +251,57 @@ autor y licencia cuando se conocen. No se inventa autor ni licencia ausentes.
 La vista local de ilustraciones solo acepta hosts localhost/127.0.0.1/::1; Docker
 publica el puerto únicamente en loopback. Deshabilitarla al desplegar públicamente.
 
+## Banlist, historial de precios, wantlists y perfil
+
+**Banlist.** Las listas Forbidden & Limited vigentes viajan con la aplicación en
+`backend/app/data/banlists/`: TCG del 19 de octubre de 2026 (base oficial de Konami)
+y OCG del 1 de octubre de 2026 (transcripción de Yugipedia). Cada archivo guarda solo
+nombres y estados, con su URL de origen y la fecha de consulta. El contenedor de la API
+las importa al arrancar; fuera de Docker:
+
+```powershell
+.\.venv\Scripts\cardmatica.exe import-banlist
+```
+
+Las entradas se guardan por nombre en inglés, así que una carta sincronizada después
+también obtiene su estado sin repetir la importación. En una lista marcada como completa,
+una carta que no figura queda como permitida; en una incompleta, como «sin estado
+verificado». Para una lista nueva: copiar un JSON existente, actualizar fecha, fuente y
+nombres, y volver a ejecutar el comando. La importación es idempotente.
+
+**Historial de precios.** Se construye solo con ventas completadas en Cardmática
+(tabla `price_observations`); nunca con guías de precios externas. Mientras no exista el
+backend de pedidos, un administrador puede registrar una venta:
+
+```powershell
+$headers = @{ Authorization = "Bearer $env:ADMIN_TOKEN" }
+$body = @{ printing_id = "UUID_DE_LA_IMPRESION"; price = "450.00"; currency = "UYU"; observed_at = "2026-10-20T15:00:00-03:00"; condition = "NM" } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/v1/admin/price-observations -Headers $headers -ContentType "application/json" -Body $body
+```
+
+La ficha muestra la última venta con su fecha aunque nadie tenga la carta a la venta
+o no haya ventas en el periodo elegido.
+
+**Wantlists y perfil.** Se guardan en el navegador de cada persona (localStorage):
+todavía no hay cuentas en el servidor y un perfil de vendedor no publica una tienda.
+Las wantlists referencian el UUID y la impresión del catálogo, nunca índices del comercio
+de demostración.
+
 ## API y seguridad
 
 Endpoints principales:
 
 - `GET /api/v1/cards`: q, market, card_type, subtype, rarity, set_id,
   archetype_id, product_type, language, sort, page, page_size.
-- `GET /api/v1/cards/{uuid}`; `/printings`; `/errata`.
+- `GET /api/v1/cards/{uuid}`; `/printings`; `/errata`; `/price-history`
+  (market, printing_id, days). La ficha incluye `banlist_status` por formato.
+- `GET /api/v1/banlists`: lista vigente por formato, recuentos y fuente.
 - `GET /api/v1/printings/{uuid}`, `/archetypes`, `/archetypes/{uuid}/cards`, `/sets`.
 - `GET /api/v1/images/{uuid}?thumbnail=true`.
 - `GET /api/v1/artworks/{uuid}?thumbnail=true`: ilustración general y control de uso.
 - `POST /api/v1/admin/sync-jobs`, `GET /api/v1/admin/sync-jobs/{uuid}`,
   `POST /api/v1/admin/sync-jobs/{uuid}/resume`, `/errors` y `/admin/conflicts`.
+- `POST /api/v1/admin/price-observations`: registra una venta completada.
 - `GET /health/live` y `/health/ready`.
 
 Administración exige `Authorization: Bearer ADMIN_TOKEN` de al menos 32 caracteres.

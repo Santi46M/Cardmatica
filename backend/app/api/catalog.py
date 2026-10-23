@@ -10,15 +10,19 @@ from app.core.config import get_settings
 from app.models import Archetype, Card, CardArtwork, CardImage, CardPrinting, CardSet, Rarity
 from app.repositories.catalog import CatalogRepository, printing_loads
 from app.schemas.catalog import (
+    BanlistListView,
     CardDetail,
     CardSummary,
     ErratumView,
     NamedView,
     Page,
+    PriceHistoryView,
     PrintingView,
     SetView,
 )
+from app.services.banlists import current_lists, list_view, statuses_for_cards
 from app.services.catalog import card_detail, card_summary, errata_views, printing_view
+from app.services.prices import last_sales, price_history
 
 router = APIRouter(prefix="/api/v1", tags=["Catálogo"])
 PageNumber = Annotated[int, Query(ge=1, le=1000000)]
@@ -56,12 +60,15 @@ def cards(
         sort=sort,
         language=language,
     )
-    return Page(
-        items=[card_summary(row, language, market) for row in rows],
-        total=total,
-        page=page,
-        page_size=page_size,
-    )
+    sales = last_sales(session, [row.id for row in rows], market)
+    bans = statuses_for_cards(session, rows, market)
+    items = []
+    for row in rows:
+        item = card_summary(row, language, market)
+        item.last_sale = sales.get(row.id)
+        item.market_banlist = bans.get(row.id)
+        items.append(item)
+    return Page(items=items, total=total, page=page, page_size=page_size)
 
 
 def require_card(session, card_id):
@@ -106,6 +113,27 @@ def printings(
 def errata(card_id: UUID, session: SessionDep):
     require_card_exists(session, card_id)
     return errata_views(session, card_id)
+
+
+@router.get("/cards/{card_id}/price-history", response_model=PriceHistoryView)
+def card_price_history(
+    card_id: UUID,
+    session: SessionDep,
+    market: Market | None = None,
+    printing_id: UUID | None = None,
+    days: Annotated[int, Query(ge=1, le=3650)] = 365,
+):
+    """Sales completed on Cardmática; never external price guides."""
+    require_card_exists(session, card_id)
+    return price_history(
+        session, card_id, market=market, printing_id=printing_id, days=days
+    )
+
+
+@router.get("/banlists", response_model=list[BanlistListView])
+def banlists(session: SessionDep):
+    """Lists in force today for TCG and OCG, with their source."""
+    return [list_view(session, row) for row in current_lists(session)]
 
 
 @router.get("/printings/{printing_id}", response_model=PrintingView)
@@ -239,12 +267,14 @@ def artwork(image_id: UUID, request: Request, session: SessionDep, thumbnail: bo
     row = session.get(CardArtwork, image_id)
     settings = get_settings()
     commercial = row and row.rights_status == "approved" and bool(row.authorization_reference)
-    local = settings.local_image_preview and request.url.hostname in {
-        "localhost",
-        "127.0.0.1",
-        "::1",
-        "testserver",
-    }
+    # Codespaces forwards the private port under its own domain.
+    forwarded = request.headers.get("x-forwarded-host", "").split(",")[0].strip()
+    forwarded_host = forwarded.rsplit(":", 1)[0] if forwarded else None
+    local = settings.local_image_preview and (
+        settings.is_preview_host(request.url.hostname)
+        if not forwarded_host
+        else settings.is_preview_host(forwarded_host)
+    )
     if not row or row.rights_status == "denied" or not (commercial or local):
         raise HTTPException(404, "Ilustración no disponible para este uso")
     relative = row.thumbnail_path if thumbnail else row.local_path

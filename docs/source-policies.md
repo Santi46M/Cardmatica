@@ -95,3 +95,36 @@ No se hace hotlink de imágenes no aprobadas. El fallback nunca usa otra impresi
 Galerías ambiguas, edición/arte desconocidos o metadatos insuficientes se registran
 para revisión. Se descargaron ilustraciones generales de YGOPRODeck para la
 prueba local; no se descargaron ni aprobaron escaneos de Yugipedia.
+
+## Vista provisional de imágenes en desarrollo
+
+`LOCAL_PREVIEW_HOST_SUFFIXES` permite tratar un dominio privado de desarrollo (por ejemplo
+`.app.github.dev` de un Codespace con el puerto privado) igual que localhost para la vista local
+de prueba. Solo funciona con DEPLOYMENT_MODE=local y ALLOW_LOCAL_IMAGE_PREVIEW=true, no concede
+derechos y la interfaz marca cada ilustración así servida con un aviso de imagen provisional.
+`cardmatica preview-images` descarga las ilustraciones generales de las cartas del catálogo con
+el mismo límite de una solicitud por segundo. No habilitarlo en un despliegue público.
+
+## Banlists
+
+Revisado: 2026-10-23. Las listas incluidas contienen únicamente nombres de cartas y su
+estado (prohibida, limitada, semi-limitada), con fecha de vigencia, URL de origen y fecha
+de consulta. No incluyen textos, imágenes ni otros materiales de las cartas.
+
+- TCG, vigente desde el 19 de octubre de 2026: leída una vez, de forma manual, en
+  https://www.db.yugioh-card.com/yugiohdb/forbidden_limited.action?request_locale=en
+  ("Status Updated 10/19/2026": 156 prohibidas, 92 limitadas, 7 semi-limitadas).
+- OCG, vigente desde el 1 de octubre de 2026: transcripción comunitaria de la regulación
+  oficial en https://yugipedia.com/wiki/October_2026_Lists_(OCG). Aplica a japonés,
+  Asian-English y chino simplificado; Corea publica una lista propia.
+
+No es una extracción sistemática ni un conector automático: no se agregó ningún cliente que
+consulte esas páginas. Queda pendiente que el operador confirme si la reproducción de estos
+estados requiere la misma referencia de autorización que las importaciones oficiales
+descritas arriba, y ajuste o retire los archivos según esa revisión.
+
+## Precios
+
+Los precios del historial provienen solo de ventas completadas en Cardmática. No se
+importan precios de terceros ni de guías de precios.
+

@@ -10,9 +10,10 @@ from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.db.session import session_factory
 from app.ingestion.sync import SyncRunner, worker
-from app.models import CardArtwork, CardImage, SyncError, SyncJob
+from app.models import Card, CardArtwork, CardImage, SyncError, SyncJob
 from app.schemas.catalog import JobRequest
 from app.schemas.ingestion import CardRecord
+from app.services.banlists import bundled_files, import_banlist, load_file
 from app.services.ingestion import IngestionService
 
 
@@ -66,6 +67,60 @@ def import_records(path: Path, authorization: str):
     return 1 if failures else 0
 
 
+def import_banlists(paths: list[Path]):
+    """Load dated lists from JSON files; without paths, the lists bundled with the app."""
+    files = paths or bundled_files()
+    if not files:
+        raise ValueError("No hay archivos de banlist para importar")
+    factory = session_factory()
+    results = []
+    for path in files:
+        data = load_file(path)
+        with factory.begin() as session:
+            results.append({"file": path.name, **import_banlist(session, data)})
+    print(json.dumps(results, ensure_ascii=False))
+    return 0
+
+
+def preview_images(max_cards: int, runner=None):
+    """Download the general artwork of every catalogue card for the local preview.
+
+    Only for private development environments: the artwork stays unverified and
+    is never served in production (see docs/source-policies.md).
+    """
+    from sqlalchemy import exists, select
+
+    settings = get_settings()
+    if not settings.local_image_preview:
+        raise ValueError(
+            "Activar DEPLOYMENT_MODE=local y ALLOW_LOCAL_IMAGE_PREVIEW=true antes de descargar"
+        )
+    runner = runner or SyncRunner()
+    downloaded = exists().where(
+        CardArtwork.card_id == Card.id, CardArtwork.local_path.is_not(None)
+    )
+    with runner.factory() as session:
+        identifiers = list(
+            session.scalars(
+                select(Card.ygoprodeck_id)
+                .where(Card.ygoprodeck_id.is_not(None), ~downloaded)
+                .order_by(Card.display_name)
+                .limit(max_cards)
+            )
+        )
+    failed = 0
+    for identifier in identifiers:
+        job_id = runner.enqueue(
+            JobRequest(source="ygoprodeck", mode="images", identifier=str(identifier))
+        )
+        asyncio.run(runner.run(job_id))
+        with runner.factory() as session:
+            if session.get(SyncJob, job_id).status in {"failed", "completed_with_errors"}:
+                failed += 1
+    print(json.dumps({"cards": len(identifiers), "failed": failed}))
+    return 1 if failed else 0
+
+
 def main():
     configure_logging()
     parser = argparse.ArgumentParser(prog="cardmatica")
@@ -92,6 +147,15 @@ def main():
     importing = commands.add_parser("import-jsonl")
     importing.add_argument("path", type=Path)
     importing.add_argument("--authorization-reference", required=True)
+    banlist = commands.add_parser(
+        "import-banlist", help="Importar listas Forbidden & Limited fechadas con su procedencia"
+    )
+    banlist.add_argument("paths", nargs="*", type=Path)
+    images = commands.add_parser(
+        "preview-images",
+        help="Descargar ilustraciones de las cartas del catálogo para la vista local de prueba",
+    )
+    images.add_argument("--max-cards", type=int, default=100)
     approval = commands.add_parser("image-rights")
     approval.add_argument("image_id", type=UUID)
     approval.add_argument("status", choices=["approved", "denied", "unverified"])
@@ -102,6 +166,12 @@ def main():
     args = parser.parse_args()
     if args.command == "import-jsonl":
         return import_records(args.path, args.authorization_reference)
+    if args.command == "preview-images":
+        if not 1 <= args.max_cards <= 5000:
+            parser.error("max-cards debe estar entre 1 y 5000")
+        return preview_images(args.max_cards)
+    if args.command == "import-banlist":
+        return import_banlists(args.paths)
     if args.command == "worker":
         if args.poll_seconds < 1:
             parser.error("poll-seconds debe ser al menos 1")

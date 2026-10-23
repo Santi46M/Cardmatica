@@ -1,15 +1,21 @@
 import os
+import re
 import socket
 import threading
 import time
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 
 import pytest
 import uvicorn
 from app.db.session import get_session
 from app.main import app
+from app.models import Card, CardArtwork, CardPrinting, PriceObservation
 from app.schemas.ingestion import PrintingInput
+from app.services.banlists import BanlistFile, import_banlist
 from app.services.ingestion import IngestionService
 from playwright.sync_api import expect, sync_playwright
+from sqlalchemy import select
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("CARDMATICA_BROWSER_TESTS") != "1",
@@ -114,4 +120,258 @@ def test_existing_product_cart_add_remove_checkout(live_server, browser_page):
     page.locator("#cbx [data-buy]").click()
     expect(page.locator("#cbx")).to_contain_text("Pedido recibido")
     assert page.evaluate("id => ITEMS[id].q", item_id) == initial - 1
+    assert not errors
+
+
+def test_banlist_price_history_wantlists_and_profile(live_server, browser_page, factory):
+    """Synthetic list and sales; the bundled official lists are validated elsewhere."""
+    now = datetime.now(timezone.utc)
+    with factory.begin() as session:
+        for market, forbidden in (("TCG", ["Synthetic Test Dragon"]), ("OCG", [])):
+            import_banlist(
+                session,
+                BanlistFile(
+                    format=market,
+                    effective_date=date(2026, 1, 1),
+                    complete=True,
+                    source_name="Synthetic test list",
+                    source_url="https://example.com/synthetic-list",
+                    retrieved_on=date(2026, 1, 2),
+                    forbidden=forbidden,
+                ),
+            )
+        printings = {row.code: row.id for row in session.scalars(select(CardPrinting))}
+        for code, days_ago, price in (
+            ("TST-EN001", 20, "10.00"),
+            ("TST-EN001", 5, "14.00"),
+            ("TST-EN002", 400, "30.00"),
+        ):
+            session.add(
+                PriceObservation(
+                    printing_id=printings[code],
+                    observed_at=now - timedelta(days=days_ago),
+                    price=Decimal(price),
+                    currency="EUR",
+                    quantity=1,
+                    condition="NM",
+                )
+            )
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(live_server)
+    expect(page.locator("#home-banlist")).to_contain_text("Sin fecha anunciada")
+    expect(page.locator("#home-banlist [data-countdown]")).to_contain_text("días")
+    page.locator('[data-go="Todas"]').click()
+    # Type details sit on one muted line; the latest sale is the prominent column.
+    expect(page.locator("#list .meta")).to_contain_text("Monstruo · Dragon · Efecto · LIGHT")
+    expect(page.locator("#list")).to_contain_text("14,00")
+    page.locator("#list [data-catalog-card]").first.click()
+    expect(page.locator("#mb h2 .bn-forbidden")).to_be_visible()
+    expect(page.locator("#mb")).to_contain_text("TCG · Prohibida")
+    chart = page.locator("#price-history")
+    expect(chart.locator("#ph-svg")).to_be_visible()
+    expect(chart).to_contain_text("2 ventas")
+    chart.locator('[data-ph-range="3650"]').click()
+    expect(chart).to_contain_text("3 ventas")
+    page.locator("#cur").select_option("USD")
+    expect(chart).to_contain_text("US$")
+    # The second printing only sold long ago: its last sale still shows with its date.
+    chart.locator('[data-ph-range="365"]').click()
+    chooser = page.locator("#catalog-printing")
+    other = chooser.locator("option").evaluate_all("options => options.map(option => option.value)")
+    chooser.select_option(other[1])
+    expect(chart.locator(".warn")).to_contain_text("Sin ventas en este periodo")
+    expect(chart).to_contain_text("Última venta")
+    page.locator("[data-wl-open]").click()
+    page.locator("#wl-list-name").fill("Para el deck")
+    page.locator("#wl-edition").select_option("1st")
+    page.locator("[data-wl-add]").click()
+    expect(page.locator("#ts")).to_contain_text("Para el deck")
+    page.keyboard.press("Escape")
+    page.locator('[data-g="Wantlists"]').click()
+    panel = page.locator("#wlv")
+    expect(panel).to_contain_text("Para el deck (1)")
+    expect(panel).to_contain_text("1st Edition")
+    expect(panel).to_contain_text("Second Synthetic Set")
+    panel.locator("#wl-filter-edition").select_option("Limited")
+    expect(panel).to_contain_text("Ninguna carta de esta lista coincide")
+    panel.locator("#wl-filter-edition").select_option("")
+    panel.locator("#wl-q").fill("TST-EN002")
+    expect(page.locator("#wl-count")).to_have_text("1 de 1 cartas")
+    page.locator('[data-g="Perfil"]').click()
+    page.locator("#pf-role").select_option("seller")
+    page.locator("#pf-name").fill("Ana Pérez")
+    page.locator("#pf-form button[type=submit]").click()
+    expect(page.locator("#pf-error")).to_contain_text("tienda")
+    page.locator("#pf-store").fill("Duelos del Sur")
+    page.locator("#pf-address").fill("Av. Siempre Viva 742, Montevideo")
+    page.locator("#pf-phone").fill("+598 99 123 456")
+    page.locator('input[name="pf-payment"]').first.check()
+    page.locator("#pf-form button[type=submit]").click()
+    expect(page.locator("#pfv .profile-card")).to_contain_text("Duelos del Sur")
+    page.reload()
+    page.locator('[data-g="Perfil"]').click()
+    expect(page.locator("#pfv .profile-card")).to_contain_text("Ana Pérez")
+    expect(page.locator("#pfv")).to_contain_text("1 lista · 1 cartas")
+    assert not errors
+
+
+def test_cart_page_from_popup(live_server, browser_page):
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(live_server)
+    page.locator('[data-g="Productos"]').click()
+    page.locator("#pl tr[data-pd]").first.click()
+    button = page.locator("#pt [data-add]").first
+    item_id = int(button.get_attribute("data-add"))
+    stock = page.evaluate("id => ITEMS[id].q", item_id)
+    button.click()
+    page.keyboard.press("Escape")
+    page.locator("#cb").click()
+    page.locator("#cbx [data-cart-expand]").click()
+    expect(page.locator("#cart")).not_to_have_class("on")
+    cart = page.locator("#cartv")
+    expect(cart).to_contain_text("Tu carrito · 1 artículo")
+    expect(cart.locator(".cart-seller")).to_have_count(1)
+    plus = cart.locator('[data-cart-step="1"]')
+    if stock > 1:
+        plus.click()
+        expect(cart.locator(".stepper output")).to_have_text("2")
+        cart.locator('[data-cart-step="-1"]').click()
+    else:
+        expect(plus).to_be_disabled()
+    expect(cart.locator(".stepper output")).to_have_text("1")
+    cart.locator("[data-cart-buy]").click()
+    expect(cart).to_contain_text("Pedido recibido")
+    expect(page.locator("#cc")).to_have_text("0")
+    assert page.evaluate("id => ITEMS[id].q", item_id) == stock - 1
+    assert not errors
+
+
+def test_list_url_state_grid_preview_shortcut_and_price_alerts(
+    live_server, browser_page, factory
+):
+    with factory.begin() as session:
+        import_banlist(
+            session,
+            BanlistFile(
+                format="TCG",
+                effective_date=date(2026, 1, 1),
+                complete=True,
+                source_name="Synthetic test list",
+                source_url="https://example.com/synthetic-list",
+                retrieved_on=date(2026, 1, 2),
+                limited=["Synthetic Test Dragon"],
+            ),
+        )
+        printing = session.scalar(select(CardPrinting).where(CardPrinting.code == "TST-EN001"))
+        session.add(
+            PriceObservation(
+                printing_id=printing.id,
+                observed_at=datetime.now(timezone.utc) - timedelta(days=3),
+                price=Decimal("8.00"),
+                currency="EUR",
+                quantity=1,
+            )
+        )
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(live_server)
+    # "/" jumps to the search box from anywhere outside a form field.
+    page.locator("body").press("/")
+    expect(page.locator("#q")).to_be_focused()
+    page.locator("#q").fill("Synthetic")
+    expect(page.locator("#list .bn-limited")).to_be_visible()
+    page.locator("#rar").select_option("Ultra Rare")
+    expect(page).to_have_url(re.compile(r"tab=Todas.*q=Synthetic.*rar=Ultra\+Rare"))
+    # The filters survive a reload because they live in the URL.
+    page.reload()
+    expect(page.locator("#q")).to_have_value("Synthetic")
+    expect(page.locator("#rar")).to_have_value("Ultra Rare")
+    expect(page.locator("#list")).to_contain_text("Synthetic Test Dragon")
+    # Hovering the name shows a preview without opening the card.
+    page.locator("#list [data-preview]").first.hover()
+    expect(page.locator("#card-preview")).to_be_visible()
+    expect(page.locator("#card-preview")).to_contain_text("Última venta")
+    page.mouse.move(5, 5)
+    expect(page.locator("#card-preview")).to_be_hidden()
+    # Opening a card adds it to the URL; Back closes it and keeps the filters.
+    page.locator("#list [data-catalog-card]").first.click()
+    expect(page.locator("#md")).to_have_class(re.compile("on"))
+    expect(page).to_have_url(re.compile(r"card=[0-9a-f-]+"))
+    page.go_back()
+    expect(page.locator("#md")).not_to_have_class(re.compile("on"))
+    expect(page).not_to_have_url(re.compile("card="))
+    expect(page.locator("#rar")).to_have_value("Ultra Rare")
+    # Grid view, remembered in the URL.
+    page.locator('[data-view="grid"]').click()
+    expect(page.locator("#catalog-grid .card-tile")).to_have_count(1)
+    table = page.locator("#list").locator("xpath=ancestor::div[contains(@class,'pn')]")
+    expect(table).to_be_hidden()
+    expect(page).to_have_url(re.compile("view=grid"))
+    # A wantlist target price above the last sale raises an alert.
+    page.locator("#catalog-grid .card-tile").first.click()
+    page.locator("[data-wl-open]").click()
+    page.locator("#wl-list-name").fill("Objetivos")
+    first_printing = "TST-EN001 · Ultra Rare · Synthetic Test Set"
+    page.locator("#wl-printing").select_option(label=first_printing)
+    page.locator("[data-wl-add]").click()
+    page.keyboard.press("Escape")
+    page.locator('[data-g="Wantlists"]').click()
+    page.locator("[data-wl-alert]").fill("10")
+    page.locator("[data-wl-alert]").press("Tab")
+    expect(page.locator('#tabs [data-g="Wantlists"]')).to_have_text("Wantlists (1)")
+    expect(page.locator("#wlv .wl-alerts")).to_contain_text("Synthetic Test Dragon")
+    page.locator("[data-wl-seen]").click()
+    expect(page.locator('#tabs [data-g="Wantlists"]')).to_have_text("Wantlists")
+    expect(page.locator("#wlv .wl-alerts")).to_have_count(0)
+    # Back to top appears once the page is scrolled.
+    page.set_viewport_size({"width": 800, "height": 300})
+    page.locator('[data-g="Perfil"]').click()
+    page.mouse.wheel(0, 2000)
+    expect(page.locator("#to-top")).to_be_visible()
+    page.locator("#to-top").click()
+    expect(page.locator("#to-top")).to_be_hidden()
+    assert not errors
+
+
+def test_provisional_artwork_is_marked_everywhere(
+    live_server, browser_page, factory, settings, monkeypatch
+):
+    """Synthetic image file; marks unlicensed preview artwork with a red warning."""
+    from PIL import Image
+
+    monkeypatch.setattr(settings, "deployment_mode", "local")
+    monkeypatch.setattr(settings, "allow_local_image_preview", True)
+    settings.image_directory.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (59, 86), "teal").save(settings.image_directory / "art.png")
+    with factory.begin() as session:
+        card = session.scalar(select(Card))
+        session.add(
+            CardArtwork(
+                card_id=card.id,
+                source_slug="ygoprodeck",
+                external_id="synthetic-art",
+                source_url="https://images.ygoprodeck.com/images/cards/0.jpg",
+                local_path="art.png",
+                thumbnail_path="art.png",
+            )
+        )
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(f"{live_server}/?tab=Todas")
+    warning = page.locator("#list .img-warn")
+    expect(warning).to_be_visible()
+    expect(warning).to_have_attribute("data-tip", re.compile("provisional.*sin licencia"))
+    expect(page.locator("#list img.catalog-image")).to_have_js_property("complete", True)
+    page.locator("#list [data-preview]").first.hover()
+    expect(page.locator("#card-preview")).to_contain_text("Imagen provisional")
+    page.locator('[data-view="grid"]').click()
+    expect(page.locator("#catalog-grid .img-warn")).to_be_visible()
+    page.locator("#catalog-grid .card-tile").first.click()
+    expect(page.locator("#mb .hero .img-warn")).to_be_visible()
     assert not errors

@@ -126,6 +126,16 @@ def test_fixed_query_count_instead_of_n_plus_one(factory, client, record):
         queries.clear()
         assert client.get("/api/v1/cards", params={"page_size": 8}).status_code == 200
         assert len(queries) == one
-        assert one <= 6
+        # Six catalogue queries plus one for the latest sale of every card on the page.
+        assert one <= 7
+        # With a market, two more fixed queries resolve the banlist of the whole page.
+        queries.clear()
+        response = client.get("/api/v1/cards", params={"page_size": 1, "market": "TCG"})
+        assert response.status_code == 200
+        single = len(queries)
+        queries.clear()
+        response = client.get("/api/v1/cards", params={"page_size": 8, "market": "TCG"})
+        assert response.status_code == 200
+        assert len(queries) == single
     finally:
         event.remove(engine, "before_cursor_execute", before_execute)

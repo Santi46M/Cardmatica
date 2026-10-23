@@ -26,6 +26,7 @@ from app.schemas.catalog import (
     SourceView,
     TextView,
 )
+from app.services.banlists import card_statuses
 
 
 def image_view(image):
@@ -245,6 +246,7 @@ def card_detail(session, card, language="es"):
                 .order_by(BanlistEntry.effective_date.desc())
             )
         ],
+        banlist_status=card_statuses(session, card),
         relations=[
             {"card_id": row.related_card_id, "relation": row.relation}
             for row in session.scalars(select(CardRelation).where(CardRelation.card_id == card.id))
