@@ -349,10 +349,10 @@ def test_list_url_state_grid_preview_shortcut_and_price_alerts(live_server, brow
     # Opening a card adds it to the URL; Back closes it and keeps the filters.
     page.locator("#list [data-catalog-card]").first.click()
     expect(page.locator("#md")).to_have_class(re.compile("on"))
-    expect(page).to_have_url(re.compile(r"card=[0-9a-f-]+"))
+    expect(page).to_have_url(re.compile(r"/carta/[0-9a-f-]+"))
     page.go_back()
     expect(page.locator("#md")).not_to_have_class(re.compile("on"))
-    expect(page).not_to_have_url(re.compile("card="))
+    expect(page).not_to_have_url(re.compile("/carta/"))
     expect(page.locator("#rar")).to_have_value("Ultra Rare")
     # Grid view, remembered in the URL.
     page.locator('[data-view="grid"]').click()
@@ -524,4 +524,25 @@ def test_browser_data_moves_into_the_account(live_server, browser_page):
     page.locator("#account-menu [data-auth-logout]").click()
     page.locator('[data-g="Wantlists"]').click()
     expect(page.locator("#wlv")).not_to_contain_text("Antes de la cuenta")
+    assert not errors
+
+
+def test_card_address_and_legal_pages(live_server, browser_page):
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(f"{live_server}/?tab=Todas")
+    page.locator("#list [data-catalog-card]").first.click()
+    expect(page).to_have_url(re.compile(r"/carta/[0-9a-f-]{36}"))
+    address = page.url
+    # The card's own address opens the card directly, with its name in the title.
+    page.goto(address)
+    expect(page.locator("#mb")).to_contain_text("Synthetic official test text.")
+    expect(page).to_have_title(re.compile("Synthetic Test Dragon"))
+    page.keyboard.press("Escape")
+    expect(page).not_to_have_url(re.compile("/carta/"))
+    page.locator('.site-footer a[href="/privacidad"]').click()
+    expect(page.locator("h1")).to_have_text("Política de privacidad")
+    page.goto(f"{live_server}/pagina-inventada")
+    expect(page.locator("h1")).to_have_text("Esta página no existe")
     assert not errors

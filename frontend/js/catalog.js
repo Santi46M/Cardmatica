@@ -106,6 +106,10 @@ function status(message, { quiet = false } = {}) {
 
 // ---- URL state: shareable searches and the browser's Back button -------------
 
+// A card has its own address, /carta/<id>, that can be shared and indexed.
+// Older links with ?card=<id> still open the card.
+const CARD_PATH = /^\/carta\/([0-9a-f-]{36})(?:\/|$)/i;
+
 function readUrl() {
     const params = new URLSearchParams(location.search);
     return {
@@ -118,7 +122,7 @@ function readUrl() {
         srt: params.get("srt") || "name",
         page: Math.max(1, Number(params.get("page")) || 1),
         view: params.get("view"),
-        card: params.get("card")
+        card: location.pathname.match(CARD_PATH)?.[1] || params.get("card")
     };
 }
 
@@ -172,8 +176,8 @@ function writeUrl(mode = "replace") {
         if (view !== "list") params.set("view", view);
     }
     const card = openCardId();
-    if (card) params.set("card", card);
-    const url = `${location.pathname}${params.toString() ? `?${params}` : ""}${location.hash}`;
+    const path = card ? `/carta/${card}` : "/";
+    const url = `${path}${params.toString() ? `?${params}` : ""}${location.hash}`;
     if (url === `${location.pathname}${location.search}${location.hash}`) return;
     if (mode === "push") history.pushState({ card }, "", url);
     else history.replaceState(history.state, "", url);
@@ -198,7 +202,8 @@ new MutationObserver(() => {
         closingFromHistory = false;
         return;
     }
-    if (!new URLSearchParams(location.search).get("card")) return;
+    if (!CARD_PATH.test(location.pathname) && !new URLSearchParams(location.search).get("card"))
+        return;
     if (history.state?.card) history.back();
     else writeUrl();
 }).observe(element("md"), { attributes: true, attributeFilter: ["class"] });

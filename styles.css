@@ -1916,3 +1916,56 @@ button.acc-avatar:hover,
 #secv .fm-stack .btn {
     justify-self: start;
 }
+
+/* Pie de página y páginas de texto (legales, 404) */
+.site-footer {
+    max-width: 1100px;
+    margin: 32px auto 24px;
+    padding: 16px;
+    border-top: 1px solid var(--bd);
+    display: grid;
+    gap: 6px;
+    color: var(--mu);
+    font-size: 13px;
+}
+
+.site-footer nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+}
+
+.site-footer a {
+    color: var(--tx);
+}
+
+.page {
+    max-width: 820px;
+    margin: 18px auto;
+    padding: 0 16px;
+}
+
+.legal h1 {
+    margin: 0 0 12px;
+    font-size: 26px;
+    font-weight: 600;
+}
+
+.legal h2 {
+    margin: 22px 0 6px;
+    font-size: 17px;
+}
+
+.legal p,
+.legal li {
+    line-height: 1.6;
+}
+
+.legal a {
+    color: var(--ac);
+}
+
+.not-found {
+    text-align: center;
+    padding: 40px 20px;
+}

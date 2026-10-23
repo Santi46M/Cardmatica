@@ -158,3 +158,29 @@ def test_hsts_only_over_https(client):
     assert "Strict-Transport-Security" not in client.get("/health/live").headers
     secure = client.get("/health/live", headers={"X-Forwarded-Proto": "https"})
     assert secure.headers["Strict-Transport-Security"].startswith("max-age=31536000")
+
+
+def test_card_page_title_legal_pages_and_404(client, factory, record):
+    from sqlalchemy import select
+
+    from app.models import Card
+    from app.services.ingestion import IngestionService
+
+    with factory.begin() as session:
+        IngestionService(session).ingest(record)
+    with factory() as session:
+        card_id = session.scalar(select(Card.id))
+    page = client.get(f"/carta/{card_id}/synthetic-test-dragon")
+    assert page.status_code == 200
+    assert "<title>Synthetic Test Dragon · Cartas sueltas · Cardmática</title>" in page.text
+    assert f'rel="canonical" href="/carta/{card_id}"' in page.text
+    assert client.get("/terminos").status_code == 200
+    assert "Borrador" in client.get("/privacidad").text
+    html = {"Accept": "text/html"}
+    missing = client.get("/carta/00000000-0000-0000-0000-000000000000", headers=html)
+    assert missing.status_code == 404 and "no existe" in missing.text
+    assert client.get("/no-existe/aqui", headers=html).status_code == 404
+    assert "no existe" in client.get("/no-existe/aqui", headers=html).text
+    # The API keeps answering JSON.
+    assert client.get("/api/v1/nada", headers=html).json()["error"]["code"] == "http_error"
+    assert client.get("/robots.txt").text.startswith("User-agent")
