@@ -1,15 +1,10 @@
 import { badgeHtml, banlistSectionHtml, statusFor } from "./banlist.js";
 import { formatDate, money } from "./format.js";
+import { typeLine } from "./card-types.js";
 import { escapeHtml } from "./html.js";
 
 
 const h = escapeHtml;
-const kinds = {
-    Monster: "Monstruo",
-    Spell: "Magia",
-    Trap: "Trampa",
-    Skill: "Habilidad"
-};
 const chip = (value) => `<span class="chip">${h(value)}</span>`;
 const section = (title, content) =>
     content ? `<section class="catalog-section"><h3>${h(title)}</h3>${content}</section>` : "";
@@ -119,30 +114,9 @@ export function pager(data, kind = "catalog") {
     }>Siguiente</button></div>`;
 }
 
-// Spanish labels for the subtypes the API reports; races such as "Dragon" stay as given.
-const SUBTYPES = {
-    Effect: "Efecto",
-    Fusion: "Fusión",
-    Synchro: "Sincro",
-    Pendulum: "Péndulo",
-    "Quick-Play": "Juego rápido",
-    Continuous: "Continua",
-    Equip: "Equipo",
-    Field: "Campo",
-    Counter: "Contraefecto"
-};
-
 // Type, subtypes and attribute matter less than price to a buyer who knows the
 // card, so they share one muted line under the name instead of a column of chips.
-function cardMeta(card) {
-    return [
-        kinds[card.card_type] || card.card_type || "Sin clasificar",
-        ...card.subtypes.map((value) => SUBTYPES[value] || value),
-        card.attribute
-    ]
-        .filter(Boolean)
-        .join(" · ");
-}
+const cardMeta = typeLine;
 
 function saleCell(sale) {
     if (!sale) return '<td class="num"><span class="muted">Sin ventas</span></td>';
@@ -397,13 +371,9 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
               printing.release_date ? h(formatDate(printing.release_date)) : ""
           )}${factRow("Banlist", banlist ? `${badgeHtml(banlist)} ${h(banlistLabel(banlist))}` : "")}`
         : '<p class="empty">No hay impresiones documentadas para este mercado.</p>';
+    // The type line (card-types.js), then the numbers printed on the card.
     const stats = [
-        kinds[card.card_type] || card.card_type,
-        card.subtypes.join(" / "),
-        card.attribute,
-        card.level ? `Nivel ${card.level}` : "",
-        card.rank ? `Rango ${card.rank}` : "",
-        card.link_rating ? `LINK-${card.link_rating}` : "",
+        typeLine(card),
         card.pendulum_scale !== null && card.pendulum_scale !== undefined ? `Escala ${card.pendulum_scale}` : "",
         card.atk !== null && card.atk !== undefined
             ? `ATK ${card.atk}${card.defense !== null && card.defense !== undefined ? ` / DEF ${card.defense}` : ""}`

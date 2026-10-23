@@ -23,6 +23,10 @@ class Card(Entity, Base):
     __table_args__ = (
         CheckConstraint("konami_id IS NULL OR konami_id > 0", name="positive_konami_id"),
         Index("ix_cards_type_name", "card_type", "display_name"),
+        Index("ix_cards_frame", "card_type", "monster_frame"),
+        Index("ix_cards_property", "card_type", "card_property"),
+        Index("ix_cards_race", "monster_race"),
+        Index("ix_cards_attribute", "attribute"),
     )
     konami_id: Mapped[int | None] = mapped_column(Integer, unique=True)
     ygoprodeck_id: Mapped[int | None] = mapped_column(Integer, unique=True)
@@ -38,6 +42,13 @@ class Card(Entity, Base):
     atk: Mapped[str | None] = mapped_column(String(20))
     defense: Mapped[str | None] = mapped_column(String(20))
     pendulum_scale: Mapped[int | None] = mapped_column(Integer)
+    # Type levels derived from card_type + subtypes (app/services/card_types.py),
+    # stored so the catalogue can filter and sort by them with an index.
+    monster_frame: Mapped[str | None] = mapped_column(String(20))
+    is_pendulum: Mapped[bool] = mapped_column(Boolean, default=False)
+    monster_abilities: Mapped[list] = mapped_column(JSON, default=list)
+    monster_race: Mapped[str | None] = mapped_column(String(40))
+    card_property: Mapped[str | None] = mapped_column(String(20))
     names: Mapped[list["CardName"]] = relationship(
         back_populates="card", cascade="all, delete-orphan"
     )

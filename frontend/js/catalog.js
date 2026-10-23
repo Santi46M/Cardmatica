@@ -13,6 +13,7 @@ import {
     skeletonRows,
     skeletonTiles
 } from "./catalog-view.js";
+import { TYPE_FILTERS, typeFiltersHtml, typeParams } from "./card-types.js";
 import { BACK_TO_TOP_PX, CATALOG, HOVER_PREVIEW } from "./config.js";
 import { escapeHtml } from "./html.js";
 import { priceChartHtml, priceSummary } from "./price-chart.js";
@@ -98,7 +99,7 @@ function readUrl() {
         tab: params.get("tab"),
         mk: params.get("mk"),
         q: params.get("q") || "",
-        sub: params.get("sub") || "",
+        types: Object.fromEntries(TYPE_FILTERS.map((filter) => [filter.id, params.get(filter.param) || ""])),
         rar: params.get("rar") || "",
         stp: params.get("stp") || "",
         srt: params.get("srt") || "name",
@@ -114,15 +115,19 @@ function applyUrl(state) {
     window.tab = tabs.includes(state.tab) ? state.tab : "Inicio";
     if (["TCG", "OCG"].includes(state.mk)) window.market = state.mk;
     element("q").value = state.q;
-    Object.assign(wanted, { sub: state.sub, rar: state.rar, stp: state.stp, srt: state.srt });
+    Object.assign(wanted, state.types, { rar: state.rar, stp: state.stp, srt: state.srt });
     pendingPage = state.page;
     if (["list", "grid"].includes(state.view)) view = state.view;
 }
 
+// Filters whose options are drawn per tab; the others live in index.html.
+const FILTER_IDS = ["rar", "stp", "srt", ...TYPE_FILTERS.map((filter) => filter.id)];
+
 function applyWanted() {
-    for (const id of ["sub", "rar", "stp", "srt"]) {
+    for (const id of FILTER_IDS) {
         if (!(id in wanted)) continue;
         const select = element(id);
+        if (!select) continue;
         if ([...select.options].some((option) => option.value === wanted[id])) {
             select.value = wanted[id];
             delete wanted[id];
@@ -143,7 +148,11 @@ function writeUrl(mode = "replace") {
     const q = element("q").value.trim();
     if (q) params.set("q", q);
     if (isCatalog()) {
-        for (const id of ["sub", "rar", "stp"]) if (element(id).value) params.set(id, element(id).value);
+        for (const id of ["rar", "stp"]) if (element(id).value) params.set(id, element(id).value);
+        for (const filter of TYPE_FILTERS) {
+            const value = element(filter.id)?.value;
+            if (value) params.set(filter.param, value);
+        }
         if (element("srt").value && element("srt").value !== "name")
             params.set("srt", element("srt").value);
         if (page > 1) params.set("page", page);
@@ -187,7 +196,6 @@ async function loadFacets() {
     if (facets) return;
     facets = await api.get("facets");
     for (const [id, items, label] of [
-        ["sub", facets.subtypes, "Todos los subtipos"],
         ["rar", facets.rarities, "Todas las rarezas"],
         ["stp", facets.product_types, "Cualquier origen"]
     ]) {
@@ -198,6 +206,16 @@ async function loadFacets() {
             items.map((value) => `<option value="${h(value)}">${h(value)}</option>`).join("");
         select.value = items.includes(previous) ? previous : "";
     }
+}
+
+// Type filters depend on the tab (card-types.js). They are redrawn only when
+// the tab changes: a chosen value survives page changes and searches, and a
+// new tab starts with its own filters empty.
+function renderTypeFilters() {
+    const slot = element("type-filters");
+    if (slot.dataset.tab === window.tab) return;
+    slot.dataset.tab = window.tab;
+    slot.innerHTML = typeFiltersHtml(window.tab, facets.types);
 }
 
 function renderDetail() {
@@ -296,6 +314,7 @@ async function loadCards(reset = false) {
     );
     try {
         await loadFacets();
+        renderTypeFilters();
         applyWanted();
         writeUrl();
         const data = await api.get(
@@ -306,7 +325,7 @@ async function loadCards(reset = false) {
                 market: window.market,
                 q: element("q").value.trim(),
                 card_type: cardTypes[window.tab],
-                subtype: home ? undefined : element("sub").value,
+                ...(home ? {} : typeParams()),
                 rarity: home ? undefined : element("rar").value,
                 product_type: home ? undefined : element("stp").value,
                 sort: home ? "updated" : element("srt").value,
@@ -502,7 +521,10 @@ document.addEventListener(
 // Search box and list filters. The demo store's product list also reads the
 // search box, so this goes through window.refreshList for every tab.
 element("q").addEventListener("input", () => window.refreshList());
-for (const id of ["sub", "rar", "stp", "srt"])
+document.addEventListener("change", (event) => {
+    if (TYPE_FILTERS.some((filter) => filter.id === event.target.id)) window.refreshList();
+});
+for (const id of ["rar", "stp", "srt"])
     element(id).addEventListener("change", () => window.refreshList());
 
 document.addEventListener("change", (event) => {

@@ -201,7 +201,9 @@ def test_banlist_price_history_wantlists_and_profile(live_server, browser_page, 
     expect(page.locator("#home-banlist [data-countdown]")).to_contain_text("días")
     page.locator('[data-go="Todas"]').click()
     # Type details sit on one muted line; the latest sale is the prominent column.
-    expect(page.locator("#list .meta")).to_contain_text("Monstruo · Dragon · Efecto · LIGHT")
+    expect(page.locator("#list .meta")).to_contain_text(
+        "Monstruo de Efecto · Dragón · LUZ · Nivel 8"
+    )
     expect(page.locator("#list")).to_contain_text("14,00")
     page.locator("#list [data-catalog-card]").first.click()
     expect(page.locator("#mb h2 .bn-forbidden")).to_be_visible()
@@ -421,4 +423,28 @@ def test_provisional_artwork_is_marked_everywhere(
     expect(page.locator("#catalog-grid .img-warn")).to_be_visible()
     page.locator("#catalog-grid .card-tile").first.click()
     expect(page.locator("#mb .cd-image .img-warn")).to_be_visible()
+    assert not errors
+
+
+def test_type_filters_follow_the_tab(live_server, browser_page):
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(f"{live_server}/?tab=Todas")
+    groups = page.locator("#f-type optgroup")
+    expect(groups).to_have_count(3)
+    expect(page.locator('#f-type optgroup[label="Trampas"] option')).to_have_count(3)
+    page.locator('[data-g="Monstruo"]').click()
+    expect(page.locator("#f-type")).to_have_count(0)
+    expect(page.locator("#f-race option", has_text="Dragón")).to_have_count(1)
+    page.locator("#f-frame").select_option("Synchro")
+    expect(page.locator("#catalog-status")).to_contain_text("no contiene resultados")
+    page.locator("#f-frame").select_option("Effect")
+    expect(page.locator("#list")).to_contain_text("Synthetic Test Dragon")
+    assert "clase=Effect" in page.url
+    page.reload()
+    expect(page.locator("#f-frame")).to_have_value("Effect")
+    page.locator('[data-g="Magia"]').click()
+    expect(page.locator("#f-property option", has_text="Juego rápido")).to_have_count(1)
+    expect(page.locator("#f-frame")).to_have_count(0)
     assert not errors

@@ -26,6 +26,7 @@ from app.models import (
 )
 from app.repositories.ingestion import ProvenanceRepository, aware, conflict, upsert
 from app.schemas.ingestion import CardRecord, PrintingInput, TextInput
+from app.services import card_types
 from app.services.reconciliation import resolve_card
 
 SOURCE_POLICIES = {
@@ -103,6 +104,7 @@ class IngestionService:
             value = getattr(record, field)
             if provenance.select_value(key, field, value):
                 setattr(card, field, value)
+        card_types.apply(card)
         for incoming in record.names:
             name_row = upsert(
                 self.session,

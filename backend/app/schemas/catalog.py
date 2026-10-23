@@ -44,6 +44,21 @@ class PrintingView(BaseModel):
     images: list[ImageView]
 
 
+class CardTypesView(BaseModel):
+    """A card's type line split into levels (see app/services/card_types.py)."""
+
+    kind: str | None
+    frame: str | None = None
+    pendulum: bool = False
+    abilities: list[str] = []
+    race: str | None = None
+    property: str | None = None
+    attribute: str | None = None
+    level: int | None = None
+    rank: int | None = None
+    link_rating: int | None = None
+
+
 class CardSummary(BaseModel):
     id: UUID
     konami_id: int | None
@@ -54,6 +69,7 @@ class CardSummary(BaseModel):
     card_type: str | None
     subtypes: list[str]
     attribute: str | None
+    types: CardTypesView | None = None
     markets: list[str]
     printing_count: int
     image: ImageView | None

@@ -25,6 +25,12 @@ class CatalogRepository:
         market=None,
         card_type=None,
         subtype=None,
+        frame=None,
+        ability=None,
+        race=None,
+        attribute=None,
+        level=None,
+        card_property=None,
         rarity=None,
         set_id=None,
         archetype_id=None,
@@ -73,6 +79,26 @@ class CatalogRepository:
             query = query.where(
                 Card.subtypes.cast(Text).contains('"' + subtype + '"', autoescape=True)
             )
+        # Type levels (app/services/card_types.py). "Pendulum" is a flag on top
+        # of a frame, so it is filtered on its own column.
+        if frame == "Pendulum":
+            query = query.where(Card.is_pendulum.is_(True))
+        elif frame:
+            query = query.where(Card.monster_frame == frame)
+        if ability:
+            query = query.where(
+                Card.monster_abilities.cast(Text).contains('"' + ability + '"', autoescape=True)
+            )
+        if race:
+            query = query.where(Card.monster_race == race)
+        if attribute:
+            query = query.where(Card.attribute == attribute)
+        if level is not None:
+            query = query.where(
+                or_(Card.level == level, Card.rank == level, Card.link_rating == level)
+            )
+        if card_property:
+            query = query.where(Card.card_property == card_property)
         if archetype_id:
             query = query.where(
                 exists(

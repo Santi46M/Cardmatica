@@ -21,6 +21,7 @@ from app.schemas.catalog import (
     SetView,
 )
 from app.services.banlists import current_lists, list_view, statuses_for_cards
+from app.services.card_types import RACES, taxonomy
 from app.services.catalog import card_detail, card_summary, errata_views, printing_view
 from app.services.prices import last_sales, price_history
 
@@ -39,6 +40,12 @@ def cards(
     market: Market | None = None,
     card_type: Literal["Monster", "Spell", "Trap", "Skill"] | None = None,
     subtype: Annotated[str | None, Query(max_length=60)] = None,
+    frame: Annotated[str | None, Query(max_length=20)] = None,
+    ability: Annotated[str | None, Query(max_length=20)] = None,
+    race: Annotated[str | None, Query(max_length=40)] = None,
+    attribute: Annotated[str | None, Query(max_length=20)] = None,
+    level: Annotated[int | None, Query(ge=0, le=13)] = None,
+    card_property: Annotated[str | None, Query(alias="property", max_length=20)] = None,
     rarity: Annotated[str | None, Query(max_length=100)] = None,
     set_id: UUID | None = None,
     archetype_id: UUID | None = None,
@@ -53,6 +60,12 @@ def cards(
         market=market,
         card_type=card_type,
         subtype=subtype,
+        frame=frame,
+        ability=ability,
+        race=race,
+        attribute=attribute,
+        level=level,
+        card_property=card_property,
         rarity=rarity,
         set_id=set_id,
         archetype_id=archetype_id,
@@ -226,6 +239,13 @@ def sets(
     )
 
 
+def races_present(session):
+    found = set(
+        session.scalars(select(Card.monster_race).where(Card.monster_race.is_not(None)).distinct())
+    )
+    return [race for race in RACES if race in found]
+
+
 @router.get("/facets")
 def facets(session: SessionDep):
     return {
@@ -254,6 +274,8 @@ def facets(session: SessionDep):
             "Field",
             "Counter",
         ],
+        # Ordered levels for the filters; races present in the catalogue only.
+        "types": {**taxonomy(), "races_present": races_present(session)},
     }
 
 

@@ -1816,3 +1816,8 @@ button.acc-avatar:hover,
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
 }
+
+/* Filtros de tipo de carta: se dibujan según la pestaña (card-types.js). */
+.type-filters {
+    display: contents;
+}
