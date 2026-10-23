@@ -208,7 +208,9 @@ def test_cache_control_by_kind_of_file(client):
     # An unchanged file is answered with 304 and no body.
     again = client.get("/frontend/js/catalog.js", headers={"If-None-Match": script.headers["etag"]})
     assert again.status_code == 304
-    assert client.get("/api/v1/cards").headers["Cache-Control"] == "private, no-store"
+    assert client.get("/api/v1/cards").headers["Cache-Control"] == "public, max-age=60"
+    assert client.get("/api/v1/auth/me").headers["Cache-Control"] == "no-store"
+    assert client.get("/api/v1/nada").headers["Cache-Control"] == "no-store"
     assert client.get("/").headers["Cache-Control"] == "no-cache"
 
 
