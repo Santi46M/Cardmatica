@@ -1,51 +1,17 @@
 // Accounts in the browser: sign in, register, sign out, password and sessions.
-//
-// The session lives in an HttpOnly cookie the page cannot read. Every request
-// that changes something sends the cm_csrf cookie's value in X-CSRF-Token
-// (backend/app/api/auth.py explains why).
 import { escapeHtml } from "./html.js";
+import { request } from "./session-api.js";
 
 const h = escapeHtml;
 const BASE = "/api/v1/auth";
 
 let user = null;
-let checked = false;
 // "login" or "register": which form the Acceso panel shows first.
 let mode = "login";
 
 export const currentUser = () => user;
-export const accountChecked = () => checked;
 
-function csrfToken() {
-    const match = document.cookie.match(/(?:^|;\s*)cm_csrf=([^;]+)/);
-    return match ? decodeURIComponent(match[1]) : "";
-}
-
-async function call(path, { method = "GET", body } = {}) {
-    const response = await fetch(`${BASE}${path}`, {
-        method,
-        credentials: "same-origin",
-        headers: {
-            Accept: "application/json",
-            ...(body ? { "Content-Type": "application/json" } : {}),
-            ...(method !== "GET" ? { "X-CSRF-Token": csrfToken() } : {})
-        },
-        body: body ? JSON.stringify(body) : undefined
-    });
-    if (response.status === 204) return null;
-    let data = null;
-    try {
-        data = await response.json();
-    } catch {
-        /* An empty or broken answer is reported below. */
-    }
-    if (!response.ok) {
-        const error = new Error(data?.error?.message || "No se pudo completar la operación.");
-        error.status = response.status;
-        throw error;
-    }
-    return data;
-}
+const call = (path, options) => request(`${BASE}${path}`, options);
 
 function changed() {
     document.dispatchEvent(new CustomEvent("cm:account", { detail: user }));
@@ -58,11 +24,10 @@ export async function loadAccount() {
     } catch {
         user = null;
     }
-    checked = true;
     changed();
 }
 
-export function setAuthMode(value) {
+function setAuthMode(value) {
     if (value === "login" || value === "register") mode = value;
 }
 

@@ -3,7 +3,7 @@ import { formatDate, money, toEuro } from "./format.js";
 
 const h = escapeHtml;
 
-export const RANGES = [
+const RANGES = [
     ["1M", 30],
     ["3M", 90],
     ["6M", 180],
@@ -32,7 +32,7 @@ function lastSaleHtml(sale, withCode) {
 
 // Averages shown next to the chart (last 30, 7 and 1 days), in euros, from the
 // sales of the selected printing (or of every printing). null means no sales.
-export const SUMMARY_WINDOWS = [
+const SUMMARY_WINDOWS = [
     ["Media 30 días", 30],
     ["Media 7 días", 7],
     ["Media 1 día", 1]

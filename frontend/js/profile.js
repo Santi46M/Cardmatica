@@ -1,5 +1,7 @@
 import { escapeHtml } from "./html.js";
 import { countItems, listCount } from "./wantlists.js";
+import { currentUser } from "./auth.js";
+import { request } from "./session-api.js";
 import { readJson, writeJson } from "./storage.js";
 
 const h = escapeHtml;
@@ -22,6 +24,8 @@ const PAYMENTS = [
 let profile = readJson(KEY, null);
 
 export const ROLE_LABELS = Object.fromEntries(ROLES);
+
+const ACCOUNT = "/api/v1/account";
 
 // The saved profile, or null before the first save. The account menu reads it.
 export function currentProfile() {
@@ -50,7 +54,7 @@ function preferencesHtml() {
         "list",
         "Lista",
         view
-    )}${option("grid", "Cuadrícula", view)}</select></label></div><small>Se guardan en este navegador y se aplican al instante.</small></section>`;
+    )}${option("grid", "Cuadrícula", view)}</select></label></div><small>Se aplican al instante${currentUser() ? " y se guardan en tu cuenta" : " y se guardan en este navegador"}.</small></section>`;
 }
 
 const sells = (role) => role === "seller" || role === "both";
@@ -86,7 +90,11 @@ export function renderProfile(container) {
             `<label><input type="checkbox" name="pf-payment" value="${h(method)}"${
                 value.payments.includes(method) ? " checked" : ""
             }> ${h(method)}</label>`
-    ).join("")}</div></fieldset></div><p id="pf-error" class="warn" role="alert" hidden></p><p><button class="btn" type="submit">Guardar perfil</button></p><small>Por ahora el perfil se guarda solo en este navegador: todavía no hay cuentas en el servidor, y un perfil de vendedor aún no publica una tienda.</small></form><div class="gl pnl" style="margin-top:12px"><b>Wantlists</b><small>${listCount()} ${
+    ).join("")}</div></fieldset></div><p id="pf-error" class="warn" role="alert" hidden></p><p><button class="btn" type="submit">Guardar perfil</button></p><small>${
+        currentUser()
+            ? "El perfil se guarda en tu cuenta. Un perfil de vendedor todavía no publica una tienda."
+            : "Sin sesión iniciada, el perfil se guarda solo en este navegador. Inicia sesión para guardarlo en tu cuenta."
+    }</small></form><div class="gl pnl" style="margin-top:12px"><b>Wantlists</b><small>${listCount()} ${
         listCount() === 1 ? "lista" : "listas"
     } · ${countItems()} cartas</small><p><button class="btn s" data-go="Wantlists">Gestionar wantlists</button></p></div>${preferencesHtml()}`;
 }
@@ -116,8 +124,86 @@ function problem(data) {
     return null;
 }
 
+// Signed in, the profile lives in the account; otherwise in this browser.
+async function saveProfile(data) {
+    if (currentUser()) await request(`${ACCOUNT}/profile`, { method: "PUT", body: data });
+    else if (!writeJson(KEY, data)) throw new Error("Tu navegador no permite guardar datos en este sitio.");
+    profile = data;
+}
+
+// ---- Preferences: currency, market and catalogue view ------------------------
+
+function currentPreferences() {
+    return { currency: window.currency, market: window.market, view: readJson("cm_view", "list") };
+}
+
+// Applying the account's preferences changes the page controls; that must not
+// send them back to the server.
+let applying = false;
+
+function applyPreferences(preferences) {
+    applying = true;
+    try {
+        if (preferences.currency && preferences.currency !== window.currency) {
+            const select = document.getElementById("cur");
+            select.value = preferences.currency;
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        if (preferences.market && preferences.market !== window.market)
+            document.querySelector(`[data-mk="${preferences.market}"]`)?.click();
+        if (preferences.view && preferences.view !== readJson("cm_view", "list")) {
+            writeJson("cm_view", preferences.view);
+            document.dispatchEvent(new CustomEvent("cm:view", { detail: preferences.view }));
+        }
+    } finally {
+        applying = false;
+    }
+}
+
+let preferenceTimer;
+function savePreferencesSoon() {
+    if (applying || !currentUser()) return;
+    clearTimeout(preferenceTimer);
+    // The market button changes window.market after this click handler runs.
+    preferenceTimer = setTimeout(() => {
+        request(`${ACCOUNT}/preferences`, { method: "PUT", body: currentPreferences() }).catch(() =>
+            window.toast?.("No se pudieron guardar tus preferencias en la cuenta")
+        );
+    }, 300);
+}
+
+// On sign-in: the account's data replaces the browser's. The first time, what
+// the browser had is moved into the account so nothing is lost.
+async function syncWithAccount(panel) {
+    if (!currentUser()) {
+        profile = readJson(KEY, null);
+    } else {
+        try {
+            const data = await request(ACCOUNT);
+            const local = readJson(KEY, null);
+            if (!data.profile && local) {
+                await request(`${ACCOUNT}/profile`, { method: "PUT", body: local }).catch(() => null);
+                data.profile = local;
+            }
+            profile = data.profile;
+            const saved = Object.values(data.preferences).some(Boolean);
+            if (saved) applyPreferences(data.preferences);
+            else savePreferencesSoon();
+        } catch {
+            window.toast?.("No se pudo leer tu perfil de la cuenta");
+        }
+    }
+    document.dispatchEvent(new CustomEvent("cm:profile"));
+    if (window.tab === "Perfil") renderProfile(panel());
+}
+
 export function installProfile({ panel }) {
-    document.addEventListener("submit", (event) => {
+    document.addEventListener("cm:account", () => syncWithAccount(panel));
+    document.addEventListener("cm:view", savePreferencesSoon);
+    document.addEventListener("click", (event) => {
+        if (event.target.closest("[data-mk]")) savePreferencesSoon();
+    });
+    document.addEventListener("submit", async (event) => {
         if (event.target.id !== "pf-form") return;
         event.preventDefault();
         const data = read();
@@ -129,18 +215,20 @@ export function installProfile({ panel }) {
             if (error[0]) document.getElementById(error[0]).focus();
             return;
         }
-        profile = data;
-        if (!writeJson(KEY, profile)) {
-            message.textContent = "Tu navegador no permite guardar datos en este sitio.";
+        try {
+            await saveProfile(data);
+        } catch (failure) {
+            message.textContent = failure.message;
             message.hidden = false;
             return;
         }
-        window.toast?.("Perfil guardado");
+        window.toast?.(currentUser() ? "Perfil guardado en tu cuenta" : "Perfil guardado");
         document.dispatchEvent(new CustomEvent("cm:profile"));
         renderProfile(panel());
     });
     document.addEventListener("change", (event) => {
         const { id, value } = event.target;
+        if (id === "cur") savePreferencesSoon();
         if (id === "pf-pref-currency") {
             const select = document.getElementById("cur");
             select.value = value;

@@ -28,13 +28,9 @@ function rarityBadge(rarity) {
     return rarity ? `<span class="rr">${h(rarity)}</span>` : "";
 }
 
-// Tabs of the info panel. Cards from the API can go to a wantlist; demo cards
-// cannot, so they only show "Info".
-export function cardTabs(withWants) {
-    return `<div class="cd-tabs" role="tablist"><button role="tab" aria-selected="true" data-cd-tab="info">ⓘ Info</button>${
-        withWants ? '<button role="tab" aria-selected="false" data-cd-tab="wants">♥ Wantlists</button>' : ""
-    }</div>`;
-}
+// Tabs of the info panel. (Demo cards draw only "Info": they cannot go to a wantlist.)
+const CARD_TABS =
+    '<div class="cd-tabs" role="tablist"><button role="tab" aria-selected="true" data-cd-tab="info">ⓘ Info</button><button role="tab" aria-selected="false" data-cd-tab="wants">♥ Wantlists</button></div>';
 
 // Prices beside the chart, from Cardmática's own sales.
 export function pricesHtml(summary) {
@@ -388,7 +384,7 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
         image,
         `${card.name} · ${image?.association === "card_artwork" ? "ilustración general" : printing?.code || ""}`,
         true
-    )}${credit}</figure><div class="cd-info gl">${cardTabs(true)}<div class="cd-panel" data-cd-panel="info"><div class="cd-cols"><div><dl class="cd-facts">${facts}</dl><dl class="cd-facts" id="cd-prices"></dl></div><div class="cd-chart"><div id="price-history" class="chart" aria-live="polite"></div><button class="btn s cd-want" data-wl-open aria-controls="wl-picker">♥ Añadir a wantlist</button></div></div><div class="cd-text">${
+    )}${credit}</figure><div class="cd-info gl">${CARD_TABS}<div class="cd-panel" data-cd-panel="info"><div class="cd-cols"><div><dl class="cd-facts">${facts}</dl><dl class="cd-facts" id="cd-prices"></dl></div><div class="cd-chart"><div id="price-history" class="chart" aria-live="polite"></div><button class="btn s cd-want" data-wl-open aria-controls="wl-picker">♥ Añadir a wantlist</button></div></div><div class="cd-text">${
         stats ? `<p class="cd-stats">${stats}</p>` : ""
     }${textHtml}</div></div><div class="cd-panel" data-cd-panel="wants" hidden></div><div id="wl-picker"></div></div></div><section class="cd-offers"><div class="gl wrap"><table class="cd-table"><thead><tr><th>Vendedor</th><th>Información del producto</th><th class="num">Oferta</th></tr></thead><tbody><tr><td colspan="3" class="empty">Todavía no hay ofertas de esta impresión en Cardmática.</td></tr></tbody></table></div></section>${section(
         "Arquetipos · clasificación comunitaria",

@@ -107,7 +107,7 @@ function menuHtml() {
             )}</span>${items.map(itemHtml).join("")}</div>`
     ).join("")}${currentUser() ? accessHtml() : ""}<p class="acc-note">${
         currentUser()
-            ? "El perfil, las wantlists y el carrito todavía se guardan en este navegador; pasarán a tu cuenta en el próximo paso."
+            ? "Tu perfil, wantlists y preferencias se guardan en tu cuenta. El carrito es de la tienda de demostración y queda en este navegador."
             : "Sin cuenta, el perfil y las wantlists se guardan solo en este navegador."
     }</p>`;
 }

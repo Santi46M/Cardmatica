@@ -327,6 +327,13 @@ bloqueo temporal tras `LOGIN_MAX_FAILURES` intentos y límite por IP
 (`AUTH_ATTEMPTS_PER_MINUTE`, en memoria: válido para un solo proceso). Falta el
 envío de correos (confirmación de cuenta y recuperación de contraseña).
 
+Datos de la cuenta (`/api/v1/account`): `GET` perfil y preferencias; `PUT /profile`,
+`/preferences` (moneda, mercado, vista); `GET`/`PUT /wantlists`. Las wantlists se
+envían como un documento con la forma que usa la página y se guardan como filas
+(`wantlists`, `wantlist_items`); al leerlas, el nombre, código y rareza salen del
+catálogo. Al iniciar sesión por primera vez, lo que el navegador tenía guardado
+pasa a la cuenta.
+
 Todas las respuestas llevan Content-Security-Policy estricta (solo recursos del
 propio sitio), `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` y,
 en producción bajo HTTPS, HSTS (`backend/app/core/security.py`). En producción,

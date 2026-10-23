@@ -486,3 +486,42 @@ def test_register_sign_out_and_sign_in_from_the_account_menu(live_server, browse
     page.locator("#auth-login button[type=submit]").click()
     expect(page.locator("#ts")).to_contain_text("Hola, Martín")
     assert not errors
+
+
+def test_browser_data_moves_into_the_account(live_server, browser_page):
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(f"{live_server}/?tab=Todas")
+    page.locator("#list [data-catalog-card]").first.click()
+    page.locator("[data-wl-open]").first.click()
+    page.locator("#wl-list-name").fill("Antes de la cuenta")
+    page.locator("[data-wl-add]").click()
+    page.keyboard.press("Escape")
+    page.locator("#cur").select_option("UYU")
+    page.locator("#account-button").click()
+    page.locator('#account-menu [data-auth-mode="register"]').click()
+    page.locator("#auth-name").fill("Lucía")
+    page.locator("#auth-email").fill("lucia@example.com")
+    page.locator("#auth-password").fill("una frase larga de prueba")
+    page.locator("#auth-terms").check()
+    page.locator("#auth-register button[type=submit]").click()
+    expect(page.locator("#ts")).to_contain_text("se guardaron en tu cuenta")
+    # A fresh browser profile: the lists and the currency come from the account.
+    page.context.clear_cookies()
+    page.evaluate("localStorage.clear()")
+    page.goto(live_server)
+    page.locator("#account-button").click()
+    page.locator('#account-menu [data-auth-mode="login"]').click()
+    page.locator("#auth-email").fill("lucia@example.com")
+    page.locator("#auth-password").fill("una frase larga de prueba")
+    page.locator("#auth-login button[type=submit]").click()
+    expect(page.locator("#cur")).to_have_value("UYU")
+    page.locator('[data-g="Wantlists"]').click()
+    expect(page.locator("#wlv")).to_contain_text("Antes de la cuenta")
+    expect(page.locator("#wlv")).to_contain_text("Synthetic Test Dragon")
+    page.locator("#account-button").click()
+    page.locator("#account-menu [data-auth-logout]").click()
+    page.locator('[data-g="Wantlists"]').click()
+    expect(page.locator("#wlv")).not_to_contain_text("Antes de la cuenta")
+    assert not errors

@@ -10,10 +10,10 @@ import { escapeHtml } from "./html.js";
 
 const h = escapeHtml;
 
-export const KIND_LABELS = { Monster: "Monstruo", Spell: "Magia", Trap: "Trampa", Skill: "Habilidad" };
+const KIND_LABELS = { Monster: "Monstruo", Spell: "Magia", Trap: "Trampa", Skill: "Habilidad" };
 
 // Labels as the card's type line reads in Spanish ("Monstruo de Sincronía").
-export const FRAME_LABELS = {
+const FRAME_LABELS = {
     Normal: "Normal",
     Effect: "de Efecto",
     Ritual: "de Ritual",
@@ -34,7 +34,7 @@ const FRAME_OPTIONS = {
     Link: "Enlace (Link)",
     Pendulum: "Péndulo"
 };
-export const ABILITY_LABELS = {
+const ABILITY_LABELS = {
     Tuner: "Cantante",
     Flip: "Volteo",
     Gemini: "Géminis",
@@ -42,7 +42,7 @@ export const ABILITY_LABELS = {
     Toon: "Toon",
     Union: "Unión"
 };
-export const RACE_LABELS = {
+const RACE_LABELS = {
     Aqua: "Aqua",
     Beast: "Bestia",
     "Beast-Warrior": "Guerrero-Bestia",
@@ -70,7 +70,7 @@ export const RACE_LABELS = {
     Wyrm: "Wyrm",
     Zombie: "Zombi"
 };
-export const ATTRIBUTE_LABELS = {
+const ATTRIBUTE_LABELS = {
     LIGHT: "LUZ",
     DARK: "OSCURIDAD",
     EARTH: "TIERRA",
@@ -79,7 +79,7 @@ export const ATTRIBUTE_LABELS = {
     WIND: "VIENTO",
     DIVINE: "DIVINIDAD"
 };
-export const PROPERTY_LABELS = {
+const PROPERTY_LABELS = {
     Spell: {
         Normal: "Normal",
         "Quick-Play": "de Juego Rápido",

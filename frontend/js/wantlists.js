@@ -1,12 +1,14 @@
 import { escapeHtml } from "./html.js";
 import { WANTLIST } from "./config.js";
 import { formatDate, money, toEuro } from "./format.js";
+import { currentUser } from "./auth.js";
+import { request } from "./session-api.js";
 import { newId, readJson, writeJson } from "./storage.js";
 
 const h = escapeHtml;
 
 const KEY = "cm_wantlists_v1";
-export const LANGUAGES = {
+const LANGUAGES = {
     TCG: [
         ["EN", "Inglés"],
         ["ES", "Español"],
@@ -24,7 +26,7 @@ export const LANGUAGES = {
 };
 const LANGUAGE_NAMES = Object.fromEntries([...LANGUAGES.TCG, ...LANGUAGES.OCG]);
 const API_LANGUAGES = { en: "EN", es: "ES", fr: "FR", de: "DE", it: "IT", pt: "PT", ja: "JP", ko: "KR", zh: "SC", ae: "AE" };
-export const EDITIONS = [
+const EDITIONS = [
     ["1st", "1st Edition"],
     ["Limited", "Limited Edition"],
     ["Unlimited", "Unlimited"]
@@ -32,8 +34,18 @@ export const EDITIONS = [
 const EDITION_NAMES = Object.fromEntries(EDITIONS);
 const TYPES = { Monster: "Monstruo", Spell: "Magia", Trap: "Trampa" };
 
-let state = readJson(KEY, null);
-if (!state || !Array.isArray(state.lists)) state = { lists: [], active: null };
+const EMPTY = () => ({ lists: [], active: null });
+function localState() {
+    const saved = readJson(KEY, null);
+    return saved && Array.isArray(saved.lists) ? saved : EMPTY();
+}
+let state = localState();
+// Signed in, the lists live in the account (/api/v1/account/wantlists).
+let remote = false;
+const ACCOUNT_WANTLISTS = "/api/v1/account/wantlists";
+// Several quick edits (typing a quantity, an alert price) are sent together.
+const SAVE_DELAY_MS = 400;
+let saveTimer;
 let pendingDelete = null;
 // Price alerts: item id -> latest matching sale at or below the target price.
 let api = null;
@@ -41,8 +53,45 @@ let alerts = new Map();
 let alertsAnnounced = false;
 
 function save() {
+    if (remote) {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+            request(ACCOUNT_WANTLISTS, { method: "PUT", body: state }).catch((error) =>
+                window.toast?.(`No se pudo guardar la wantlist: ${error.message}`)
+            );
+        }, SAVE_DELAY_MS);
+        return;
+    }
     if (!writeJson(KEY, state))
         window.toast?.("Tu navegador no permite guardar: la wantlist se perderá al cerrar la página");
+}
+
+// On sign-in the account's lists replace the browser's. The first time, the
+// browser's lists are moved into the account so nothing is lost.
+async function syncWithAccount(panel) {
+    clearTimeout(saveTimer);
+    if (!currentUser()) {
+        remote = false;
+        state = localState();
+    } else {
+        try {
+            const saved = await request(ACCOUNT_WANTLISTS);
+            const local = localState();
+            if (!saved.lists.length && local.lists.length) {
+                state = await request(ACCOUNT_WANTLISTS, { method: "PUT", body: local });
+                writeJson(KEY, EMPTY());
+                window.toast?.("Tus wantlists de este navegador se guardaron en tu cuenta");
+            } else state = saved;
+            remote = true;
+        } catch {
+            window.toast?.("No se pudieron leer tus wantlists de la cuenta");
+        }
+    }
+    alerts = new Map();
+    updateBadge();
+    const container = panel();
+    if (container) renderWantlists(container);
+    refreshAlerts();
 }
 
 function activeList() {
@@ -80,7 +129,7 @@ export function listCount() {
 }
 
 // Form shown inside a card's detail. The card and printing come from the catalogue API.
-export function pickerHtml(card, printings, selectedId, market) {
+function pickerHtml(card, printings, selectedId, market) {
     const printing = printings.items.find((item) => item.id === selectedId) || printings.items[0];
     const language = API_LANGUAGES[String(printing?.language || "").toLowerCase()] || "";
     return `<div class="pick gl" id="wl-form" data-card-id="${h(card.id)}"><b>Añadir a una wantlist</b><select id="wl-list" aria-label="Wantlist">${state.lists
@@ -367,6 +416,7 @@ export function renderWantlists(container) {
 // Hooks for the card detail, which owns the current card and printing page.
 export function installWantlists({ panel, detail, api: client }) {
     api = client;
+    document.addEventListener("cm:account", () => syncWithAccount(panel));
     document.addEventListener(
         "click",
         (event) => {
