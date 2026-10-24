@@ -37,6 +37,7 @@
     <link rel="modulepreload" href="/frontend/js/catalog-view.js">
     <link rel="modulepreload" href="/frontend/js/config.js">
     <link rel="modulepreload" href="/frontend/js/format.js">
+    <link rel="modulepreload" href="/frontend/js/header-scroll.js">
     <link rel="modulepreload" href="/frontend/js/html.js">
     <link rel="modulepreload" href="/frontend/js/page-meta.js">
     <link rel="modulepreload" href="/frontend/js/price-chart.js">
@@ -53,13 +54,13 @@
             Card<b>mática</b>
         </a><div class="seg" role="group" aria-label="Mercado"><button data-mk="TCG" aria-pressed="true" title="Cartas occidentales">TCG</button><button data-mk="OCG" aria-pressed="false" title="Cartas asiáticas">OCG</button></div>
         <label class="search"><input id="q" type="search" placeholder="Nombre, código, set o arquetipo" aria-label="Buscar cartas"></label>
-        <select id="cur" aria-label="Moneda"></select><button class="btn" id="cb">Carrito (<span id="cc">0</span>)</button>
+        <select id="cur" aria-label="Moneda"></select><button class="btn" id="cb"><span class="cb-label">Carrito </span><span class="cb-paren">(</span><span id="cc">0</span><span class="cb-paren">)</span></button>
     </div>
     <nav id="tabs"></nav>
 </header>
 <main>
     <div id="home"></div><div id="prod" style="display:none"><div class="tools"><select id="pc" aria-label="Categoría"></select><span class="cnt" id="pcnt"></span></div><div class="pn gl wrap"><table><thead><tr><th>Producto</th><th>Categoría</th><th class="hide">Lanzamiento</th><th class="num">Desde</th><th class="num hide">Ofertas</th></tr></thead><tbody id="pl"></tbody></table></div></div><div id="cat" style="display:none">
-    <div class="tools">
+    <div class="tools" id="cat-tools">
         <span id="type-filters" class="type-filters"></span><select id="rar" aria-label="Rareza"></select><select id="stp" aria-label="Origen del set"></select>
         <select id="srt" aria-label="Ordenar"></select>
         <span class="cnt" id="cnt"></span>

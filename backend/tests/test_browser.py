@@ -697,3 +697,39 @@ def test_search_suggestions_open_a_card(live_server, browser_page):
     page.keyboard.press("Enter")
     expect(page.locator("#mb")).to_contain_text("Synthetic official test text.")
     expect(page.locator("#q-suggest")).to_be_hidden()
+
+
+def test_phone_layout(live_server, browser_page):
+    """At 360 px: nothing wider than the screen, compact header, filters behind a button."""
+    page = browser_page
+    page.set_viewport_size({"width": 360, "height": 740})
+    page.goto(f"{live_server}/?tab=Wantlists")
+    # The current tab is scrolled into view in the one-row tab strip.
+    current = page.locator('#tabs [aria-pressed="true"]')
+    box = current.bounding_box()
+    assert box and box["x"] >= 0 and box["x"] + box["width"] <= 360
+    page.locator('[data-g="Todas"]').click()
+    expect(page.locator("#list [data-catalog-card]").first).to_be_visible()
+    assert page.evaluate("document.documentElement.scrollWidth") <= 360
+    header = page.locator("header").bounding_box()
+    assert header and header["height"] < 200
+    for selector in ["#account-button", "#cb", "#cur"]:
+        item = page.locator(selector).bounding_box()
+        assert item and item["x"] + item["width"] <= 360, selector
+    # Filters wait behind one button; the order stays visible.
+    expect(page.locator("#rar")).to_be_hidden()
+    expect(page.locator("#srt")).to_be_visible()
+    page.locator(".filters-toggle").click()
+    expect(page.locator("#rar")).to_be_visible()
+    # The header slides away while scrolling down and comes back on the way up.
+    page.evaluate("document.body.style.paddingBottom = '3000px'")
+    page.mouse.wheel(0, 800)
+    expect(page.locator("header")).to_have_class(re.compile("tucked"))
+    page.mouse.wheel(0, -300)
+    expect(page.locator("header")).not_to_have_class(re.compile("tucked"))
+    # A card covers the whole screen, header included.
+    page.evaluate("window.scrollTo(0, 0)")
+    page.locator("#list [data-catalog-card]").first.click()
+    expect(page.locator("#mb")).to_contain_text("Synthetic official test text.")
+    assert page.evaluate("document.documentElement.scrollWidth") <= 360
+    assert page.locator("#md .box").bounding_box()["y"] < 60

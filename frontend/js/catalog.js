@@ -27,6 +27,7 @@ import { CATALOG } from "./config.js";
 import { escapeHtml } from "./html.js";
 import { installBackToTop } from "./back-to-top.js";
 import { installCardPreview } from "./card-preview.js";
+import { installHeaderScroll } from "./header-scroll.js";
 import { cardMeta, tabMeta } from "./page-meta.js";
 import { priceChartHtml, priceSummary } from "./price-chart.js";
 import { installProfile, renderProfile } from "./profile.js";
@@ -99,6 +100,35 @@ viewToggle.className = "seg m view-toggle";
 viewToggle.setAttribute("role", "group");
 viewToggle.setAttribute("aria-label", "Vista");
 element("cnt").before(viewToggle);
+
+// Phones show the filters behind one button that says how many are in use;
+// the order stays in view (styles.css, "Teléfono").
+const catalogTools = element("cat-tools");
+const filtersToggle = document.createElement("button");
+filtersToggle.type = "button";
+filtersToggle.className = "ghost filters-toggle";
+filtersToggle.setAttribute("aria-controls", catalogTools.id);
+filtersToggle.setAttribute("aria-expanded", "false");
+catalogTools.prepend(filtersToggle);
+filtersToggle.addEventListener("click", () => {
+    const open = catalogTools.classList.toggle("open");
+    filtersToggle.setAttribute("aria-expanded", String(open));
+});
+
+function updateFiltersToggle() {
+    const ids = ["rar", "stp", ...TYPE_FILTERS.map((filter) => filter.id)];
+    const used = ids.filter((id) => element(id)?.value).length;
+    filtersToggle.textContent = used ? `Filtros (${used})` : "Filtros";
+}
+
+// On phones the tabs scroll sideways; the current one is brought into view.
+function showCurrentTab() {
+    const nav = element("tabs");
+    const current = nav.querySelector('[aria-pressed="true"]');
+    if (!current || nav.scrollWidth <= nav.clientWidth) return;
+    const left = current.getBoundingClientRect().left - nav.getBoundingClientRect().left;
+    nav.scrollLeft += left - (nav.clientWidth - current.offsetWidth) / 2;
+}
 
 function renderViewToggle() {
     viewToggle.innerHTML = [
@@ -364,6 +394,7 @@ async function loadCards(reset = false) {
             await loadFacets();
             renderTypeFilters();
             applyWanted();
+            updateFiltersToggle();
         }
         writeUrl();
         const data = await api.get(
@@ -447,7 +478,9 @@ window.showTab = function () {
     if (isCommerce()) {
         status("");
         writeUrl();
-        return demoShowTab();
+        demoShowTab();
+        showCurrentTab();
+        return;
     }
     element("tabs").innerHTML = window.TABS.map(
         (tab) =>
@@ -455,6 +488,7 @@ window.showTab = function () {
                 window.TAB_LABELS[tab]
             )}</button>`
     ).join("");
+    showCurrentTab();
     const panel = localPanels[window.tab] || (window.tab === "Inicio" ? "home" : "cat");
     for (const id of ["home", "cat", "prod", "vend", ...Object.values(localPanels)])
         element(id).style.display = id === panel ? "" : "none";
@@ -619,6 +653,7 @@ document.addEventListener(
 
 const { hidePreview } = installCardPreview({ lookup: (id) => shownItems.get(id) });
 installBackToTop({ focus: element("q") });
+installHeaderScroll();
 
 // ---- Keyboard shortcut and back to top ----------------------------------------
 

@@ -20,10 +20,23 @@ body {
     color: var(--tx);
     font: 15px/1.45 "Segoe UI", Frutiger, "Trebuchet MS", system-ui, sans-serif;
     min-height: 100vh;
+    background: #050a12;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+/* The backdrop stays still while the page scrolls. A fixed layer is painted
+   once; "background-attachment: fixed" repaints on every scroll on phones. */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
     background:
         radial-gradient(900px 520px at 12% -8%, rgba(70, 160, 225, .30), transparent),
         radial-gradient(800px 520px at 92% 6%, rgba(40, 200, 185, .15), transparent),
-        linear-gradient(180deg, #0a1626, #050a12) fixed #050a12;
+        linear-gradient(180deg, #0a1626, #050a12);
 }
 
 h2 {
@@ -168,6 +181,7 @@ select {
 
 .search input {
     flex: 1;
+    min-width: 0;
 }
 
 select option {
@@ -1995,6 +2009,10 @@ button.acc-avatar:hover,
     color: var(--tx);
 }
 
+.site-footer small {
+    font-size: 12px;
+}
+
 .page {
     max-width: 820px;
     margin: 18px auto;
@@ -2090,4 +2108,273 @@ button.acc-avatar:hover,
 /* La ventana recibe el foco al abrirse; el contorno sobraría. */
 .box:focus {
     outline: none;
+}
+
+/* ---- Tableta y teléfono ---------------------------------------------------
+   Hasta 960 px: pestañas en una fila deslizable y el carrito como ícono.
+   Hasta 760 px: cabecera en dos filas. Hasta 640 px (teléfono): la cabecera se
+   esconde al bajar (header-scroll.js), filtros detrás de un botón, ventanas a
+   pantalla completa. Con el dedo, todo lo que se toca mide al menos 40 px. */
+.filters-toggle {
+    display: none;
+}
+
+@media (max-width: 960px) {
+    .bar {
+        gap: 10px;
+    }
+
+    .search {
+        min-width: 150px;
+    }
+
+    #cur {
+        max-width: 150px;
+    }
+
+    /* El carrito queda como ícono con la cantidad; el texto sigue para lectores de pantalla. */
+    #cb {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 0 8px;
+        min-height: 40px;
+    }
+
+    #cb::before {
+        content: "";
+        width: 20px;
+        height: 20px;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e8f1fa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='20' r='1.5'/%3E%3Ccircle cx='18' cy='20' r='1.5'/%3E%3Cpath d='M2 3h3l2.7 12.4a1.5 1.5 0 0 0 1.5 1.1h8.6a1.5 1.5 0 0 0 1.5-1.1L21 7H6'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
+
+    .cb-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    .cb-paren {
+        display: none;
+    }
+
+    nav {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding: 0 4px;
+        scrollbar-width: none;
+        overscroll-behavior-x: contain;
+    }
+
+    nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    nav button {
+        flex: none;
+        white-space: nowrap;
+        padding: 11px 12px;
+    }
+
+    .site-footer nav {
+        overflow: visible;
+        flex-wrap: wrap;
+    }
+}
+
+/* Fila 1: logo, mercado, carrito, cuenta. Fila 2: búsqueda y moneda. El ancho
+   fijo de la moneda evita que ensanche la columna del carrito. */
+@media (max-width: 760px) {
+    .bar {
+        position: relative;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto auto;
+        grid-template-areas:
+            "logo market cart account"
+            "search search currency currency";
+        gap: 8px 6px;
+        padding: 8px 10px;
+    }
+
+    .logo {
+        grid-area: logo;
+        font-size: 19px;
+    }
+
+    .bar > .seg {
+        grid-area: market;
+        justify-self: start;
+    }
+
+    .bar > .seg button {
+        padding: 6px 9px;
+        font-size: 14px;
+    }
+
+    /* Las sugerencias usan todo el ancho de la cabecera. */
+    .search {
+        grid-area: search;
+        min-width: 0;
+        position: static;
+    }
+
+    .search input {
+        width: 100%;
+    }
+
+    .suggest {
+        left: 6px;
+        right: 6px;
+        top: calc(100% - 2px);
+    }
+
+    #cur {
+        grid-area: currency;
+        justify-self: end;
+        width: 104px;
+        max-width: none;
+        padding-left: 8px;
+        padding-right: 2px;
+        font-size: 14px;
+    }
+
+    #cb {
+        grid-area: cart;
+    }
+
+    .acc {
+        grid-area: account;
+        margin: 0;
+    }
+}
+
+@media (max-width: 640px) {
+    header {
+        margin: 6px 6px 0;
+        transition: transform .25s ease;
+    }
+
+    header.tucked {
+        transform: translateY(calc(-100% - 12px - env(safe-area-inset-top, 0px)));
+    }
+
+    main {
+        margin-top: 10px;
+        padding: 0 6px;
+    }
+
+    /* Filtros en dos columnas, detrás del botón «Filtros». */
+    #cat-tools {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    #cat-tools select {
+        width: 100%;
+        min-width: 0;
+    }
+
+    #cat-tools .filters-toggle {
+        display: block;
+    }
+
+    #cat-tools:not(.open) .type-filters,
+    #cat-tools:not(.open) #rar,
+    #cat-tools:not(.open) #stp {
+        display: none;
+    }
+
+    #cat-tools .view-toggle {
+        margin: 0;
+        justify-self: start;
+    }
+
+    #cat-tools .cnt {
+        justify-self: end;
+        align-self: center;
+    }
+
+    #catalog-pagination-top,
+    .pager-total {
+        display: none;
+    }
+
+    .catalog-pager {
+        flex-wrap: nowrap;
+        gap: 8px;
+    }
+
+    /* Productos de la demo: la categoría ya está en el filtro de arriba. */
+    #prod th:nth-child(2),
+    #prod td:nth-child(2) {
+        display: none;
+    }
+
+    /* Las ventanas cubren la cabecera y usan todo el ancho. */
+    #md,
+    #cart {
+        z-index: 40;
+        padding-left: 6px;
+        padding-right: 6px;
+    }
+
+    .catalog-image-fallback.large {
+        min-height: 150px;
+    }
+
+    .cd-image .catalog-image.large {
+        max-width: 200px;
+    }
+
+    /* Sobre un fondo liso el desenfoque no se nota y cuesta en cada desplazamiento. */
+    main .gl {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+}
+
+/* Logos y mercado más compactos en pantallas muy angostas (320–359 px). */
+@media (max-width: 359px) {
+    .logo {
+        font-size: 16px;
+    }
+
+    .bar > .seg button {
+        padding: 6px 6px;
+        font-size: 13px;
+    }
+
+    #cb {
+        padding: 0 6px;
+    }
+}
+
+/* Con el dedo, todo lo que se toca mide al menos 40 px. */
+@media (pointer: coarse) {
+    .btn,
+    .ghost,
+    .seg button,
+    .acc-item,
+    [data-ph-range] {
+        min-height: 40px;
+    }
+
+    .seg.m button {
+        padding: 4px 14px;
+    }
+
+    input[type="checkbox"],
+    input[type="radio"] {
+        width: 20px;
+        height: 20px;
+    }
+
+    .lk,
+    .site-footer a {
+        display: inline-block;
+        padding: 9px 0;
+    }
 }

@@ -103,9 +103,9 @@ export function pager(data, kind = "catalog") {
         data.page - 1
     }" ${data.page <= 1 ? "disabled" : ""}>Anterior</button><span>Página ${
         data.page
-    } de ${last} · ${data.total} ${
+    } de ${last}<span class="pager-total"> · ${data.total} ${
         kind === "printing" ? "impresiones" : "cartas"
-    }</span><button class="ghost" data-${kind}-page="${data.page + 1}" ${
+    }</span></span><button class="ghost" data-${kind}-page="${data.page + 1}" ${
         data.page >= last ? "disabled" : ""
     }>Siguiente</button></div>`;
 }

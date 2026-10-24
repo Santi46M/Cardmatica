@@ -1048,11 +1048,15 @@ function refreshList() {
     if (tab === "Vendedores") renderSellers();
 }
 
-// Las ventanas emergentes empiezan justo debajo de la cabecera.
+// Las ventanas emergentes empiezan justo debajo de la cabecera; en el teléfono
+// la cubren y empiezan arriba, para aprovechar la pantalla.
 function alignDialogs() {
-    const offset = document.querySelector("header").getBoundingClientRect().bottom + DIALOG_GAP_PX;
-    byId("md").style.paddingTop = `${offset}px`;
-    byId("cart").style.paddingTop = `${offset}px`;
+    const phone = window.matchMedia("(max-width: 640px)").matches;
+    const offset = phone
+        ? `calc(env(safe-area-inset-top, 0px) + ${DIALOG_GAP_PX}px)`
+        : `${document.querySelector("header").getBoundingClientRect().bottom + DIALOG_GAP_PX}px`;
+    byId("md").style.paddingTop = offset;
+    byId("cart").style.paddingTop = offset;
 }
 
 function updateMarketButtons() {
