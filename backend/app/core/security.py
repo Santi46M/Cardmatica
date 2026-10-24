@@ -1,28 +1,34 @@
 """HTTP security headers sent with every response.
 
-The page uses only its own scripts, styles and images (no CDN, no inline
-<script>), so the Content-Security-Policy can be strict. Inline style
-attributes are still allowed because the demo store and charts set colours
-with style="...".
+The page uses only its own scripts, styles and images (no CDN), so the
+Content-Security-Policy can be strict. The one inline script is the import map
+(assets.py), allowed by its hash. Inline style attributes are still allowed
+because the demo store and charts set colours with style="...".
 """
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
-CONTENT_SECURITY_POLICY = "; ".join(
-    [
-        "default-src 'self'",
-        "script-src 'self'",
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data:",
-        "font-src 'self'",
-        "connect-src 'self'",
-        "object-src 'none'",
-        "base-uri 'self'",
-        "form-action 'self'",
-        "frame-ancestors 'none'",
-    ]
-)
+
+def content_security_policy(*scripts: str) -> str:
+    """The policy, allowing also the inline scripts given by their hash source."""
+    return "; ".join(
+        [
+            "default-src 'self'",
+            " ".join(["script-src 'self'", *scripts]),
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data:",
+            "font-src 'self'",
+            "connect-src 'self'",
+            "object-src 'none'",
+            "base-uri 'self'",
+            "form-action 'self'",
+            "frame-ancestors 'none'",
+        ]
+    )
+
+
+CONTENT_SECURITY_POLICY = content_security_policy()
 
 HEADERS = {
     "X-Content-Type-Options": "nosniff",

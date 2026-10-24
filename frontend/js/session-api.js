@@ -8,6 +8,12 @@ function csrfToken() {
     return match ? decodeURIComponent(match[1]) : "";
 }
 
+// Both cookies are set and removed together; without cm_csrf nobody is signed
+// in here, and there is no need to ask the server.
+export function hasSession() {
+    return Boolean(csrfToken());
+}
+
 export async function request(path, { method = "GET", body } = {}) {
     const response = await fetch(path, {
         method,

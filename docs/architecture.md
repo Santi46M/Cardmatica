@@ -29,6 +29,15 @@ local y permite integridad, búsquedas e historial con concurrencia. FastAPI sir
 la API y archivos frontend permitidos desde el mismo origen. El mantenimiento es
 un CLI/worker independiente; las rutas públicas solo consultan PostgreSQL.
 
+Velocidad de carga sin paso de compilación (24 de octubre de 2026): cada página
+enlaza sus scripts y estilos como `archivo?v=<hash de su contenido>`
+(backend/app/core/assets.py) y el navegador los guarda un año sin volver a
+preguntar; un archivo modificado cambia de dirección. Los módulos se importan
+entre sí por ruta relativa, así que la página incluye un import map que agrega la
+versión, permitido en la Content-Security-Policy por su SHA-256. En una conexión
+3G lenta la portada pasó de 1,0 s a 0,37 s en visitas repetidas y de 2,0 s a 1,4 s
+en la primera.
+
 El modelo separa identidad, nombres, impresiones, imágenes, textos, erratas,
 arquetipos/series, relaciones, banlists, observaciones por campo y trabajos.
 La sincronización usa transacciones por carta, checkpoints y leases persistentes.

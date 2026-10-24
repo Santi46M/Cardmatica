@@ -1,7 +1,7 @@
 // Accounts in the browser: sign in, register, sign out, password and sessions.
 import { escapeHtml } from "./html.js";
 import { track } from "./analytics.js";
-import { request } from "./session-api.js";
+import { hasSession, request } from "./session-api.js";
 
 const h = escapeHtml;
 const BASE = "/api/v1/auth";
@@ -28,7 +28,7 @@ function changed() {
 export async function loadAccount() {
     const before = JSON.stringify(user);
     try {
-        user = await call("/me");
+        user = hasSession() ? await call("/me") : null;
     } catch {
         user = null;
     }

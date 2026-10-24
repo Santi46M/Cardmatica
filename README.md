@@ -38,7 +38,7 @@ frontend/js/config.js           Valores ajustables del frontend (paginación, ti
 frontend/pages/, assets/        Páginas legales y 404; íconos e imagen Open Graph
 frontend/demo/data.js           Datos inventados de la tienda demo (vendedores, productos, monedas, envío)
 frontend/demo/store.js          Tienda demo y piezas compartidas (pestañas, moneda, ventanas, carrito)
-backend/app/core/               Configuración, logging JSON, cabeceras de seguridad y caché
+backend/app/core/               Configuración, logging JSON, cabeceras de seguridad, caché y versiones de archivos
 backend/app/models/             Catálogo, procedencia, cuentas, wantlists y estadísticas
 backend/app/repositories/       SQL paginado y upserts
 backend/app/services/           Reconciliación, tipos de carta, cuentas, correo, precios e imágenes

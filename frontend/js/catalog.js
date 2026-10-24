@@ -45,6 +45,7 @@ let detailGeneration = 0;
 let controller;
 let timer;
 let facets;
+let facetsRequest;
 let detail;
 let printingPage;
 let selectedPrinting = "";
@@ -224,9 +225,18 @@ new MutationObserver(() => {
 
 // ---- Catalogue list ---------------------------------------------------------
 
-async function loadFacets() {
-    if (facets) return;
-    facets = await api.get("facets");
+// Filter options, asked once for every tab. The home page asks for them in the
+// background, so the first catalogue tab does not wait for them.
+function loadFacets() {
+    facetsRequest ??= api.get("facets").then(fillFacets, (error) => {
+        facetsRequest = undefined;
+        throw error;
+    });
+    return facetsRequest;
+}
+
+function fillFacets(data) {
+    facets = data;
     for (const [id, items, label] of [
         ["rar", facets.rarities, "Todas las rarezas"],
         ["stp", facets.product_types, "Cualquier origen"]
@@ -279,11 +289,11 @@ document.addEventListener("click", (event) => {
     if (tab && panel && detail) panel.innerHTML = cardWantsHtml(detail.id);
 });
 
-async function loadHomeBanlist() {
+async function showHomeBanlist(request) {
     const slot = element("home-banlist");
     if (!slot) return;
     try {
-        slot.innerHTML = homeBanlistHtml(await api.get("banlists"), window.market);
+        slot.innerHTML = homeBanlistHtml(await request, window.market);
         startCountdowns();
     } catch (error) {
         slot.innerHTML = `<p class="catalog-status" role="alert">No se pudo cargar la banlist: ${h(
@@ -345,10 +355,15 @@ async function loadCards(reset = false) {
         () => current === generation && showSkeleton(home),
         CATALOG.skeletonDelayMs
     );
+    // The home page's banlist is asked for together with its cards.
+    const banlist = home ? api.get("banlists") : null;
+    banlist?.catch(() => {});
     try {
-        await loadFacets();
-        renderTypeFilters();
-        applyWanted();
+        if (!home) {
+            await loadFacets();
+            renderTypeFilters();
+            applyWanted();
+        }
         writeUrl();
         const data = await api.get(
             "cards",
@@ -373,7 +388,8 @@ async function loadCards(reset = false) {
         lastSearch = query;
         if (home) {
             element("home").innerHTML = `${homeHtml(data, { signedIn: Boolean(currentUser()) })}<div id="home-banlist"></div>`;
-            loadHomeBanlist();
+            showHomeBanlist(banlist);
+            loadFacets().catch(() => {});
         } else {
             lastData = data;
             renderResults(data);
@@ -526,7 +542,7 @@ document.addEventListener(
             return;
         }
         if (target.hasAttribute("data-catalog-retry")) {
-            facets = undefined;
+            facetsRequest = undefined;
             api.cache.clear();
             return loadCards();
         }

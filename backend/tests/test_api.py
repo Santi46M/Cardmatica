@@ -214,6 +214,36 @@ def test_cache_control_by_kind_of_file(client):
     assert client.get("/").headers["Cache-Control"] == "no-cache"
 
 
+def test_pages_link_versioned_files_kept_a_year(client):
+    """A page names each script by content hash; that address is never checked again."""
+    import hashlib
+    import json
+    import re
+
+    from app.core.assets import script_source
+
+    response = client.get("/")
+    page = response.text
+    links = re.findall(r'(?:src|href)="(/(?:frontend/[\w/-]+\.(?:js|css)|styles\.css)[^"]*)"', page)
+    assert links and all("?v=" in link for link in links)
+    # The modules import each other by plain path; the import map adds the version.
+    import_map = re.search(r'<script type="importmap">(.*?)</script>', page).group(1)
+    assert script_source(import_map) in response.headers["Content-Security-Policy"]
+    mapped = json.loads(import_map)["imports"]["/frontend/js/api.js"]
+    body = client.get("/frontend/js/api.js").content
+    assert mapped == f"/frontend/js/api.js?v={hashlib.sha256(body).hexdigest()[:12]}"
+    assert page.index("importmap") < page.index('rel="modulepreload"')
+    assert client.get(mapped).headers["Cache-Control"] == "public, max-age=31536000, immutable"
+    # An old or made-up version is not kept: it may not match what is served.
+    assert client.get("/frontend/js/api.js?v=000000000000").headers["Cache-Control"] == "no-cache"
+    styles = re.search(r'href="(/styles\.css\?v=\w+)"', page).group(1)
+    assert client.get(styles).headers["Cache-Control"].endswith("immutable")
+    # Pages without modules get versioned styles and no inline script.
+    legal = client.get("/terminos")
+    assert "/styles.css?v=" in legal.text and "importmap" not in legal.text
+    assert "sha256" not in legal.headers["Content-Security-Policy"]
+
+
 def test_every_module_is_used_and_preloaded():
     """New modules must be imported somewhere and listed for parallel loading."""
     import re

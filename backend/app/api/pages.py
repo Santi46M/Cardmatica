@@ -3,7 +3,8 @@ plus what search engines and browsers ask for (robots.txt, sitemap.xml, icons).
 
 Every page is sent with its own title, description and Open Graph tags, and
 with absolute addresses in og:url, og:image and the canonical link, as link
-previews (WhatsApp, Telegram, X) and search engines require.
+previews (WhatsApp, Telegram, X) and search engines require. Its scripts and
+stylesheet are linked by versioned address (app/core/assets.py).
 """
 
 import html
@@ -16,7 +17,9 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Res
 from sqlalchemy import select
 
 from app.api.dependencies import SessionDep, site_url
+from app.core import assets
 from app.core.config import ROOT
+from app.core.security import content_security_policy
 from app.models import Card
 
 router = APIRouter(include_in_schema=False)
@@ -63,7 +66,11 @@ def render(
         page,
         count=1,
     )
-    return HTMLResponse(page, status_code=status_code)
+    page, import_map = assets.version_page(page)
+    response = HTMLResponse(page, status_code=status_code)
+    if import_map:
+        response.headers["Content-Security-Policy"] = content_security_policy(import_map)
+    return response
 
 
 def not_found_page(request: Request) -> HTMLResponse:
