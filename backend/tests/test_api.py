@@ -103,6 +103,51 @@ def test_image_permission_is_checked_when_serving(factory, client, settings, wik
     assert client.get("/backend/app/core/config.py").status_code == 404
 
 
+def test_suggestions_rank_names_and_find_codes(factory, client, record):
+    from app.schemas.ingestion import NameInput
+
+    for index, (name, code) in enumerate(
+        [
+            ("Blue-Eyes White Dragon", "LOB-EN001"),
+            ("Dragon Spirit", "TST-EN101"),
+            ("White Stone", "TST-EN102"),
+            ("Azure-Eyes Silver Dragon", "TST-EN103"),
+        ]
+    ):
+        copy = record.model_copy(
+            update={
+                "konami_id": 992000 + index,
+                "external_id": str(992000 + index),
+                "passcode": str(99200000 + index),
+                "names": [NameInput(language="en", name=name)],
+            },
+            deep=True,
+        )
+        copy.printings[0].code = code
+        seed(factory, copy)
+
+    def names(**parameters):
+        response = client.get("/api/v1/suggest", params=parameters)
+        assert response.status_code == 200, response.text
+        return [card["name"] for card in response.json()]
+
+    # Starts with the text, then a word that starts with it; shorter names first.
+    assert names(q="dragon") == [
+        "Dragon Spirit",
+        "Blue-Eyes White Dragon",
+        "Azure-Eyes Silver Dragon",
+    ]
+    # Every word counts, in any order, in the suggestions and in the catalogue.
+    assert names(q="white blue") == ["Blue-Eyes White Dragon"]
+    assert client.get("/api/v1/cards", params={"q": "white blue"}).json()["total"] == 1
+    assert names(q="LOB-EN") == ["Blue-Eyes White Dragon"]
+    assert names(q="dragon", limit=1) == ["Dragon Spirit"]
+    assert names(q="dragon", market="OCG") == []
+    first = client.get("/api/v1/suggest", params={"q": "spirit"}).json()[0]
+    assert first["types"]["kind"] == "Monster" and "thumbnail_url" in first
+    assert client.get("/api/v1/suggest", params={"q": "d"}).status_code == 422
+
+
 def test_fixed_query_count_instead_of_n_plus_one(factory, client, record):
     for index in range(8):
         copy = record.model_copy(

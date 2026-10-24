@@ -80,6 +80,15 @@ class CardSummary(BaseModel):
     market_banlist: "BanlistStatusView | None" = None
 
 
+class CardSuggestion(BaseModel):
+    """One entry under the search box: enough to recognise the card and open it."""
+
+    id: UUID
+    name: str
+    types: CardTypesView | None = None
+    thumbnail_url: str | None = None
+
+
 class NameView(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     language: str

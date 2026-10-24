@@ -84,6 +84,77 @@ header {
     flex: 1;
     min-width: 200px;
     display: flex;
+    position: relative;
+}
+
+/* Sugerencias bajo la búsqueda (search-suggest.js) */
+.suggest {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    margin: 0;
+    padding: 6px;
+    list-style: none;
+    border: 1px solid var(--bd);
+    border-radius: 12px;
+    background: #0e1a2c;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .55);
+    z-index: 30;
+}
+
+.suggest li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.suggest li:hover,
+.suggest li[aria-selected="true"] {
+    background: rgba(255, 255, 255, .08);
+}
+
+.suggest img,
+.suggest-ph {
+    width: 32px;
+    height: 46px;
+    flex: none;
+    border-radius: 3px;
+    object-fit: cover;
+}
+
+/* Sin imagen: el color del marco de la carta. */
+.suggest-ph {
+    background: linear-gradient(160deg, #3a4a70, #0e121c);
+    border: 1px solid rgba(0, 0, 0, .5);
+}
+
+.suggest-ph[data-kind="Monster"] { background: linear-gradient(160deg, #b9773a, #4a2a12); }
+.suggest-ph[data-kind="Spell"] { background: linear-gradient(160deg, #1f9e8a, #0b3b34); }
+.suggest-ph[data-kind="Trap"] { background: linear-gradient(160deg, #a8467f, #3d1530); }
+
+.suggest-text {
+    display: grid;
+    min-width: 0;
+}
+
+.suggest-text b,
+.suggest-text small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.suggest-text b {
+    font-weight: 600;
+}
+
+.suggest-text small {
+    color: var(--mu);
+    font-size: 12px;
 }
 
 input,

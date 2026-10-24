@@ -32,6 +32,7 @@ index.html, styles.css          Página y estilos
 frontend/js/catalog.js          Punto de entrada: pestañas, lista, ficha, dirección de la página
 frontend/js/catalog-view.js     HTML de la lista, la cuadrícula y la ficha de carta
 frontend/js/card-types.js       Tipos de carta por niveles, en español, y sus filtros
+frontend/js/search-suggest.js   Sugerencias con miniatura mientras se escribe en la búsqueda
 frontend/js/auth.js, account-menu.js, profile.js, wantlists.js   Cuenta y sus datos
 frontend/js/admin.js            Panel de administración
 frontend/js/config.js           Valores ajustables del frontend (paginación, tiempos, cachés)

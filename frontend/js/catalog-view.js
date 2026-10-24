@@ -52,7 +52,7 @@ function creditLink(value, label) {
     return `<a href="${h(url.href)}" target="_blank" rel="noopener noreferrer">${h(label)}</a>`;
 }
 
-function assetUrl(value) {
+export function assetUrl(value) {
     if (!value) return null;
     const url = new URL(value, location.origin);
     return url.origin === location.origin &&

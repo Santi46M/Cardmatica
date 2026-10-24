@@ -1,4 +1,4 @@
-from sqlalchemy import Text, exists, func, or_, select
+from sqlalchemy import Text, case, exists, func, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models import Archetype, Card, CardArchetype, CardName, CardPrinting, CardSet, Rarity
@@ -10,6 +10,19 @@ def printing_loads():
         joinedload(CardPrinting.rarity),
         selectinload(CardPrinting.images),
     )
+
+
+def in_market(market):
+    """Cards sold in a market: listed for it, or with a printing there."""
+    return or_(
+        Card.available_markets.cast(Text).contains('"' + market + '"', autoescape=True),
+        exists(select(1).where(CardPrinting.card_id == Card.id, CardPrinting.market == market)),
+    )
+
+
+# A printing code has letters, digits and a hyphen ("LOB-EN001", "RA03-SP").
+def looks_like_code(text):
+    return "-" in text and " " not in text.strip()
 
 
 class CatalogRepository:
@@ -56,16 +69,7 @@ class CatalogRepository:
             .where(CardPrinting.card_id == Card.id, *printing_filters)
         )
         if market:
-            query = query.where(
-                or_(
-                    Card.available_markets.cast(Text).contains('"' + market + '"', autoescape=True),
-                    exists(
-                        select(1).where(
-                            CardPrinting.card_id == Card.id, CardPrinting.market == market
-                        )
-                    ),
-                )
-            )
+            query = query.where(in_market(market))
         if rarity or set_id or product_type:
             # Evaluated once for the whole query. A per-card EXISTS made the planner
             # walk every printing of a common rarity for each card (seconds, not ms).
@@ -114,9 +118,11 @@ class CatalogRepository:
         if q:
             query = query.where(
                 or_(
+                    # In a name, every word counts, in any order.
                     exists(
                         select(1).where(
-                            CardName.card_id == Card.id, CardName.name.icontains(q, autoescape=True)
+                            CardName.card_id == Card.id,
+                            *(CardName.name.icontains(word, autoescape=True) for word in q.split()),
                         )
                     ),
                     exists(
@@ -169,6 +175,56 @@ class CatalogRepository:
             .limit(page_size)
         ).all()
         return cards, total
+
+    def suggestions(self, q, *, market=None, limit=6):
+        """Cards for the search box. Every word typed must appear in the name, in
+        any order ("dragón azul" finds "Dragón Blanco de Ojos Azules"). Names that
+        start with the text come first, then names with a word that starts with
+        it, then the rest; shorter names first. A printing code finds its card
+        by prefix."""
+        if looks_like_code(q):
+            matches = (
+                select(
+                    CardPrinting.card_id,
+                    func.min(0).label("rank"),
+                    func.min(func.length(CardPrinting.code)).label("length"),
+                )
+                .where(CardPrinting.code.istartswith(q, autoescape=True))
+                .group_by(CardPrinting.card_id)
+            )
+        else:
+            name = func.lower(CardName.name)
+            needle = q.lower()
+            rank = case(
+                (name.startswith(needle, autoescape=True), 0),
+                (name.contains(" " + needle, autoescape=True), 1),
+                else_=2,
+            )
+            matches = (
+                select(
+                    CardName.card_id,
+                    func.min(rank).label("rank"),
+                    func.min(func.length(CardName.name)).label("length"),
+                )
+                .where(
+                    CardName.is_current.is_(True),
+                    *(CardName.name.icontains(word, autoescape=True) for word in q.split()),
+                )
+                .group_by(CardName.card_id)
+            )
+        matches = matches.subquery()
+        query = select(Card).join(matches, matches.c.card_id == Card.id)
+        if market:
+            query = query.where(in_market(market))
+        return self.session.scalars(
+            query.options(
+                selectinload(Card.names),
+                selectinload(Card.artworks),
+                selectinload(Card.printings).options(*printing_loads()),
+            )
+            .order_by(matches.c.rank, matches.c.length, Card.display_name)
+            .limit(limit)
+        ).all()
 
     def card(self, identifier):
         return self.session.scalar(

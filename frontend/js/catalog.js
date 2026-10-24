@@ -30,6 +30,7 @@ import { installCardPreview } from "./card-preview.js";
 import { cardMeta, tabMeta } from "./page-meta.js";
 import { priceChartHtml, priceSummary } from "./price-chart.js";
 import { installProfile, renderProfile } from "./profile.js";
+import { installSearchSuggest } from "./search-suggest.js";
 import { readJson, writeJson } from "./storage.js";
 import { cardWantsHtml, installWantlists, refreshAlerts, renderWantlists } from "./wantlists.js";
 
@@ -580,6 +581,12 @@ document.addEventListener(
 // Search box and list filters. The demo store's product list also reads the
 // search box, so this goes through window.refreshList for every tab.
 element("q").addEventListener("input", () => window.refreshList());
+installSearchSuggest({
+    input: element("q"),
+    api,
+    market: () => window.market,
+    onPick: (id) => openCard(id)
+});
 document.addEventListener("change", (event) => {
     if (TYPE_FILTERS.some((filter) => filter.id === event.target.id)) window.refreshList();
 });

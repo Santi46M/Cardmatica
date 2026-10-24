@@ -13,6 +13,13 @@ export const CATALOG = {
     historyDays: 3650
 };
 
+export const SUGGEST = {
+    // Suggestions start at this many letters, after this pause in typing.
+    minLength: 2,
+    delayMs: 150,
+    limit: 6
+};
+
 export const API_CACHE = {
     // Identical requests within this time reuse the previous answer.
     ttlMs: 30000,

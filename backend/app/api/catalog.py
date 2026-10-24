@@ -12,6 +12,7 @@ from app.repositories.catalog import CatalogRepository, printing_loads
 from app.schemas.catalog import (
     BanlistListView,
     CardDetail,
+    CardSuggestion,
     CardSummary,
     ErratumView,
     NamedView,
@@ -82,6 +83,31 @@ def cards(
         item.market_banlist = bans.get(row.id)
         items.append(item)
     return Page(items=items, total=total, page=page, page_size=page_size)
+
+
+@router.get("/suggest", response_model=list[CardSuggestion])
+def suggest(
+    session: SessionDep,
+    q: Annotated[str, Query(min_length=2, max_length=100)],
+    market: Market | None = None,
+    language: Annotated[str, Query(min_length=2, max_length=12)] = "es",
+    limit: Annotated[int, Query(ge=1, le=10)] = 6,
+):
+    """Suggestions while typing in the search box."""
+    rows = CatalogRepository(session).suggestions(q.strip(), market=market, limit=limit)
+    suggestions = []
+    for row in rows:
+        summary = card_summary(row, language, market)
+        image = summary.image
+        suggestions.append(
+            CardSuggestion(
+                id=summary.id,
+                name=summary.name,
+                types=summary.types,
+                thumbnail_url=image and (image.thumbnail_url or image.url),
+            )
+        )
+    return suggestions
 
 
 def require_card(session, card_id):
