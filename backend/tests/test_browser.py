@@ -755,3 +755,70 @@ def test_rarity_filter_grouped_by_family(live_server, browser_page):
     # The card opens on the printing of the rarity being looked for.
     expect(page.locator(".card-detail .rr").first).to_have_text("Super Rare")
     expect(page.locator(".card-detail .rr").first).to_have_attribute("data-tone", "super")
+
+
+def test_shopping_wizard_plans_by_shipments_or_price(live_server, browser_page):
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(f"{live_server}/?tab=Deseados")
+    # The plan itself, with offers made up for the test.
+    plans = page.evaluate(
+        """async () => {
+            const { planPurchase } = await import("/frontend/js/shopping-wizard.js");
+            const x = { id: "x", name: "X", quantity: 1 }, y = { id: "y", name: "Y", quantity: 1 };
+            const z = { id: "z", name: "Z", quantity: 2 };
+            const offer = (id, seller, price, available = 1) => ({ id, seller, price, available });
+            const candidates = [
+                { want: x, offers: [offer(1, "A", 1), offer(2, "B", 0.9)] },
+                { want: y, offers: [offer(3, "A", 1), offer(4, "C", 0.9)] },
+                { want: z, offers: [offer(5, "A", 3)], reason: "" },
+            ];
+            const shipping = { perSeller: 0.05, freeFrom: 25 };
+            const result = (priority) => {
+                const plan = planPurchase(candidates, { priority, shipping });
+                return { sellers: plan.sellers.map((group) => group.seller).sort(), total: plan.total,
+                         missing: plan.missing.map((item) => item.reason) };
+            };
+            return { shipments: result("shipments"), price: result("price") };
+        }"""
+    )
+    assert plans["shipments"]["sellers"] == ["A"]
+    assert plans["price"]["sellers"] == ["A", "B", "C"]
+    assert plans["price"]["total"] < plans["shipments"]["total"]
+    assert plans["shipments"]["missing"] == ["Solo se encontraron 1 de 2"]
+    # With a list of cards the demo store sells.
+    items = [
+        {
+            "id": f"i{index}",
+            "cardId": f"00000000-0000-0000-0000-00000000000{index}",
+            "name": name,
+            "market": "TCG",
+            "cardType": "Monster",
+            "subtypes": [],
+            "printingId": None,
+            "code": None,
+            "setName": None,
+            "rarity": None,
+            "language": "",
+            "edition": "",
+            "quantity": 2,
+            "addedAt": "2026-10-24T00:00:00Z",
+        }
+        for index, name in enumerate(["Dark Magician", "Mirror Force", "Kuriboh", "No Existe"])
+    ]
+    state = {
+        "lists": [{"id": "L1", "name": "Mazo", "items": items, "createdAt": "2026-10-24T00:00:00Z"}]
+    }
+    page.evaluate("state => localStorage.setItem('cm_wantlists_v1', JSON.stringify(state))", state)
+    page.reload()
+    page.locator("[data-wz-run]").click()
+    summary = page.locator(".wz-summary")
+    expect(summary).to_contain_text("de 8 cartas")
+    expect(page.locator(".wz-missing")).to_contain_text("No Existe")
+    page.locator('[data-wz-priority="price"]').click()
+    expect(page.locator('[data-wz-priority="price"]')).to_have_attribute("aria-checked", "true")
+    found = int(summary.inner_text().split(" de ")[0])
+    page.locator('[data-wz-cart="all"]').click()
+    expect(page.locator("#cc")).to_have_text(str(found))
+    assert not errors

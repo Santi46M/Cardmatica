@@ -34,6 +34,8 @@ frontend/js/catalog-view.js     HTML de la lista, la cuadrícula y la ficha de c
 frontend/js/card-types.js       Tipos de carta por niveles, en español, y sus filtros
 frontend/js/search-suggest.js   Sugerencias con miniatura mientras se escribe en la búsqueda
 frontend/js/rarities.js         Rarezas: familias en español, filtro agrupado y etiqueta de color
+frontend/js/printings.js        Impresiones legibles y agrupadas por set
+frontend/js/shopping-wizard.js  Asistente de compra de la lista de deseados
 frontend/js/header-scroll.js    En el teléfono, la cabecera se esconde al bajar y vuelve al subir
 frontend/js/auth.js, account-menu.js, profile.js, wantlists.js   Cuenta y sus datos
 frontend/js/admin.js            Panel de administración
@@ -304,6 +306,13 @@ con cuenta, en el servidor (ver «Cuentas» más abajo). Un perfil de vendedor t
 publica una tienda. Las listas referencian el UUID y la impresión del catálogo, nunca
 índices del comercio de demostración. En el código y la API conservan el nombre técnico
 `wantlists`.
+
+**Asistente de compra.** Como el Shopping Wizard de Cardmarket: arma la compra de una
+lista entre los vendedores, con «Menos envíos» o «Menor precio» (contando el envío de
+cada vendedor y el envío gratis), estado mínimo, país y valoración; calcula las dos
+opciones para compararlas, explica qué cartas no encontró y pasa todo o un vendedor al
+carrito (`frontend/js/shopping-wizard.js`). Hoy usa las ofertas de la tienda de
+demostración; con publicaciones reales solo cambia de dónde salen las ofertas.
 
 ## API y seguridad
 

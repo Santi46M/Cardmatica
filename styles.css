@@ -516,7 +516,8 @@ small {
     font-weight: 600;
 }
 
-.seg button[aria-pressed=true] {
+.seg button[aria-pressed=true],
+.seg button[aria-checked=true] {
     color: #fff;
     background: linear-gradient(180deg, rgba(130, 220, 250, .38), rgba(35, 110, 165, .38));
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25);
@@ -2153,6 +2154,100 @@ button.acc-avatar:hover,
 /* La ventana recibe el foco al abrirse; el contorno sobraría. */
 .box:focus {
     outline: none;
+}
+
+/* Asistente de compra en la lista de deseados (shopping-wizard.js) */
+.wz {
+    margin-top: 14px;
+    display: grid;
+    gap: 12px;
+}
+
+.wz-head {
+    display: grid;
+    gap: 2px;
+}
+
+.wz-head small {
+    color: var(--mu);
+}
+
+.wz-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.wz-options label {
+    display: grid;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--mu);
+}
+
+.wz-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid var(--bd);
+    border-radius: 10px;
+    background: rgba(111, 211, 242, .08);
+}
+
+.wz-summary small {
+    color: var(--mu);
+}
+
+.wz-seller {
+    border: 1px solid var(--bd);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.wz-seller header,
+.wz-seller footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, .04);
+}
+
+.wz-seller header small,
+.wz-seller footer span {
+    color: var(--mu);
+}
+
+.wz-seller table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.wz-seller td {
+    padding: 7px 12px;
+    border-top: 1px solid rgba(170, 215, 255, .08);
+}
+
+.wz-seller td small {
+    display: block;
+    color: var(--mu);
+    font-size: 12px;
+}
+
+.wz-missing ul {
+    margin: 8px 0 0;
+    padding-left: 18px;
+}
+
+.wz-missing li small {
+    display: block;
+    color: var(--mu);
 }
 
 /* ---- Tableta y teléfono ---------------------------------------------------

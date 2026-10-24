@@ -5,6 +5,7 @@ import { track } from "./analytics.js";
 import { currentUser } from "./auth.js";
 import { request } from "./session-api.js";
 import { printingOptionsHtml } from "./printings.js";
+import { installShoppingWizard, wizardHtml } from "./shopping-wizard.js";
 import { newId, readJson, writeJson } from "./storage.js";
 
 const h = escapeHtml;
@@ -283,6 +284,12 @@ function rowsHtml(list) {
           }</td></tr>`;
 }
 
+// The purchase plan follows the list: a removed card or a new quantity redraws it.
+function refreshWizard(list) {
+    const section = document.getElementById("wl-wizard");
+    if (section) section.outerHTML = wizardHtml(list);
+}
+
 function alertCell(item) {
     const target = item.alert;
     const currency = target?.currency || window.currency;
@@ -407,13 +414,14 @@ export function renderWantlists(container) {
         formatDate(list.createdAt)
     )}. ${currentUser() ? "Tus listas se guardan en tu cuenta." : "Tus listas se guardan en este navegador."}</small> <button class="ghost" data-wl-delete="${h(
         list.id
-    )}">${pendingDelete === list.id ? "Confirmar: eliminar la lista" : "Eliminar esta lista"}</button></p>`;
+    )}">${pendingDelete === list.id ? "Confirmar: eliminar la lista" : "Eliminar esta lista"}</button></p>${wizardHtml(list)}`;
     document.getElementById("wl-rows").innerHTML = rowsHtml(list);
 }
 
 // Hooks for the card detail, which owns the current card and printing page.
 export function installWantlists({ panel, detail, api: client }) {
     api = client;
+    installShoppingWizard({ currentList: activeList });
     document.addEventListener("cm:account", () => syncWithAccount(panel));
     document.addEventListener(
         "click",
@@ -466,6 +474,7 @@ export function installWantlists({ panel, detail, api: client }) {
                 list.items = list.items.filter((item) => item.id !== target.dataset.wlRemove);
                 save();
                 document.getElementById("wl-rows").innerHTML = rowsHtml(list);
+                refreshWizard(list);
                 return;
             } else if (target.dataset.wlDelete) {
                 if (pendingDelete !== target.dataset.wlDelete) {
@@ -492,6 +501,7 @@ export function installWantlists({ panel, detail, api: client }) {
                 item.quantity = Math.min(WANTLIST.maxQuantity, Math.max(1, Number(event.target.value) || 1));
                 event.target.value = item.quantity;
                 save();
+                refreshWizard(list);
             }
         }
         if (event.target.dataset.wlAlert) {
