@@ -226,24 +226,23 @@ export function previewHtml(card) {
     }</div>`;
 }
 
+// A home tile: image, name and one line of detail.
+export function tileHtml(card, line) {
+    return `<button class="tile gl" data-catalog-card="${h(card.id)}">${imageHtml(card.image, card.name)}<span><b>${h(
+        card.name
+    )}</b><small>${h(line)}</small></span></button>`;
+}
+
 export function homeHtml(data, { signedIn = false } = {}) {
     // The page's one <h1> and its calls to action, visible without scrolling.
     return `<section class="hero2 gl"><h1>Cartas de <b>Yu-Gi-Oh!</b> para el Mercosur</h1><p>Busca cualquier carta TCG u OCG, compara sus impresiones y rarezas, revisa la banlist y arma tus listas de deseados con avisos de precio.</p><p class="hero-actions"><button class="btn" data-go="Todas">Explorar cartas</button>${
         signedIn
             ? '<button class="ghost" data-go="Deseados">Mi lista de deseados</button>'
             : '<button class="ghost" data-go="Acceso" data-auth-mode="register">Crear cuenta gratis</button>'
-    }</p></section><h2 class="sec-title">Cartas del catálogo</h2>${
+    }</p></section><div id="home-trending"></div><h2 class="sec-title">Cartas del catálogo</h2>${
         data.items.length
             ? `<div class="grid">${data.items
-                  .map(
-                      (card) =>
-                          `<button class="tile gl" data-catalog-card="${h(card.id)}">${imageHtml(
-                              card.image,
-                              card.name
-                          )}<span><b>${h(card.name)}</b><small>${
-                              card.printing_count
-                          } impresiones · ${h(card.markets.join(" / "))}</small></span></button>`
-                  )
+                  .map((card) => tileHtml(card, `${card.printing_count} impresiones · ${card.markets.join(" / ")}`))
                   .join("")}</div>`
             : '<div class="empty gl">Todavía no hay cartas importadas para este mercado.</div>'
     }`;

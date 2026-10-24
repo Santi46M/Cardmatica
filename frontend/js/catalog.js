@@ -20,7 +20,8 @@ import {
     pager,
     pricesHtml,
     skeletonRows,
-    skeletonTiles
+    skeletonTiles,
+    tileHtml
 } from "./catalog-view.js";
 import { TYPE_FILTERS, typeFiltersHtml, typeParams } from "./card-types.js";
 import {
@@ -43,6 +44,8 @@ import { installProfile, renderProfile } from "./profile.js";
 import { rarityOptionsHtml, rarityParams } from "./rarities.js";
 import { installSearchSuggest } from "./search-suggest.js";
 import { readJson, writeJson } from "./storage.js";
+import { installTrending, trendingHtml } from "./trending.js";
+import { newsHtml } from "./news.js";
 import { cardWantsHtml, installWantlists, refreshAlerts, renderWantlists } from "./wantlists.js";
 
 const api = new CatalogApi();
@@ -478,6 +481,19 @@ document.addEventListener(
     true
 );
 
+let trendingData = null;
+async function showTrending(request) {
+    try {
+        trendingData = await request;
+    } catch {
+        // Without trending lists the home page simply goes on to the catalogue.
+        trendingData = null;
+    }
+    const slot = element("home-trending");
+    if (slot) slot.innerHTML = trendingHtml(trendingData, tileHtml);
+}
+installTrending({ slot: () => element("home-trending"), data: () => trendingData, tile: tileHtml });
+
 async function showHomeBanlist(request) {
     const slot = element("home-banlist");
     if (!slot) return;
@@ -544,9 +560,11 @@ async function loadCards(reset = false) {
         () => current === generation && showSkeleton(home),
         CATALOG.skeletonDelayMs
     );
-    // The home page's banlist is asked for together with its cards.
+    // The home page's banlist and trending cards are asked for with its cards.
     const banlist = home ? api.get("banlists") : null;
-    banlist?.catch(() => {});
+    const trending = home ? api.get("trending", { market: window.market, language: "es" }) : null;
+    const news = home ? api.get("news", { limit: CATALOG.newsSize }) : null;
+    for (const request of [banlist, trending, news]) request?.catch(() => {});
     try {
         if (!home) {
             renderScopeHead();
@@ -580,8 +598,15 @@ async function loadCards(reset = false) {
         if (query && query !== lastSearch) track("busqueda");
         lastSearch = query;
         if (home) {
-            element("home").innerHTML = `${homeHtml(data, { signedIn: Boolean(currentUser()) })}<div id="home-banlist"></div>`;
+            element("home").innerHTML = `${homeHtml(data, {
+                signedIn: Boolean(currentUser())
+            })}<div id="home-banlist"></div><div id="home-news"></div>`;
             showHomeBanlist(banlist);
+            showTrending(trending);
+            news.then((data) => {
+                const slot = element("home-news");
+                if (slot) slot.innerHTML = newsHtml(data);
+            }, () => {});
             loadFacets().catch(() => {});
         } else {
             lastData = data;

@@ -3,8 +3,9 @@
 export const CATALOG = {
     // Cards per page in the catalogue and in a card's list of printings.
     pageSize: 24,
-    // Cards shown on the home page.
+    // Cards shown on the home page, and news in each of its two columns.
     homeSize: 8,
+    newsSize: 3,
     // Wait this long after the last keystroke before searching.
     searchDelayMs: 250,
     // Answers faster than this skip the loading placeholders, so they never flash.

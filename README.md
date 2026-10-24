@@ -36,6 +36,7 @@ frontend/js/search-suggest.js   Sugerencias con miniatura mientras se escribe en
 frontend/js/rarities.js         Rarezas: familias en español, filtro agrupado y etiqueta de color
 frontend/js/printings.js        Impresiones legibles y agrupadas por set
 frontend/js/collections.js      Página de cada set y arquetipo, y banner del último set
+frontend/js/trending.js, news.js  Inicio: cartas en tendencia y noticias
 frontend/js/shopping-wizard.js  Asistente de compra de la lista de deseados
 frontend/js/header-scroll.js    En el teléfono, la cabecera se esconde al bajar y vuelve al subir
 frontend/js/auth.js, account-menu.js, profile.js, wantlists.js   Cuenta y sus datos
@@ -307,6 +308,15 @@ con cuenta, en el servidor (ver «Cuentas» más abajo). Un perfil de vendedor t
 publica una tienda. Las listas referencian el UUID y la impresión del catálogo, nunca
 índices del comercio de demostración. En el código y la API conservan el nombre técnico
 `wantlists`.
+
+**En tendencia y noticias del inicio.** «En tendencia» junta listas que salen solo
+de datos del catálogo (`backend/app/services/trending.py`): bajan de precio (ventas
+completadas), vuelven al juego (una banlist nueva las libera), más deseadas (en las
+listas de varias personas, solo el recuento), vuelven con reimpresión e impresiones
+destacadas por rareza. Una lista sin datos no se muestra. Las noticias vienen con la
+aplicación en `backend/app/data/news.json` (se cargan al arrancar con
+`cardmatica import-news`) y un administrador puede publicar o quitar más desde su
+panel; las de Yu-Gi-Oh! siempre llevan su fuente.
 
 **Asistente de compra.** Como el Shopping Wizard de Cardmarket: arma la compra de una
 lista entre los vendedores, con «Menos envíos» o «Menor precio» (contando el envío de

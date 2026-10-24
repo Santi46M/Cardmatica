@@ -83,6 +83,36 @@ function topHtml(rows) {
         .join("")}</ul>`;
 }
 
+// ---- News of the home page (backend/app/api/news.py) ---------------------------
+
+const NEWS_SECTIONS = { site: "Cardmática", yugioh: "Yu-Gi-Oh!" };
+
+function newsListHtml(items) {
+    if (!items.length) return '<p class="catalog-status">Todavía no hay noticias.</p>';
+    return `<ul class="admin-news">${items
+        .map(
+            (item) =>
+                `<li><span><b>${h(item.title)}</b><small>${h(NEWS_SECTIONS[item.section])} · ${h(
+                    item.published_on
+                )}${item.source_name ? ` · ${h(item.source_name)}` : ""}</small></span><button class="ghost" data-admin-news-delete="${h(
+                    item.id
+                )}">Quitar</button></li>`
+        )
+        .join("")}</ul>`;
+}
+
+const NEWS_FORM = `<form id="admin-news-form" class="fm-stack"><label>Sección<select name="section"><option value="site">Novedades de Cardmática</option><option value="yugioh">Noticias de Yu-Gi-Oh! (con fuente)</option></select></label><label>Título<input name="title" required minlength="3" maxlength="140"></label><label>Resumen<textarea name="summary" required minlength="3" maxlength="400" rows="2"></textarea></label><label>Enlace a la fuente<input name="url" type="url" maxlength="500" placeholder="https://"></label><label>Nombre de la fuente<input name="source_name" maxlength="120" placeholder="Konami, YGOrganization…"></label><label>Fecha<input name="published_on" type="date" required></label><button class="btn s" type="submit">Publicar</button></form>`;
+
+async function loadNews() {
+    const slot = document.getElementById("admin-news");
+    if (!slot) return;
+    try {
+        slot.innerHTML = newsListHtml(await request(`${ADMIN}/news`));
+    } catch (error) {
+        slot.innerHTML = `<p class="warn">${h(error.message)}</p>`;
+    }
+}
+
 async function loadUsers() {
     const slot = document.getElementById("admin-users");
     if (!slot) return;
@@ -110,8 +140,9 @@ export async function renderAdmin(container) {
             search
         )}"><div class="wrap" id="admin-users"></div></section><section class="gl pnl"><b>Últimas sincronizaciones</b><div class="wrap">${jobsHtml(
             jobs
-        )}</div><small>Se encolan con <code>cardmatica sync</code> y las procesa el worker.</small></section>`;
+        )}</div><small>Se encolan con <code>cardmatica sync</code> y las procesa el worker.</small></section><section class="gl pnl"><b>Noticias del inicio</b>${NEWS_FORM}<div id="admin-news"></div><small>Las de Yu-Gi-Oh! siempre llevan su fuente.</small></section>`;
         loadUsers();
+        loadNews();
     } catch (error) {
         container.innerHTML = `<h3>Administración</h3><p class="warn">${h(error.message)}</p>`;
     }
@@ -137,6 +168,32 @@ export function installAdmin() {
         } catch (error) {
             window.toast?.(error.message);
             loadUsers();
+        }
+    });
+    document.addEventListener("submit", async (event) => {
+        if (event.target.id !== "admin-news-form") return;
+        event.preventDefault();
+        const form = event.target;
+        const fields = Object.fromEntries(new FormData(form));
+        // Empty optional fields are not sent.
+        const body = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== ""));
+        try {
+            await request(`${ADMIN}/news`, { method: "POST", body });
+            form.reset();
+            window.toast?.("Noticia publicada");
+            loadNews();
+        } catch (error) {
+            window.toast?.(error.message);
+        }
+    });
+    document.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-admin-news-delete]");
+        if (!button) return;
+        try {
+            await request(`${ADMIN}/news/${button.dataset.adminNewsDelete}`, { method: "DELETE" });
+            loadNews();
+        } catch (error) {
+            window.toast?.(error.message);
         }
     });
 }

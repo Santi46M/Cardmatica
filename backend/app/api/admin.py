@@ -11,6 +11,7 @@ from app.models import (
     Card,
     CardPrinting,
     DataConflict,
+    NewsItem,
     PriceObservation,
     SyncError,
     SyncJob,
@@ -19,6 +20,7 @@ from app.models import (
     Wantlist,
 )
 from app.schemas.catalog import JobRequest, JobView, PriceObservationInput, PricePoint
+from app.services import news
 from app.services.accounts import as_aware
 from app.services.prices import record_sale
 
@@ -200,3 +202,27 @@ def set_role(user_id: UUID, payload: RoleInput, session: SessionDep, admin: Admi
     user.role = payload.role
     session.commit()
     return {"id": str(user.id), "role": user.role}
+
+
+@router.get("/news")
+def all_news(session: SessionDep):
+    rows = session.scalars(
+        select(NewsItem).order_by(NewsItem.published_on.desc(), NewsItem.created_at.desc())
+    ).all()
+    return [news.view(row) for row in rows]
+
+
+@router.post("/news", status_code=201)
+def add_news(data: news.NewsInput, session: SessionDep):
+    row = news.add(session, data)
+    session.commit()
+    return news.view(row)
+
+
+@router.delete("/news/{news_id}", status_code=204)
+def delete_news(news_id: UUID, session: SessionDep):
+    row = session.get(NewsItem, news_id)
+    if not row:
+        raise HTTPException(404, "Noticia inexistente")
+    session.delete(row)
+    session.commit()

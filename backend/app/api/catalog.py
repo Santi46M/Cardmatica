@@ -37,6 +37,7 @@ from app.services.banlists import current_lists, list_view, statuses_for_cards
 from app.services.card_types import ATTRIBUTES, RACES, taxonomy
 from app.services.catalog import card_detail, card_summary, errata_views, printing_view
 from app.services.prices import last_sales, price_history
+from app.services.trending import trending
 
 router = APIRouter(prefix="/api/v1", tags=["Catálogo"])
 PageNumber = Annotated[int, Query(ge=1, le=1000000)]
@@ -133,6 +134,28 @@ def rarity_names(session, rarity, family):
         return None
     stored = session.scalars(select(Rarity.name))
     return rarities.stored_names(stored, rarity=rarity or None, family=family)
+
+
+@router.get("/trending")
+def trending_cards(
+    session: SessionDep,
+    market: Market = "TCG",
+    limit: Annotated[int, Query(ge=1, le=12)] = 8,
+    language: Annotated[str, Query(min_length=2, max_length=12)] = "es",
+):
+    """Lists of cards in fashion for the home page (app/services/trending.py)."""
+    return {
+        "lists": [
+            {
+                "key": key,
+                "items": [
+                    {"card": card_summary(card, language, market), "reason": reason}
+                    for card, reason in items
+                ],
+            }
+            for key, items in trending(session, market, limit=limit)
+        ]
+    }
 
 
 def require_card(session, card_id):

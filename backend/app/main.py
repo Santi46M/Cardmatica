@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 
-from app.api import account, admin, analytics, auth, catalog, pages
+from app.api import account, admin, analytics, auth, catalog, news, pages
 from app.core.caching import CacheControlMiddleware
 from app.core.config import ROOT, get_settings
 from app.core.logging import configure_logging
@@ -23,7 +23,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
 )
 # JSON and the frontend files shrink to about a quarter of their size.
@@ -37,6 +37,7 @@ app.include_router(admin.router)
 app.include_router(auth.router)
 app.include_router(account.router)
 app.include_router(analytics.router)
+app.include_router(news.router)
 
 
 @app.exception_handler(HTTPException)

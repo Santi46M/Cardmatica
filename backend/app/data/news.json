@@ -1,0 +1,75 @@
+[
+    {
+        "key": "2026-10-24-asistente-de-compra",
+        "section": "site",
+        "title": "Asistente de compra",
+        "summary": "Desde tu lista de deseados, arma la compra entre los vendedores: con menos envíos o al menor precio, con el estado y el país que elijas.",
+        "published_on": "2026-10-24"
+    },
+    {
+        "key": "2026-10-24-pagina-de-cada-set",
+        "section": "site",
+        "title": "Una página para cada set",
+        "summary": "Cada set y cada arquetipo tienen su página con sus cartas, y el inicio muestra el último set lanzado y las cartas en tendencia.",
+        "published_on": "2026-10-24"
+    },
+    {
+        "key": "2026-10-24-rarezas",
+        "section": "site",
+        "title": "Rarezas en orden",
+        "summary": "Cada rareza tiene un solo nombre y se agrupa por familia, como en Cardmarket y TCGplayer. El filtro muestra solo las que hay.",
+        "published_on": "2026-10-24"
+    },
+    {
+        "key": "2026-10-24-telefono",
+        "section": "site",
+        "title": "Mejor en el teléfono",
+        "summary": "Cabecera más compacta que se esconde al bajar, pestañas deslizables, filtros plegables y búsqueda con sugerencias.",
+        "published_on": "2026-10-24"
+    },
+    {
+        "key": "2026-10-19-banlist-tcg",
+        "section": "yugioh",
+        "title": "Nueva lista Forbidden & Limited de la TCG",
+        "summary": "Vigente desde el 19 de octubre de 2026: 156 cartas prohibidas, 92 limitadas y 7 semi-limitadas. Ya se ve en cada carta del catálogo.",
+        "url": "https://www.db.yugioh-card.com/yugiohdb/forbidden_limited.action?request_locale=en",
+        "source_name": "Konami",
+        "published_on": "2026-10-19"
+    },
+    {
+        "key": "2026-10-16-ocg-octubre",
+        "section": "yugioh",
+        "title": "OCG: YCS Tokyo y «Jointech of Passion»",
+        "summary": "La YCS Tokyo será el 22 de noviembre de 2026 y «Jointech of Passion» sale a la venta el 7 de noviembre.",
+        "url": "https://ygorganization.com/yu-gi-oh-official-card-game-times-october-2026-general-information/",
+        "source_name": "YGOrganization",
+        "published_on": "2026-10-16"
+    },
+    {
+        "key": "2026-10-01-regulacion-ocg",
+        "section": "yugioh",
+        "title": "Nueva regulación de la OCG",
+        "summary": "Vigente desde el 1 de octubre de 2026: 94 cartas prohibidas, 95 limitadas y 13 semi-limitadas.",
+        "url": "https://yugipedia.com/wiki/October_2026_Lists_(OCG)",
+        "source_name": "Yugipedia",
+        "published_on": "2026-10-01"
+    },
+    {
+        "key": "2026-08-18-glorious-victors",
+        "section": "yugioh",
+        "title": "«Glorious Victors», el booster de diciembre",
+        "summary": "Nuevo set de 60 cartas para la TCG con la estrategia Zenet; sale el 4 de diciembre de 2026, en sobres de 7 cartas.",
+        "url": "https://icv2.com/articles/news/view/63153/new-yu-gi-oh-tcg-booster-set-revealed",
+        "source_name": "ICv2",
+        "published_on": "2026-08-18"
+    },
+    {
+        "key": "2026-08-07-magnificent-maestros",
+        "section": "yugioh",
+        "title": "«Magnificent Maestros» llega en noviembre",
+        "summary": "Set de la TCG con reimpresiones de estilo anime, 21 cartas nuevas para Toon, Witchcrafter y Unchained, y Grand Master Rares numeradas; sale el 13 de noviembre de 2026.",
+        "url": "https://icv2.com/articles/news/view/63062/konami-unveils-magnificent-maestros-yu-gi-oh-tcg",
+        "source_name": "ICv2",
+        "published_on": "2026-08-07"
+    }
+]

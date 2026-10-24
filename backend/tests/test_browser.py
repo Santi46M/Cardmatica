@@ -876,3 +876,21 @@ def test_latest_set_banner_and_set_page(live_server, browser_page, factory, reco
     expect(page.locator("#home h1")).to_be_visible()
     expect(page.locator(".promo")).to_have_count(0)
     assert not errors
+
+
+def test_home_news_columns(live_server, browser_page, factory):
+    from app.services import news
+
+    with factory.begin() as session:
+        news.import_bundled(session)
+    page = browser_page
+    page.goto(live_server)
+    columns = page.locator(".news > div")
+    expect(columns).to_have_count(2)
+    expect(page.locator(".news-title")).to_have_text(
+        ["Novedades de Cardmática", "Noticias de Yu-Gi-Oh!"]
+    )
+    expect(columns.nth(1).locator("li")).to_have_count(3)
+    link = columns.nth(1).locator("a").first
+    expect(link).to_have_attribute("rel", "noopener noreferrer")
+    expect(columns.nth(1)).to_contain_text("Fuente:")
