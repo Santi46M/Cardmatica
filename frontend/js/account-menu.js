@@ -8,7 +8,7 @@ import { countItems } from "./wantlists.js";
 
 const h = escapeHtml;
 
-// [label, data-go tab or null when not built yet, section]
+// [label, data-go tab (null while not built yet), optional id to scroll to]
 const SECTIONS = [
     [
         "Mi cuenta",
@@ -101,26 +101,31 @@ function accessHtml() {
 // Only administrators see the way into the panel.
 function adminHtml() {
     if (currentUser()?.role !== "admin") return "";
-    return `<div class="acc-section" role="group" aria-label="Administración"><span class="acc-title">Administración</span>${itemHtml([
-        "Panel de administración",
-        "Admin"
-    ])}</div>`;
+    return sectionHtml(["Administración", [["Panel de administración", "Admin"]]]);
+}
+
+function sectionHtml([title, items]) {
+    return `<div class="acc-section" role="group" aria-label="${h(title)}"><span class="acc-title">${h(
+        title
+    )}</span>${items.map(itemHtml).join("")}</div>`;
 }
 
 function menuHtml() {
-    const role = currentProfile() ? ROLE_LABELS[currentProfile().role] : "";
-    return `<div class="acc-who"><span class="acc-avatar big" aria-hidden="true">${avatarHtml()}</span><div>${whoHtml()}${
-        role && currentUser() ? `<small>${h(role)}</small>` : ""
-    }</div></div>${currentUser() ? "" : accessHtml()}${SECTIONS.map(
-        ([title, items]) =>
-            `<div class="acc-section" role="group" aria-label="${h(title)}"><span class="acc-title">${h(
-                title
-            )}</span>${items.map(itemHtml).join("")}</div>`
-    ).join("")}${adminHtml()}${currentUser() ? accessHtml() : ""}<p class="acc-note">${
-        currentUser()
-            ? "Tu perfil, wantlists y preferencias se guardan en tu cuenta. El carrito es de la tienda de demostración y queda en este navegador."
-            : "Sin cuenta, el perfil y las wantlists se guardan solo en este navegador."
-    }</p>`;
+    const signedIn = Boolean(currentUser());
+    const role = signedIn ? ROLE_LABELS[currentProfile()?.role] : "";
+    const note = signedIn
+        ? "Tu perfil, wantlists y preferencias se guardan en tu cuenta. El carrito es de la tienda de demostración y queda en este navegador."
+        : "Sin cuenta, el perfil y las wantlists se guardan solo en este navegador.";
+    return [
+        `<div class="acc-who"><span class="acc-avatar big" aria-hidden="true">${avatarHtml()}</span><div>${whoHtml()}${
+            role ? `<small>${h(role)}</small>` : ""
+        }</div></div>`,
+        signedIn ? "" : accessHtml(),
+        ...SECTIONS.map(sectionHtml),
+        adminHtml(),
+        signedIn ? accessHtml() : "",
+        `<p class="acc-note">${note}</p>`
+    ].join("");
 }
 
 export function installAccountMenu() {

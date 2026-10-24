@@ -9,7 +9,7 @@ const chip = (value) => `<span class="chip">${h(value)}</span>`;
 const section = (title, content) =>
     content ? `<section class="catalog-section"><h3>${h(title)}</h3>${content}</section>` : "";
 const fact = (label, value) =>
-    value === null || value === undefined || value === ""
+    value == null || value === ""
         ? ""
         : `<div><span>${h(label)}</span><b>${h(value)}</b></div>`;
 
@@ -375,9 +375,9 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
     // The type line (card-types.js), then the numbers printed on the card.
     const stats = [
         typeLine(card),
-        card.pendulum_scale !== null && card.pendulum_scale !== undefined ? `Escala ${card.pendulum_scale}` : "",
-        card.atk !== null && card.atk !== undefined
-            ? `ATK ${card.atk}${card.defense !== null && card.defense !== undefined ? ` / DEF ${card.defense}` : ""}`
+        card.pendulum_scale != null ? `Escala ${card.pendulum_scale}` : "",
+        card.atk != null
+            ? `ATK ${card.atk}${card.defense != null ? ` / DEF ${card.defense}` : ""}`
             : ""
     ]
         .filter(Boolean)

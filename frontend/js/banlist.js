@@ -22,7 +22,7 @@ function safeUrl(value) {
 }
 
 function copies(status) {
-    if (status.max_copies === null || status.max_copies === undefined) return "";
+    if (status.max_copies == null) return "";
     return status.max_copies === 1 ? "1 copia" : `${status.max_copies} copias`;
 }
 

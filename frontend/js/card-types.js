@@ -118,22 +118,22 @@ export function typeLine(card) {
         ...(types.pendulum ? ["Péndulo"] : []),
         ...types.abilities.map((ability) => ABILITY_LABELS[ability] || ability)
     ];
-    const stars =
-        types.link_rating !== null && types.link_rating !== undefined
-            ? `LINK-${types.link_rating}`
-            : types.rank !== null && types.rank !== undefined
-              ? `Rango ${types.rank}`
-              : types.level !== null && types.level !== undefined
-                ? `Nivel ${types.level}`
-                : "";
     return [
         [head, ...abilities].join(" / "),
         RACE_LABELS[types.race] || types.race,
         ATTRIBUTE_LABELS[types.attribute] || types.attribute,
-        stars
+        starsLabel(types)
     ]
         .filter(Boolean)
         .join(" · ");
+}
+
+// Link monsters have a rating, Xyz a rank, the rest a level (0 is valid).
+function starsLabel({ link_rating, rank, level }) {
+    if (link_rating != null) return `LINK-${link_rating}`;
+    if (rank != null) return `Rango ${rank}`;
+    if (level != null) return `Nivel ${level}`;
+    return "";
 }
 
 // ---- Filters ---------------------------------------------------------------
