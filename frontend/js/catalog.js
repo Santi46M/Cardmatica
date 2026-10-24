@@ -64,7 +64,7 @@ const cardTypes = { Monstruo: "Monster", Magia: "Spell", Trampa: "Trap" };
 const isCommerce = () => ["Productos", "Vendedores"].includes(window.tab);
 // Panels stored in this browser only; they never query the catalogue list.
 const localPanels = {
-    Wantlists: "wlv",
+    Deseados: "wlv",
     Perfil: "pfv",
     Carrito: "cartv",
     Acceso: "authv",
@@ -72,7 +72,7 @@ const localPanels = {
     Admin: "admv"
 };
 const renderLocal = {
-    Wantlists: renderWantlists,
+    Deseados: renderWantlists,
     Perfil: renderProfile,
     Carrito: renderCart,
     Acceso: renderAuth,
@@ -81,8 +81,14 @@ const renderLocal = {
 };
 const isLocal = () => window.tab in localPanels;
 const isCatalog = () => !isCommerce() && !isLocal() && window.tab !== "Inicio";
-const SORTS =
-    '<option value="name">Nombre</option><option value="name_desc">Nombre: Z–A</option><option value="updated">Actualizadas recientemente</option>';
+const SORTS = [
+    ["name", "Nombre: A–Z"],
+    ["name_desc", "Nombre: Z–A"],
+    ["newest", "Lanzamiento: más reciente"],
+    ["oldest", "Lanzamiento: más antiguo"]
+]
+    .map(([value, label]) => `<option value="${value}">${label}</option>`)
+    .join("");
 
 // Layout pieces around the existing table: view toggle, top pager and the grid.
 const tableWrap = element("list").closest(".pn");
@@ -116,6 +122,13 @@ filtersToggle.addEventListener("click", () => {
     const open = catalogTools.classList.toggle("open");
     filtersToggle.setAttribute("aria-expanded", String(open));
 });
+
+// A filter with nothing to choose (an OCG catalogue without rarities, a set
+// type nobody filled) is not shown.
+function hideEmptyFilters() {
+    for (const select of catalogTools.querySelectorAll("select"))
+        select.hidden = select.id !== "srt" && select.options.length < 2;
+}
 
 function updateFiltersToggle() {
     const ids = ["rar", "stp", ...TYPE_FILTERS.map((filter) => filter.id)];
@@ -176,7 +189,9 @@ function readUrl() {
 function applyUrl(state) {
     // Profile, cart and account panels open from menus and popups, not from a tab.
     const tabs = [...window.TABS, ...Object.keys(localPanels)];
-    window.tab = tabs.includes(state.tab) ? state.tab : "Inicio";
+    // "Wantlists" is the tab's former name, still in shared links.
+    const requested = state.tab === "Wantlists" ? "Deseados" : state.tab;
+    window.tab = tabs.includes(requested) ? requested : "Inicio";
     if (["TCG", "OCG"].includes(state.mk)) window.market = state.mk;
     element("q").value = state.q;
     Object.assign(wanted, state.types, { rar: state.rar, stp: state.stp, srt: state.srt });
@@ -289,7 +304,7 @@ function fillFacets(data) {
     fillSelect(element("rar"), rarityOptionsHtml(facets.rarity_groups));
     fillSelect(
         element("stp"),
-        `<option value="">Cualquier origen</option>${facets.product_types
+        `<option value="">Cualquier producto</option>${facets.product_types
             .map((value) => `<option value="${h(value)}">${h(value)}</option>`)
             .join("")}`
     );
@@ -327,7 +342,7 @@ function renderChart() {
         );
 }
 
-// The "Wantlists" tab is drawn when opened, so it reflects lists changed meanwhile.
+// The "Deseados" tab is drawn when opened, so it reflects lists changed meanwhile.
 document.addEventListener("click", (event) => {
     const tab = event.target.closest('[data-cd-tab="wants"]');
     const panel = element("mb").querySelector('[data-cd-panel="wants"]');
@@ -408,6 +423,7 @@ async function loadCards(reset = false) {
             await loadFacets();
             renderTypeFilters();
             applyWanted();
+            hideEmptyFilters();
             updateFiltersToggle();
         }
         writeUrl();
@@ -698,7 +714,7 @@ document.addEventListener("keydown", (event) => {
 
 installWantlists({
     api,
-    panel: () => (window.tab === "Wantlists" ? element("wlv") : null),
+    panel: () => (window.tab === "Deseados" ? element("wlv") : null),
     detail: () =>
         detail && element("md").dataset.mode === "catalog"
             ? { card: detail, printings: printingPage, selectedId: selectedPrinting }
@@ -745,8 +761,8 @@ window.TAB_LABELS.Productos = "Productos (demo)";
 window.TAB_LABELS.Vendedores = "Vendedores (demo)";
 // The cart page and the profile have no tab of their own: they open from the
 // cart popup and from the account menu (account-menu.js).
-if (!window.TABS.includes("Wantlists")) window.TABS.push("Wantlists");
-window.TAB_LABELS.Wantlists = "Wantlists";
+if (!window.TABS.includes("Deseados")) window.TABS.push("Deseados");
+window.TAB_LABELS.Deseados = "Lista de deseados";
 window.TAB_LABELS.Perfil = "Perfil";
 try {
     const market = localStorage.getItem("cm_market");

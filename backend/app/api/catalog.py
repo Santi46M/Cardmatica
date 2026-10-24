@@ -23,7 +23,7 @@ from app.schemas.catalog import (
 )
 from app.services import rarities
 from app.services.banlists import current_lists, list_view, statuses_for_cards
-from app.services.card_types import RACES, taxonomy
+from app.services.card_types import ATTRIBUTES, RACES, taxonomy
 from app.services.catalog import card_detail, card_summary, errata_views, printing_view
 from app.services.prices import last_sales, price_history
 
@@ -47,13 +47,15 @@ def cards(
     race: Annotated[str | None, Query(max_length=40)] = None,
     attribute: Annotated[str | None, Query(max_length=20)] = None,
     level: Annotated[int | None, Query(ge=0, le=13)] = None,
+    rank: Annotated[int | None, Query(ge=0, le=13)] = None,
+    link_rating: Annotated[int | None, Query(ge=1, le=8)] = None,
     card_property: Annotated[str | None, Query(alias="property", max_length=20)] = None,
     rarity: Annotated[str | None, Query(max_length=100)] = None,
     rarity_family: rarities.Family | None = None,
     set_id: UUID | None = None,
     archetype_id: UUID | None = None,
     product_type: Annotated[str | None, Query(max_length=60)] = None,
-    sort: Literal["name", "name_desc", "updated"] = "name",
+    sort: Literal["name", "name_desc", "newest", "oldest", "updated"] = "name",
     language: Annotated[str, Query(min_length=2, max_length=12)] = "es",
 ):
     rows, total = CatalogRepository(session).cards(
@@ -68,6 +70,8 @@ def cards(
         race=race,
         attribute=attribute,
         level=level,
+        rank=rank,
+        link_rating=link_rating,
         card_property=card_property,
         rarity_names=rarity_names(session, rarity, rarity_family),
         set_id=set_id,
@@ -275,11 +279,20 @@ def sets(
     )
 
 
-def races_present(session):
-    found = set(
-        session.scalars(select(Card.monster_race).where(Card.monster_race.is_not(None)).distinct())
-    )
-    return [race for race in RACES if race in found]
+def present(session, column):
+    return set(session.scalars(select(column).where(column.is_not(None)).distinct()))
+
+
+def types_present(session):
+    """What the catalogue has, so the filters never offer an empty choice."""
+    races, attributes = present(session, Card.monster_race), present(session, Card.attribute)
+    return {
+        "races_present": [race for race in RACES if race in races],
+        "attributes_present": [value for value in ATTRIBUTES if value in attributes],
+        "levels": sorted(present(session, Card.level)),
+        "ranks": sorted(present(session, Card.rank)),
+        "link_ratings": sorted(present(session, Card.link_rating)),
+    }
 
 
 @router.get("/facets")
@@ -296,8 +309,8 @@ def facets(session: SessionDep, market: Market | None = None):
         "rarities": [name for group in groups for name in group["names"]],
         "rarity_groups": groups,
         "product_types": list(session.scalars(sets.distinct().order_by(CardSet.product_type))),
-        # Ordered levels for the filters; races present in the catalogue only.
-        "types": {**taxonomy(), "races_present": races_present(session)},
+        # Ordered type levels, and the values the catalogue actually has.
+        "types": {**taxonomy(), **types_present(session)},
     }
 
 

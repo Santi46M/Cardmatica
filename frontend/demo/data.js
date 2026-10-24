@@ -214,7 +214,10 @@ DEMO.sellers = [
 // Productos sellados y accesorios. "set" es un prefijo de DEMO.sets (vacío en
 // los accesorios), "basePrice" está en euros y "icon" se muestra como
 // miniatura. Cada producto TCG con set tiene además su versión OCG.
-DEMO.productCategories = ["Caja sellada", "Sobre", "Mazo sellado", "Lata", "Binder", "Deckbox", "Páginas de binder"];
+DEMO.productCategories = {
+    "Producto sellado": ["Caja sellada", "Sobre", "Mazo sellado", "Lata"],
+    Accesorios: ["Binder", "Páginas de binder", "Deckbox"]
+};
 DEMO.products = [
     { name: "Caja sellada Crimson Frontier (24 sobres)", category: "Caja sellada", set: "CRFR", basePrice: 95, icon: "📦" },
     { name: "Sobre Crimson Frontier", category: "Sobre", set: "CRFR", basePrice: 4.5, icon: "🎴" },
@@ -234,17 +237,18 @@ DEMO.products = [
 // Las versiones OCG de productos sellados cuestan este factor de la TCG.
 DEMO.ocgProductPriceFactor = 0.9;
 
-// Monedas del selector. "perEuro" es un tipo de cambio aproximado y fijo:
-// los precios se guardan en euros y se convierten solo para mostrarlos.
+// Monedas del selector: primero las del Mercosur, por país, y después las
+// internacionales. "perEuro" es un tipo de cambio aproximado y fijo: los
+// precios se guardan en euros y se convierten solo para mostrarlos.
 // "decimals" es 0 en monedas que no se usan con céntimos.
 DEMO.currencies = [
-    { code: "EUR", name: "Euro", perEuro: 1, decimals: 2 },
-    { code: "USD", name: "Dólar estadounidense", perEuro: 1.1, decimals: 2 },
-    { code: "ARS", name: "Peso argentino", perEuro: 1600, decimals: 0 },
-    { code: "BRL", name: "Real brasileño", perEuro: 6.2, decimals: 2 },
-    { code: "PYG", name: "Guaraní paraguayo", perEuro: 8600, decimals: 0 },
-    { code: "UYU", name: "Peso uruguayo", perEuro: 46, decimals: 2 },
-    { code: "BOB", name: "Boliviano", perEuro: 7.6, decimals: 2 }
+    { code: "ARS", name: "Peso argentino", group: "Mercosur", perEuro: 1600, decimals: 0 },
+    { code: "BOB", name: "Boliviano", group: "Mercosur", perEuro: 7.6, decimals: 2 },
+    { code: "BRL", name: "Real brasileño", group: "Mercosur", perEuro: 6.2, decimals: 2 },
+    { code: "PYG", name: "Guaraní paraguayo", group: "Mercosur", perEuro: 8600, decimals: 0 },
+    { code: "UYU", name: "Peso uruguayo", group: "Mercosur", perEuro: 46, decimals: 2 },
+    { code: "USD", name: "Dólar estadounidense", group: "Internacionales", perEuro: 1.1, decimals: 2 },
+    { code: "EUR", name: "Euro", group: "Internacionales", perEuro: 1, decimals: 2 }
 ];
 
 // Envío: cada vendedor envía por separado y es gratis a partir de cierto

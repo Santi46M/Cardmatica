@@ -268,7 +268,7 @@ autor y licencia cuando se conocen. No se inventa autor ni licencia ausentes.
 La vista local de ilustraciones solo acepta hosts localhost/127.0.0.1/::1; Docker
 publica el puerto únicamente en loopback. Deshabilitarla al desplegar públicamente.
 
-## Banlist, historial de precios, wantlists y perfil
+## Banlist, historial de precios, listas de deseados y perfil
 
 **Banlist.** Las listas Forbidden & Limited vigentes viajan con la aplicación en
 `backend/app/data/banlists/`: TCG del 19 de octubre de 2026 (base oficial de Konami)
@@ -299,10 +299,11 @@ Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/v1/admin/price-obs
 La ficha muestra la última venta con su fecha aunque nadie tenga la carta a la venta
 o no haya ventas en el periodo elegido.
 
-**Wantlists y perfil.** Se guardan en el navegador de cada persona (localStorage):
-todavía no hay cuentas en el servidor y un perfil de vendedor no publica una tienda.
-Las wantlists referencian el UUID y la impresión del catálogo, nunca índices del comercio
-de demostración.
+**Listas de deseados y perfil.** Sin cuenta se guardan en el navegador (localStorage);
+con cuenta, en el servidor (ver «Cuentas» más abajo). Un perfil de vendedor todavía no
+publica una tienda. Las listas referencian el UUID y la impresión del catálogo, nunca
+índices del comercio de demostración. En el código y la API conservan el nombre técnico
+`wantlists`.
 
 ## API y seguridad
 

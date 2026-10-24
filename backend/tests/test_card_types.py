@@ -134,3 +134,68 @@ def test_catalogue_filters_by_type_levels(client, factory, record):
     types = client.get("/api/v1/facets").json()["types"]
     assert types["spell"][:2] == ["Normal", "Quick-Play"] and types["trap"][-1] == "Counter"
     assert "Spellcaster" in types["races_present"] and "Zombie" not in types["races_present"]
+
+
+def test_level_rank_and_link_are_separate_and_sort_by_release(client, factory, record):
+    from datetime import date
+
+    from app.schemas.ingestion import PrintingInput
+
+    def printing(code, released):
+        return [
+            PrintingInput(
+                code=code,
+                set_key=code,
+                set_name=code,
+                language="en",
+                market="TCG",
+                set_release_date=released,
+            )
+        ]
+
+    ingest_variant(
+        factory,
+        record,
+        990201,
+        "Synthetic Xyz",
+        "Monster",
+        ["Warrior", "Xyz", "Effect"],
+        level=None,
+        rank=4,
+        printings=printing("OLD-EN001", date(2004, 1, 1)),
+    )
+    ingest_variant(
+        factory,
+        record,
+        990202,
+        "Synthetic Link",
+        "Monster",
+        ["Cyberse", "Link", "Effect"],
+        level=None,
+        link_rating=4,
+        printings=printing("NEW-EN001", date(2025, 1, 1)),
+    )
+    ingest_variant(
+        factory,
+        record,
+        990203,
+        "Synthetic Four",
+        "Monster",
+        ["Warrior", "Effect"],
+        level=4,
+        printings=printing("MID-EN001", date(2015, 1, 1)),
+    )
+    # The same number means different things on the card.
+    assert names(client, level=4) == ["Synthetic Four"]
+    assert names(client, rank=4) == ["Synthetic Xyz"]
+    assert names(client, link_rating=4) == ["Synthetic Link"]
+
+    def order(sort):
+        items = client.get("/api/v1/cards", params={"sort": sort, "market": "TCG"}).json()["items"]
+        return [item["name"] for item in items]
+
+    assert order("newest") == ["Synthetic Link", "Synthetic Four", "Synthetic Xyz"]
+    assert order("oldest") == ["Synthetic Xyz", "Synthetic Four", "Synthetic Link"]
+    types = client.get("/api/v1/facets").json()["types"]
+    assert types["levels"] == [4] and types["ranks"] == [4] and types["link_ratings"] == [4]
+    assert types["attributes_present"] == ["LIGHT"]

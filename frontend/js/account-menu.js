@@ -9,21 +9,25 @@ import { countItems } from "./wantlists.js";
 const h = escapeHtml;
 
 // [label, data-go tab (null while not built yet), optional id to scroll to]
+// As on Cardmarket: the account, what you buy, what you sell, then settings.
+// What already works comes first in each section.
 const SECTIONS = [
     [
         "Mi cuenta",
         [
             ["Mi perfil", "Perfil"],
-            ["Wantlists", "Wantlists"],
-            ["Carrito", "Carrito"],
-            ["Personalización", "Perfil", "pf-prefs"]
+            ["Personalización", "Perfil", "pf-prefs"],
+            ["Seguridad e inicio de sesión", "Seguridad"],
+            ["Mensajes", null]
         ]
     ],
     [
         "Compras",
         [
+            ["Carrito", "Carrito"],
+            ["Lista de deseados", "Deseados"],
+            ["Asistente de compra", "Deseados", "wl-wizard"],
             ["Mis pedidos", null],
-            ["Mensajes", null],
             ["Vendedores favoritos", null]
         ]
     ],
@@ -39,7 +43,6 @@ const SECTIONS = [
         [
             ["Pagos y saldo", null],
             ["Direcciones y envíos", null],
-            ["Seguridad e inicio de sesión", "Seguridad"],
             ["Notificaciones por correo", null]
         ]
     ]
@@ -68,7 +71,7 @@ function itemHtml([label, tab, anchor]) {
         return `<button role="menuitem" class="acc-item" disabled aria-disabled="true">${h(
             label
         )}<small>Próximamente</small></button>`;
-    const badge = tab === "Wantlists" && countItems() ? `<small>${countItems()}</small>` : "";
+    const badge = tab === "Deseados" && countItems() ? `<small>${countItems()}</small>` : "";
     return `<button role="menuitem" class="acc-item" data-go="${h(tab)}"${
         anchor ? ` data-acc-scroll="${h(anchor)}"` : ""
     }>${h(label)}${badge}</button>`;
@@ -114,8 +117,8 @@ function menuHtml() {
     const signedIn = Boolean(currentUser());
     const role = signedIn ? ROLE_LABELS[currentProfile()?.role] : "";
     const note = signedIn
-        ? "Tu perfil, wantlists y preferencias se guardan en tu cuenta. El carrito es de la tienda de demostración y queda en este navegador."
-        : "Sin cuenta, el perfil y las wantlists se guardan solo en este navegador.";
+        ? "Tu perfil, listas de deseados y preferencias se guardan en tu cuenta. El carrito es de la tienda de demostración y queda en este navegador."
+        : "Sin cuenta, el perfil y las listas de deseados se guardan solo en este navegador.";
     return [
         `<div class="acc-who"><span class="acc-avatar big" aria-hidden="true">${avatarHtml()}</span><div>${whoHtml()}${
             role ? `<small>${h(role)}</small>` : ""

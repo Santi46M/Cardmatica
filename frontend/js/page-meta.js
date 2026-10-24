@@ -15,7 +15,7 @@ const TABS = {
     Trampa: [`Trampas · ${SITE}`, "Cartas trampa de Yu-Gi-Oh!: normales, continuas y de contraefecto."],
     Productos: [`Cajas y accesorios (demo) · ${SITE}`, "Cajas selladas, sobres y accesorios de la tienda de demostración."],
     Vendedores: [`Vendedores (demo) · ${SITE}`, "Vendedores de la tienda de demostración."],
-    Wantlists: [`Mis wantlists · ${SITE}`, "Las cartas que buscas, con avisos de precio."],
+    Deseados: [`Mi lista de deseados · ${SITE}`, "Las cartas que buscas, con avisos de precio y asistente de compra."],
     Perfil: [`Mi perfil · ${SITE}`, DEFAULT_DESCRIPTION],
     Carrito: [`Carrito · ${SITE}`, DEFAULT_DESCRIPTION],
     Acceso: [`Iniciar sesión o crear cuenta · ${SITE}`, DEFAULT_DESCRIPTION],

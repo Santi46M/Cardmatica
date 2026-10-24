@@ -233,7 +233,7 @@ def test_banlist_price_history_wantlists_and_profile(live_server, browser_page, 
     page.locator("[data-wl-add]").click()
     expect(page.locator("#ts")).to_contain_text("Para el deck")
     page.keyboard.press("Escape")
-    page.locator('[data-g="Wantlists"]').click()
+    page.locator('[data-g="Deseados"]').click()
     panel = page.locator("#wlv")
     expect(panel).to_contain_text("Para el deck (1)")
     expect(panel).to_contain_text("1st Edition")
@@ -368,17 +368,18 @@ def test_list_url_state_grid_preview_shortcut_and_price_alerts(live_server, brow
     page.locator("#catalog-grid .card-tile").first.click()
     page.locator("[data-wl-open]").click()
     page.locator("#wl-list-name").fill("Objetivos")
-    first_printing = "TST-EN001 · Ultra Rare · Synthetic Test Set"
-    page.locator("#wl-printing").select_option(label=first_printing)
+    # Printings are grouped by set: "code · rarity" under the set's name.
+    expect(page.locator('#wl-printing optgroup[label="Synthetic Test Set"]')).to_have_count(1)
+    page.locator("#wl-printing").select_option(label="TST-EN001 · Ultra Rare")
     page.locator("[data-wl-add]").click()
     page.keyboard.press("Escape")
-    page.locator('[data-g="Wantlists"]').click()
+    page.locator('[data-g="Deseados"]').click()
     page.locator("[data-wl-alert]").fill("10")
     page.locator("[data-wl-alert]").press("Tab")
-    expect(page.locator('#tabs [data-g="Wantlists"]')).to_have_text("Wantlists (1)")
+    expect(page.locator('#tabs [data-g="Deseados"]')).to_have_text("Lista de deseados (1)")
     expect(page.locator("#wlv .wl-alerts")).to_contain_text("Synthetic Test Dragon")
     page.locator("[data-wl-seen]").click()
-    expect(page.locator('#tabs [data-g="Wantlists"]')).to_have_text("Wantlists")
+    expect(page.locator('#tabs [data-g="Deseados"]')).to_have_text("Lista de deseados")
     expect(page.locator("#wlv .wl-alerts")).to_have_count(0)
     # Back to top appears once the page is scrolled.
     page.set_viewport_size({"width": 800, "height": 300})
@@ -437,7 +438,10 @@ def test_type_filters_follow_the_tab(live_server, browser_page):
     page.goto(f"{live_server}/?tab=Todas")
     groups = page.locator("#f-type optgroup")
     expect(groups).to_have_count(3)
-    expect(page.locator('#f-type optgroup[label="Trampas"] option')).to_have_count(3)
+    # "Todas las trampas" and the three kinds of trap, in whole phrases.
+    expect(page.locator('#f-type optgroup[label="Trampas"] option')).to_have_text(
+        ["Todas las trampas", "Trampas normales", "Trampas continuas", "Trampas de contraefecto"]
+    )
     page.locator('[data-g="Monstruo"]').click()
     expect(page.locator("#f-type")).to_have_count(0)
     expect(page.locator("#f-race option", has_text="Dragón")).to_have_count(1)
@@ -446,6 +450,11 @@ def test_type_filters_follow_the_tab(live_server, browser_page):
     page.locator("#f-frame").select_option("Effect")
     expect(page.locator("#list")).to_contain_text("Synthetic Test Dragon")
     assert "clase=Effect" in page.url
+    # Level, Rank and Link are separate groups with only the numbers the catalogue has.
+    expect(page.locator('#f-level optgroup[label="Nivel"] option')).to_have_text(["Nivel 8"])
+    expect(page.locator('#f-level optgroup[label="Link"]')).to_have_count(0)
+    page.locator("#f-level").select_option("level:8")
+    expect(page.locator("#list")).to_contain_text("Synthetic Test Dragon")
     page.reload()
     expect(page.locator("#f-frame")).to_have_value("Effect")
     page.locator('[data-g="Magia"]').click()
@@ -522,12 +531,12 @@ def test_browser_data_moves_into_the_account(live_server, browser_page):
     page.locator("#auth-password").fill("una frase larga de prueba")
     page.locator("#auth-login button[type=submit]").click()
     expect(page.locator("#cur")).to_have_value("UYU")
-    page.locator('[data-g="Wantlists"]').click()
+    page.locator('[data-g="Deseados"]').click()
     expect(page.locator("#wlv")).to_contain_text("Antes de la cuenta")
     expect(page.locator("#wlv")).to_contain_text("Synthetic Test Dragon")
     page.locator("#account-button").click()
     page.locator("#account-menu [data-auth-logout]").click()
-    page.locator('[data-g="Wantlists"]').click()
+    page.locator('[data-g="Deseados"]').click()
     expect(page.locator("#wlv")).not_to_contain_text("Antes de la cuenta")
     assert not errors
 

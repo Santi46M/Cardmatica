@@ -134,7 +134,7 @@ def save_wantlists(session: Session, user: User, data: WantlistsData) -> Wantlis
     card_ids = {item.cardId for wantlist in data.lists for item in wantlist.items}
     known = set(session.scalars(select(Card.id).where(Card.id.in_(card_ids))))
     if card_ids - known:
-        raise AccountError("Una de las cartas de la wantlist ya no está en el catálogo.")
+        raise AccountError("Una de las cartas de la lista de deseados ya no está en el catálogo.")
     printing_ids = {
         item.printingId for wantlist in data.lists for item in wantlist.items if item.printingId
     }

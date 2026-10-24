@@ -4,6 +4,7 @@ import { formatDate, money, toEuro } from "./format.js";
 import { track } from "./analytics.js";
 import { currentUser } from "./auth.js";
 import { request } from "./session-api.js";
+import { printingOptionsHtml } from "./printings.js";
 import { newId, readJson, writeJson } from "./storage.js";
 
 const h = escapeHtml;
@@ -59,13 +60,13 @@ function save() {
         saveTimer = setTimeout(() => {
             if (!currentUser()) return;
             request(ACCOUNT_WANTLISTS, { method: "PUT", body: state }).catch((error) => {
-                if (currentUser()) window.toast?.(`No se pudo guardar la wantlist: ${error.message}`);
+                if (currentUser()) window.toast?.(`No se pudo guardar la lista de deseados: ${error.message}`);
             });
         }, SAVE_DELAY_MS);
         return;
     }
     if (!writeJson(KEY, state))
-        window.toast?.("Tu navegador no permite guardar: la wantlist se perderá al cerrar la página");
+        window.toast?.("Tu navegador no permite guardar: la lista de deseados se perderá al cerrar la página");
 }
 
 // On sign-in the account's lists replace the browser's. The first time, the
@@ -82,11 +83,11 @@ async function syncWithAccount(panel) {
             if (!saved.lists.length && local.lists.length) {
                 state = await request(ACCOUNT_WANTLISTS, { method: "PUT", body: local });
                 writeJson(KEY, EMPTY());
-                window.toast?.("Tus wantlists de este navegador se guardaron en tu cuenta");
+                window.toast?.("Tus listas de deseados de este navegador se guardaron en tu cuenta");
             } else state = saved;
             remote = true;
         } catch {
-            if (currentUser()) window.toast?.("No se pudieron leer tus wantlists de la cuenta");
+            if (currentUser()) window.toast?.("No se pudieron leer tus listas de deseados de la cuenta");
         }
     }
     alerts = new Map();
@@ -134,7 +135,7 @@ export function listCount() {
 function pickerHtml(card, printings, selectedId, market) {
     const printing = printings.items.find((item) => item.id === selectedId) || printings.items[0];
     const language = API_LANGUAGES[String(printing?.language || "").toLowerCase()] || "";
-    return `<div class="pick gl" id="wl-form" data-card-id="${h(card.id)}"><b>Añadir a una wantlist</b><select id="wl-list" aria-label="Wantlist">${state.lists
+    return `<div class="pick gl" id="wl-form" data-card-id="${h(card.id)}"><b>Añadir a una lista de deseados</b><select id="wl-list" aria-label="Lista de deseados">${state.lists
         .map(
             (list) =>
                 `<option value="${h(list.id)}"${
@@ -143,16 +144,12 @@ function pickerHtml(card, printings, selectedId, market) {
         )
         .join(
             ""
-        )}<option value="new"${state.lists.length ? "" : " selected"}>+ Nueva wantlist…</option></select><input id="wl-list-name" placeholder="Nombre de la nueva lista" maxlength="60"${
+        )}<option value="new"${state.lists.length ? "" : " selected"}>+ Nueva lista…</option></select><input id="wl-list-name" placeholder="Nombre de la nueva lista" maxlength="60"${
         state.lists.length ? " hidden" : ""
-    }><select id="wl-printing" aria-label="Impresión"><option value="">Cualquier impresión</option>${printings.items
-        .map(
-            (item) =>
-                `<option value="${h(item.id)}"${item.id === printing?.id ? " selected" : ""}>${h(
-                    [item.code, item.rarity, item.set_name].join(" · ")
-                )}</option>`
-        )
-        .join("")}</select><select id="wl-language" aria-label="Idioma">${options(
+    }><select id="wl-printing" aria-label="Impresión">${printingOptionsHtml(printings.items, printing?.id, {
+        any: "Cualquier impresión",
+        details: false
+    })}</select><select id="wl-language" aria-label="Idioma">${options(
         LANGUAGES[market],
         language,
         "Cualquier idioma"
@@ -163,7 +160,7 @@ function pickerHtml(card, printings, selectedId, market) {
     )}</select><label class="qty">Cantidad <input id="wl-quantity" type="number" min="1" max="${WANTLIST.maxQuantity}" value="1"></label><button class="btn s" data-wl-add>Añadir</button></div>`;
 }
 
-// "Wantlists" tab of a card's detail: the lists that already include it.
+// "Deseados" tab of a card's detail: the lists that already include it.
 export function cardWantsHtml(cardId) {
     const entries = state.lists.flatMap((list) =>
         list.items.filter((item) => item.cardId === cardId).map((item) => ({ list, item }))
@@ -180,9 +177,9 @@ export function cardWantsHtml(cardId) {
         .join("");
     return `${
         rows
-            ? `<p>Esta carta está en ${entries.length === 1 ? "1 de tus wantlists" : `${entries.length} entradas de tus wantlists`}:</p><ul class="cd-wants">${rows}</ul>`
-            : '<p class="catalog-status">Esta carta todavía no está en ninguna de tus wantlists.</p>'
-    }<p><button class="btn s" data-wl-open aria-controls="wl-picker">♥ Añadir a wantlist</button></p><small class="catalog-status">Las wantlists se gestionan en su pestaña, arriba.</small>`;
+            ? `<p>Esta carta está en ${entries.length === 1 ? "1 de tus listas de deseados" : `${entries.length} entradas de tus listas de deseados`}:</p><ul class="cd-wants">${rows}</ul>`
+            : '<p class="catalog-status">Esta carta todavía no está en ninguna de tus listas de deseados.</p>'
+    }<p><button class="btn s" data-wl-open aria-controls="wl-picker">♥ Añadir a la lista de deseados</button></p><small class="catalog-status">Las listas se gestionan en la pestaña «Lista de deseados».</small>`;
 }
 
 function addFromForm(card, printings, market) {
@@ -191,7 +188,7 @@ function addFromForm(card, printings, market) {
     if (choice === "new") {
         const name = document.getElementById("wl-list-name").value.trim();
         if (!name) {
-            window.toast?.("Ponle un nombre a la nueva wantlist");
+            window.toast?.("Ponle un nombre a la nueva lista");
             document.getElementById("wl-list-name").focus();
             return false;
         }
@@ -282,7 +279,7 @@ function rowsHtml(list) {
         : `<tr><td colspan="7" class="empty">${
               list.items.length
                   ? "Ninguna carta de esta lista coincide con los filtros."
-                  : "Esta lista está vacía. Abre una carta y usa «+ Wantlist»."
+                  : "Esta lista está vacía. Abre una carta y usa «♥ Añadir a la lista de deseados»."
           }</td></tr>`;
 }
 
@@ -322,9 +319,9 @@ function alertsHtml() {
 
 function updateBadge() {
     const count = alerts.size;
-    window.TAB_LABELS.Wantlists = count ? `Wantlists (${count})` : "Wantlists";
-    const tab = document.querySelector('#tabs [data-g="Wantlists"]');
-    if (tab) tab.textContent = window.TAB_LABELS.Wantlists;
+    window.TAB_LABELS.Deseados = count ? `Lista de deseados (${count})` : "Lista de deseados";
+    const tab = document.querySelector('#tabs [data-g="Deseados"]');
+    if (tab) tab.textContent = window.TAB_LABELS.Deseados;
 }
 
 const API_LANGUAGE = Object.fromEntries(
@@ -369,30 +366,30 @@ export async function refreshAlerts() {
         alertsAnnounced = true;
         window.toast?.(
             alerts.size === 1
-                ? "Una carta de tus wantlists bajó de tu precio objetivo"
-                : `${alerts.size} cartas de tus wantlists bajaron de tu precio objetivo`
+                ? "Una carta de tus listas de deseados bajó de tu precio objetivo"
+                : `${alerts.size} cartas de tus listas de deseados bajaron de tu precio objetivo`
         );
     }
     const container = document.getElementById("wlv");
-    if (container && window.tab === "Wantlists") renderWantlists(container);
+    if (container && window.tab === "Deseados") renderWantlists(container);
 }
 
 export function renderWantlists(container) {
     const list = activeList();
-    const create = `<input id="wl-new-name" placeholder="Nueva wantlist" maxlength="60" aria-label="Nombre de la nueva wantlist"><button class="btn s" data-wl-create>Crear</button>`;
+    const create = `<input id="wl-new-name" placeholder="Nueva lista" maxlength="60" aria-label="Nombre de la nueva lista"><button class="btn s" data-wl-create>Crear lista</button>`;
     if (!list) {
-        container.innerHTML = `<h3>Mis wantlists</h3><div class="gl pnl"><p class="empty">Todavía no tienes wantlists. Crea una aquí o abre una carta y usa «+ Wantlist».</p><div class="tools">${create}</div></div>`;
+        container.innerHTML = `<h3>Mis listas de deseados</h3><div class="gl pnl"><p class="empty">Todavía no tienes listas de deseados. Crea una aquí o abre una carta y usa «♥ Añadir a la lista de deseados».</p><div class="tools">${create}</div></div>`;
         return;
     }
     const sets = [...new Set(list.items.map((item) => item.setName).filter(Boolean))].sort();
-    container.innerHTML = `<h3>Mis wantlists</h3>${alertsHtml()}<div class="tools">${state.lists
+    container.innerHTML = `<h3>Mis listas de deseados</h3>${alertsHtml()}<div class="tools">${state.lists
         .map(
             (item) =>
                 `<button class="pill" aria-pressed="${item.id === list.id}" data-wl-select="${h(
                     item.id
                 )}">${h(item.name)} (${item.items.length})</button>`
         )
-        .join("")}${create}</div><div class="tools"><input id="wl-q" type="search" placeholder="Buscar por carta, set o código" aria-label="Buscar en la wantlist"><select id="wl-type" aria-label="Tipo">${options(
+        .join("")}${create}</div><div class="tools"><input id="wl-q" type="search" placeholder="Buscar por carta, set o código" aria-label="Buscar en la lista"><select id="wl-type" aria-label="Tipo">${options(
         Object.entries(TYPES),
         "",
         "Todos los tipos"
@@ -400,17 +397,15 @@ export function renderWantlists(container) {
         sets.map((name) => [name, name]),
         "",
         "Todos los sets"
-    )}</select><select id="wl-filter-language" aria-label="Idioma">${options(
-        [...LANGUAGES.TCG, ...LANGUAGES.OCG],
-        "",
-        "Todos los idiomas"
-    )}</select><select id="wl-filter-edition" aria-label="Edición">${options(
+    )}</select><select id="wl-filter-language" aria-label="Idioma"><option value="">Todos los idiomas</option><optgroup label="TCG">${options(
+        LANGUAGES.TCG
+    )}</optgroup><optgroup label="OCG">${options(LANGUAGES.OCG)}</optgroup></select><select id="wl-filter-edition" aria-label="Edición">${options(
         EDITIONS,
         "",
         "Cualquier edición"
     )}</select><span class="cnt" id="wl-count"></span></div><div class="pn gl wrap"><table><thead><tr><th>Carta</th><th>Impresión</th><th>Idioma</th><th>Edición</th><th class="num">Cant.</th><th class="num">Avisar si baja de</th><th></th></tr></thead><tbody id="wl-rows"></tbody></table></div><p><small>Creada el ${h(
         formatDate(list.createdAt)
-    )}. Las wantlists se guardan en este navegador.</small> <button class="ghost" data-wl-delete="${h(
+    )}. ${currentUser() ? "Tus listas se guardan en tu cuenta." : "Tus listas se guardan en este navegador."}</small> <button class="ghost" data-wl-delete="${h(
         list.id
     )}">${pendingDelete === list.id ? "Confirmar: eliminar la lista" : "Eliminar esta lista"}</button></p>`;
     document.getElementById("wl-rows").innerHTML = rowsHtml(list);
@@ -461,7 +456,7 @@ export function installWantlists({ panel, detail, api: client }) {
                 const input = document.getElementById("wl-new-name");
                 const name = input.value.trim();
                 if (!name) {
-                    window.toast?.("Escribe un nombre para la wantlist");
+                    window.toast?.("Escribe un nombre para la lista");
                     input.focus();
                     return;
                 }
@@ -480,7 +475,7 @@ export function installWantlists({ panel, detail, api: client }) {
                     state.active = state.lists[0]?.id || null;
                     pendingDelete = null;
                     save();
-                    window.toast?.("Wantlist eliminada");
+                    window.toast?.("Lista eliminada");
                 }
             }
             if (container) renderWantlists(container);

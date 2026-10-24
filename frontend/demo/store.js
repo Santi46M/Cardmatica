@@ -11,7 +11,7 @@
 // globales. Los módulos de frontend/js usan estos nombres desde `window`:
 //   estado:     tab, market, currency, cart, cartClearArmed
 //   datos:      TABS, TAB_LABELS, LISTINGS, CURRENCIES, SHIPPING
-//   funciones:  showTab, refreshList, formatPrice, flag, toast, alignDialogs,
+//   funciones:  showTab, refreshList, formatPrice, currencyOptions, flag, toast, alignDialogs,
 //               updateMarketButtons, updateCartCount, cartTotals, cartLine,
 //               openDemoCard, openSeller, openProduct, showCart
 // frontend/js/catalog.js sustituye showTab y refreshList para las pestañas del
@@ -372,16 +372,14 @@ function releaseDate(setPrefix) {
     return released ? formatDate(Date.parse(released)) : "—";
 }
 
-function fillSelect(select, options, allLabel) {
-    select.innerHTML =
-        `<option value="">${allLabel}</option>` +
-        options.map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
-}
-
+// "Estado mínimo": Mint solo, y del resto ese estado o uno mejor.
 function conditionOptions() {
     return DEMO.conditions
         .slice(0, -1)
-        .map((condition, index) => `<option value="${index}">${condition.code} o mejor</option>`)
+        .map(
+            (condition, index) =>
+                `<option value="${index}">${condition.name} (${condition.code})${index ? " o mejor" : ""}</option>`
+        )
         .join("");
 }
 
@@ -856,12 +854,18 @@ function byReleaseThenName(a, b) {
 
 function renderProducts() {
     const categorySelect = byId("pc");
+    // Producto sellado y accesorios, cada uno en su grupo.
     if (!categorySelect.options.length)
-        fillSelect(
-            categorySelect,
-            DEMO.productCategories.map((category) => [category, category]),
-            "Todas las categorías"
-        );
+        categorySelect.innerHTML =
+            '<option value="">Todas las categorías</option>' +
+            Object.entries(DEMO.productCategories)
+                .map(
+                    ([group, names]) =>
+                        `<optgroup label="${group}">${names
+                            .map((name) => `<option value="${name}">${name}</option>`)
+                            .join("")}</optgroup>`
+                )
+                .join("");
     const search = byId("q").value.toLowerCase();
     const category = categorySelect.value;
     const products = PRODUCTS.filter(
@@ -1083,12 +1087,26 @@ function refreshPrices() {
     if (byId("cart").classList.contains("on")) showCart();
 }
 
-byId("cur").innerHTML = CURRENCIES.map(
-    (item) =>
-        `<option value="${item.code}"${item.code === currency ? " selected" : ""}>${item.code} · ${
-            item.name
-        }</option>`
-).join("");
+// Opciones de moneda agrupadas (Mercosur, internacionales). También las usa
+// "Personalización" (frontend/js/profile.js).
+function currencyOptions(selected) {
+    const groups = [...new Set(CURRENCIES.map((item) => item.group))];
+    return groups
+        .map(
+            (group) =>
+                `<optgroup label="${group}">${CURRENCIES.filter((item) => item.group === group)
+                    .map(
+                        (item) =>
+                            `<option value="${item.code}"${item.code === selected ? " selected" : ""}>${
+                                item.code
+                            } · ${item.name}</option>`
+                    )
+                    .join("")}</optgroup>`
+        )
+        .join("");
+}
+
+byId("cur").innerHTML = currencyOptions(currency);
 byId("cur").addEventListener("change", (event) => {
     currency = event.target.value;
     try {

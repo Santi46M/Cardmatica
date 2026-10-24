@@ -23,17 +23,21 @@ const FRAME_LABELS = {
     Link: "de Enlace",
     Token: "Ficha"
 };
-// Short labels for filter options.
+// Short labels for filter options, grouped as the cards are built into a deck.
 const FRAME_OPTIONS = {
     Normal: "Normal",
     Effect: "Efecto",
     Ritual: "Ritual",
+    Pendulum: "Péndulo",
     Fusion: "Fusión",
     Synchro: "Sincronía",
     Xyz: "Xyz",
-    Link: "Enlace (Link)",
-    Pendulum: "Péndulo"
+    Link: "Enlace (Link)"
 };
+const FRAME_GROUPS = [
+    ["Main Deck", ["Normal", "Effect", "Ritual", "Pendulum"]],
+    ["Extra Deck", ["Fusion", "Synchro", "Xyz", "Link"]]
+];
 const ABILITY_LABELS = {
     Tuner: "Cantante",
     Flip: "Volteo",
@@ -99,8 +103,35 @@ const PROPERTY_OPTIONS = {
     Ritual: "Ritual",
     Counter: "Contraefecto"
 };
-// Levels 1–12 and ranks 0–13 cover every card printed so far.
-const LEVELS = Array.from({ length: 14 }, (_, index) => index);
+// "Tipo de carta" in the Todas tab: whole phrases, so the closed list reads well.
+const KIND_PHRASES = {
+    Monster: {
+        all: "Todos los monstruos",
+        Normal: "Monstruos normales",
+        Effect: "Monstruos de efecto",
+        Ritual: "Monstruos de ritual",
+        Pendulum: "Monstruos de péndulo",
+        Fusion: "Monstruos de fusión",
+        Synchro: "Monstruos de sincronía",
+        Xyz: "Monstruos Xyz",
+        Link: "Monstruos de enlace (Link)"
+    },
+    Spell: {
+        all: "Todas las magias",
+        Normal: "Magias normales",
+        "Quick-Play": "Magias de juego rápido",
+        Continuous: "Magias continuas",
+        Equip: "Magias de equipo",
+        Field: "Magias de campo",
+        Ritual: "Magias de ritual"
+    },
+    Trap: {
+        all: "Todas las trampas",
+        Normal: "Trampas normales",
+        Continuous: "Trampas continuas",
+        Counter: "Trampas de contraefecto"
+    }
+};
 
 // "Monstruo de Sincronía / Cantante · Dragón · LUZ · Nivel 7"
 // "Monstruo de Efecto / Péndulo · Lanzador de Conjuros · OSCURIDAD · Nivel 4"
@@ -138,37 +169,88 @@ function starsLabel({ link_rating, rank, level }) {
 
 // ---- Filters ---------------------------------------------------------------
 
-// Each filter: element id, URL parameter, API parameter, label.
+// Each filter: element id, URL parameter, API parameter, label, tabs.
 export const TYPE_FILTERS = [
     { id: "f-type", param: "tipo", label: "Tipo de carta", tabs: ["Todas"] },
     { id: "f-frame", param: "clase", api: "frame", label: "Clase", tabs: ["Monstruo"] },
     { id: "f-ability", param: "hab", api: "ability", label: "Habilidad", tabs: ["Monstruo"] },
     { id: "f-race", param: "raza", api: "race", label: "Tipo de monstruo", tabs: ["Monstruo"] },
     { id: "f-attribute", param: "atr", api: "attribute", label: "Atributo", tabs: ["Monstruo"] },
-    { id: "f-level", param: "nivel", api: "level", label: "Nivel / Rango / Link", tabs: ["Monstruo"] },
-    { id: "f-property", param: "prop", api: "property", label: "Tipo", tabs: ["Magia", "Trampa"] }
+    { id: "f-level", param: "nivel", label: "Nivel, Rango o Link", tabs: ["Monstruo"] },
+    {
+        id: "f-property",
+        param: "prop",
+        api: "property",
+        label: { Magia: "Tipo de magia", Trampa: "Tipo de trampa" },
+        tabs: ["Magia", "Trampa"]
+    }
 ];
 
+// The three numbers of a monster, each with its own API parameter.
+const STAR_PARAMS = { level: "level", rank: "rank", link: "link_rating" };
+
 const option = (value, label) => `<option value="${h(value)}">${h(label)}</option>`;
+const group = (label, html) => (html ? `<optgroup label="${h(label)}">${html}</optgroup>` : "");
+const labelOf = (filter, tab) => (typeof filter.label === "string" ? filter.label : filter.label[tab]);
+
+// Values read "Monster::" (every monster) or "Monster:frame:Effect" (one kind).
+function cardTypeOptions(types) {
+    const kind = (code, level, values) =>
+        option(`${code}::`, KIND_PHRASES[code].all) +
+        values.map((value) => option(`${code}:${level}:${value}`, KIND_PHRASES[code][value])).join("");
+    const frames = FRAME_GROUPS.flatMap(([, values]) => values).filter((value) =>
+        types.monster.frames.includes(value)
+    );
+    return (
+        option("", "Todos los tipos") +
+        group("Monstruos", kind("Monster", "frame", frames)) +
+        group("Magias", kind("Spell", "property", types.spell)) +
+        group("Trampas", kind("Trap", "property", types.trap))
+    );
+}
+
+// Values read "level:4", "rank:4" or "link:2": three different numbers on a card.
+function starOptions(types) {
+    const numbers = (kind, values, label) =>
+        values.map((value) => option(`${kind}:${value}`, label(value))).join("");
+    return (
+        option("", "Cualquier nivel, rango o Link") +
+        group("Nivel", numbers("level", types.levels || [], (value) => `Nivel ${value}`)) +
+        group("Rango (Xyz)", numbers("rank", types.ranks || [], (value) => `Rango ${value}`)) +
+        group("Link", numbers("link", types.link_ratings || [], (value) => `LINK-${value}`))
+    );
+}
 
 function optionsFor(filter, tab, types) {
     switch (filter.id) {
         case "f-type":
-            // One list, grouped by kind: the first level of the index.
-            return `${option("", "Todos los tipos")}<optgroup label="Monstruos">${types.monster.frames
-                .map((value) => option(`Monster:frame:${value}`, `Monstruo · ${FRAME_OPTIONS[value]}`))
-                .join("")}</optgroup><optgroup label="Magias">${types.spell
-                .map((value) => option(`Spell:property:${value}`, `Magia · ${PROPERTY_OPTIONS[value]}`))
-                .join("")}</optgroup><optgroup label="Trampas">${types.trap
-                .map((value) => option(`Trap:property:${value}`, `Trampa · ${PROPERTY_OPTIONS[value]}`))
-                .join("")}</optgroup>`;
+            return cardTypeOptions(types);
         case "f-frame":
-            return option("", "Todas las clases") + types.monster.frames.map((value) => option(value, FRAME_OPTIONS[value])).join("");
-        case "f-ability":
-            return option("", "Cualquier habilidad") + types.monster.abilities.map((value) => option(value, ABILITY_LABELS[value])).join("");
+            return (
+                option("", "Todas las clases") +
+                FRAME_GROUPS.map(([label, values]) =>
+                    group(
+                        label,
+                        values
+                            .filter((value) => types.monster.frames.includes(value))
+                            .map((value) => option(value, FRAME_OPTIONS[value]))
+                            .join("")
+                    )
+                ).join("")
+            );
+        case "f-ability": {
+            // Cantante (Tuner) is by far the most searched; the rest alphabetically.
+            const abilities = [...types.monster.abilities].sort((a, b) =>
+                a === "Tuner" ? -1 : b === "Tuner" ? 1 : ABILITY_LABELS[a].localeCompare(ABILITY_LABELS[b], "es")
+            );
+            return (
+                option("", "Cualquier habilidad") +
+                abilities.map((value) => option(value, ABILITY_LABELS[value])).join("")
+            );
+        }
         case "f-race":
             return (
-                option("", "Todos los tipos") +
+                option("", "Todos los tipos de monstruo") +
                 (types.races_present.length ? types.races_present : types.monster.races)
                     .map((value) => [value, RACE_LABELS[value] || value])
                     .sort((a, b) => a[1].localeCompare(b[1], "es"))
@@ -176,9 +258,14 @@ function optionsFor(filter, tab, types) {
                     .join("")
             );
         case "f-attribute":
-            return option("", "Todos los atributos") + types.monster.attributes.map((value) => option(value, ATTRIBUTE_LABELS[value])).join("");
+            return (
+                option("", "Todos los atributos") +
+                (types.attributes_present?.length ? types.attributes_present : types.monster.attributes)
+                    .map((value) => option(value, ATTRIBUTE_LABELS[value]))
+                    .join("")
+            );
         case "f-level":
-            return option("", "Cualquier nivel") + LEVELS.map((value) => option(value, String(value))).join("");
+            return starOptions(types);
         case "f-property": {
             const values = tab === "Magia" ? types.spell : types.trap;
             const all = tab === "Magia" ? "Todas las magias" : "Todas las trampas";
@@ -192,14 +279,14 @@ function optionsFor(filter, tab, types) {
 // The filters of a tab, as <select> elements (labels kept for screen readers).
 export function typeFiltersHtml(tab, types) {
     return TYPE_FILTERS.filter((filter) => filter.tabs.includes(tab))
-        .map(
-            (filter) =>
-                `<select id="${filter.id}" aria-label="${h(filter.label)}" title="${h(filter.label)}">${optionsFor(
-                    filter,
-                    tab,
-                    types
-                )}</select>`
-        )
+        .map((filter) => {
+            const label = labelOf(filter, tab);
+            return `<select id="${filter.id}" aria-label="${h(label)}" title="${h(label)}">${optionsFor(
+                filter,
+                tab,
+                types
+            )}</select>`;
+        })
         .join("");
 }
 
@@ -210,9 +297,13 @@ export function typeParams() {
         const value = document.getElementById(filter.id)?.value;
         if (!value) continue;
         if (filter.id === "f-type") {
+            // "Monster::" is every monster; "Monster:frame:Effect" one kind of them.
             const [kind, level, code] = value.split(":");
             params.card_type = kind;
-            params[level] = code;
+            if (level) params[level] = code;
+        } else if (filter.id === "f-level") {
+            const [kind, number] = value.split(":");
+            if (STAR_PARAMS[kind]) params[STAR_PARAMS[kind]] = number;
         } else params[filter.api] = value;
     }
     return params;

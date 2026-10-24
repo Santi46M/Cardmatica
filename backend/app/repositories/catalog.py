@@ -43,6 +43,8 @@ class CatalogRepository:
         race=None,
         attribute=None,
         level=None,
+        rank=None,
+        link_rating=None,
         card_property=None,
         rarity_names=None,
         set_id=None,
@@ -98,10 +100,13 @@ class CatalogRepository:
             query = query.where(Card.monster_race == race)
         if attribute:
             query = query.where(Card.attribute == attribute)
+        # Level, Rank (Xyz) and Link rating are different numbers on the card.
         if level is not None:
-            query = query.where(
-                or_(Card.level == level, Card.rank == level, Card.link_rating == level)
-            )
+            query = query.where(Card.level == level)
+        if rank is not None:
+            query = query.where(Card.rank == rank)
+        if link_rating is not None:
+            query = query.where(Card.link_rating == link_rating)
         if card_property:
             query = query.where(Card.card_property == card_property)
         if archetype_id:
@@ -151,6 +156,20 @@ class CatalogRepository:
         total = self.session.scalar(select(func.count()).select_from(query.subquery()))
         if sort == "updated":
             ordering = (Card.updated_at.desc(), Card.id)
+        elif sort in ("newest", "oldest"):
+            # By the card's latest printing (in this market), as Cardmarket's
+            # "release date"; cards without a known date go last either way.
+            released = (
+                select(func.max(func.coalesce(CardPrinting.release_date, CardSet.release_date)))
+                .select_from(CardPrinting)
+                .join(CardSet)
+                .where(CardPrinting.card_id == Card.id)
+            )
+            if market:
+                released = released.where(CardPrinting.market == market)
+            released = released.scalar_subquery()
+            direction = released.desc() if sort == "newest" else released.asc()
+            ordering = (direction.nullslast(), Card.display_name, Card.id)
         else:
             localized = (
                 select(CardName.name)

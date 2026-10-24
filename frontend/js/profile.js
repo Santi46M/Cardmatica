@@ -36,14 +36,7 @@ export function currentProfile() {
 // gathered here. Each control drives the original one, so both stay in sync.
 function preferencesHtml() {
     const view = readJson("cm_view", "list");
-    const currencies = (window.CURRENCIES || [])
-        .map(
-            (item) =>
-                `<option value="${h(item.code)}"${item.code === window.currency ? " selected" : ""}>${h(
-                    item.code
-                )} · ${h(item.name)}</option>`
-        )
-        .join("");
+    const currencies = window.currencyOptions?.(window.currency) || "";
     const option = (value, label, current) =>
         `<option value="${value}"${value === current ? " selected" : ""}>${label}</option>`;
     return `<section class="gl pnl" id="pf-prefs"><b>Personalización</b><div class="fm"><label>Moneda<select id="pf-pref-currency">${currencies}</select></label><label>Mercado<select id="pf-pref-market">${option(
@@ -94,9 +87,9 @@ export function renderProfile(container) {
         currentUser()
             ? "El perfil se guarda en tu cuenta. Un perfil de vendedor todavía no publica una tienda."
             : "Sin sesión iniciada, el perfil se guarda solo en este navegador. Inicia sesión para guardarlo en tu cuenta."
-    }</small></form><div class="gl pnl" style="margin-top:12px"><b>Wantlists</b><small>${listCount()} ${
+    }</small></form><div class="gl pnl" style="margin-top:12px"><b>Listas de deseados</b><small>${listCount()} ${
         listCount() === 1 ? "lista" : "listas"
-    } · ${countItems()} cartas</small><p><button class="btn s" data-go="Wantlists">Gestionar wantlists</button></p></div>${preferencesHtml()}`;
+    } · ${countItems()} cartas</small><p><button class="btn s" data-go="Deseados">Ver mis listas</button></p></div>${preferencesHtml()}`;
 }
 
 function read() {

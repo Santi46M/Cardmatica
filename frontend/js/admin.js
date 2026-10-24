@@ -19,7 +19,7 @@ const OVERVIEW = [
     ["printings", "Impresiones"],
     ["users", "Cuentas"],
     ["active_sessions", "Sesiones abiertas"],
-    ["wantlists", "Wantlists"],
+    ["wantlists", "Listas de deseados"],
     ["sales", "Ventas registradas"],
     ["pending_jobs", "Sincronizaciones en cola"]
 ];
@@ -68,7 +68,7 @@ const KEY_LABELS = {
     carta: "Fichas de carta abiertas",
     busqueda: "Búsquedas",
     "cuenta:registro": "Cuentas creadas",
-    "wantlist:agregar": "Cartas añadidas a wantlists"
+    "wantlist:agregar": "Cartas añadidas a listas de deseados"
 };
 
 function topHtml(rows) {

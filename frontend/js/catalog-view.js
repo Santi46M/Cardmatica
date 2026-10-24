@@ -2,6 +2,7 @@ import { badgeHtml, banlistSectionHtml, statusFor } from "./banlist.js";
 import { formatDate, money } from "./format.js";
 import { typeLine } from "./card-types.js";
 import { escapeHtml } from "./html.js";
+import { editionName, languageName, printingOptionsHtml } from "./printings.js";
 import { rarityBadge } from "./rarities.js";
 
 
@@ -26,9 +27,9 @@ const BANLIST_LABELS = {
 const banlistLabel = (status) => BANLIST_LABELS[status.status] || "Sin estado verificado";
 
 
-// Tabs of the info panel. (Demo cards draw only "Info": they cannot go to a wantlist.)
+// Tabs of the info panel. (Demo cards draw only "Info": they cannot go to a list.)
 const CARD_TABS =
-    '<div class="cd-tabs" role="tablist"><button role="tab" aria-selected="true" data-cd-tab="info">ⓘ Info</button><button role="tab" aria-selected="false" data-cd-tab="wants">♥ Wantlists</button></div>';
+    '<div class="cd-tabs" role="tablist"><button role="tab" aria-selected="true" data-cd-tab="info">ⓘ Info</button><button role="tab" aria-selected="false" data-cd-tab="wants">♥ Deseados</button></div>';
 
 // Prices beside the chart, from Cardmática's own sales.
 export function pricesHtml(summary) {
@@ -226,9 +227,9 @@ export function previewHtml(card) {
 
 export function homeHtml(data, { signedIn = false } = {}) {
     // The page's one <h1> and its calls to action, visible without scrolling.
-    return `<section class="hero2 gl"><h1>Cartas de <b>Yu-Gi-Oh!</b> para el Mercosur</h1><p>Busca cualquier carta TCG u OCG, compara sus impresiones y rarezas, revisa la banlist y arma tus wantlists con avisos de precio.</p><p class="hero-actions"><button class="btn" data-go="Todas">Explorar cartas</button>${
+    return `<section class="hero2 gl"><h1>Cartas de <b>Yu-Gi-Oh!</b> para el Mercosur</h1><p>Busca cualquier carta TCG u OCG, compara sus impresiones y rarezas, revisa la banlist y arma tus listas de deseados con avisos de precio.</p><p class="hero-actions"><button class="btn" data-go="Todas">Explorar cartas</button>${
         signedIn
-            ? '<button class="ghost" data-go="Wantlists">Mis wantlists</button>'
+            ? '<button class="ghost" data-go="Deseados">Mi lista de deseados</button>'
             : '<button class="ghost" data-go="Acceso" data-auth-mode="register">Crear cuenta gratis</button>'
     }</p></section><h2 class="sec-title">Cartas del catálogo</h2>${
         data.items.length
@@ -348,14 +349,10 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
         : "";
     const printingChoice =
         printings.items.length > 1
-            ? `<select id="catalog-printing" aria-label="Impresión">${printings.items
-                  .map(
-                      (item) =>
-                          `<option value="${h(item.id)}" ${item.id === printing.id ? "selected" : ""}>${h(
-                              [item.code, item.rarity, item.language, item.edition].join(" · ")
-                          )}</option>`
-                  )
-                  .join("")}</select>${printings.total > printings.page_size ? pager(printings, "printing") : ""}`
+            ? `<select id="catalog-printing" aria-label="Impresión">${printingOptionsHtml(
+                  printings.items,
+                  printing.id
+              )}</select>${printings.total > printings.page_size ? pager(printings, "printing") : ""}`
             : "";
     const banlist = statusFor(card, market);
     const facts = printing
@@ -364,8 +361,8 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
               h(printing.set_name)
           )}${printingChoice ? factRow("Impresión", printingChoice) : ""}${factRow(
               "Idioma",
-              h(printing.language)
-          )}${factRow("Edición", printing.edition === "unknown" ? "" : h(printing.edition))}${factRow(
+              h(languageName(printing.language))
+          )}${factRow("Edición", h(editionName(printing.edition)))}${factRow(
               "Lanzamiento",
               printing.release_date ? h(formatDate(printing.release_date)) : ""
           )}${factRow("Banlist", banlist ? `${badgeHtml(banlist)} ${h(banlistLabel(banlist))}` : "")}`
@@ -387,7 +384,7 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
         image,
         `${card.name} · ${image?.association === "card_artwork" ? "ilustración general" : printing?.code || ""}`,
         true
-    )}${credit}</figure><div class="cd-info gl">${CARD_TABS}<div class="cd-panel" data-cd-panel="info"><div class="cd-cols"><div><dl class="cd-facts">${facts}</dl><dl class="cd-facts" id="cd-prices"></dl></div><div class="cd-chart"><div id="price-history" class="chart" aria-live="polite"></div><button class="btn s cd-want" data-wl-open aria-controls="wl-picker">♥ Añadir a wantlist</button></div></div><div class="cd-text">${
+    )}${credit}</figure><div class="cd-info gl">${CARD_TABS}<div class="cd-panel" data-cd-panel="info"><div class="cd-cols"><div><dl class="cd-facts">${facts}</dl><dl class="cd-facts" id="cd-prices"></dl></div><div class="cd-chart"><div id="price-history" class="chart" aria-live="polite"></div><button class="btn s cd-want" data-wl-open aria-controls="wl-picker">♥ Añadir a la lista de deseados</button></div></div><div class="cd-text">${
         stats ? `<p class="cd-stats">${stats}</p>` : ""
     }${textHtml}</div></div><div class="cd-panel" data-cd-panel="wants" hidden></div><div id="wl-picker"></div></div></div><section class="cd-offers"><div class="gl wrap"><table class="cd-table"><thead><tr><th>Vendedor</th><th>Información del producto</th><th class="num">Oferta</th></tr></thead><tbody><tr><td colspan="3" class="empty">Todavía no hay ofertas de esta impresión en Cardmática.</td></tr></tbody></table></div></section>${section(
         "Arquetipos · clasificación comunitaria",
