@@ -10,8 +10,8 @@ def test_bundled_news_by_section_and_newest_first(client, factory):
     with factory.begin() as session:
         assert news.import_bundled(session) == imported
     data = client.get("/api/v1/news", params={"limit": 2}).json()
-    assert set(data) == {"site", "yugioh"}
-    assert len(data["site"]) == 2 and len(data["yugioh"]) == 2
+    # Site news come from the repository (news_feeds); the bundled ones are the game's.
+    assert data["site"] == [] and len(data["yugioh"]) == 2
     dates = [item["published_on"] for item in data["yugioh"]]
     assert dates == sorted(dates, reverse=True)
     # News about the game say where they come from.

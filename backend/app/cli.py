@@ -94,6 +94,24 @@ def import_news_file():
     return 0
 
 
+async def refresh_news(*, forever=False):
+    """Bring the news up to date now, or every NEWS_REFRESH_HOURS when forever."""
+    from app.integrations.http import PoliteHttpClient
+    from app.services import news_feeds
+
+    settings = get_settings()
+    while True:
+        client = PoliteHttpClient("news", settings)
+        try:
+            with session_factory().begin() as session:
+                print(json.dumps(await news_feeds.refresh(session, client, settings)), flush=True)
+        finally:
+            await client.close()
+        if not forever:
+            return 0
+        await asyncio.sleep(settings.news_refresh_hours * 3600)
+
+
 def preview_images(max_cards: int, runner=None):
     """Download the general artwork of every catalogue card for the local preview.
 
@@ -167,6 +185,10 @@ def main():
     )
     banlist.add_argument("paths", nargs="*", type=Path)
     commands.add_parser("import-news", help="Importar las noticias incluidas con la aplicación")
+    commands.add_parser("fetch-news", help="Actualizar ahora las noticias desde sus fuentes")
+    commands.add_parser(
+        "news-worker", help="Actualizar las noticias cada NEWS_REFRESH_HOURS, sin parar"
+    )
     images = commands.add_parser(
         "preview-images",
         help="Descargar ilustraciones de las cartas del catálogo para la vista local de prueba",
@@ -210,6 +232,8 @@ def main():
         return import_banlists(args.paths)
     if args.command == "import-news":
         return import_news_file()
+    if args.command in ("fetch-news", "news-worker"):
+        return asyncio.run(refresh_news(forever=args.command == "news-worker"))
     if args.command == "worker":
         if args.poll_seconds < 1:
             parser.error("poll-seconds debe ser al menos 1")

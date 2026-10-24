@@ -89,11 +89,17 @@ class PoliteHttpClient:
             "ygoprodeck": settings.ygoprodeck_request_interval,
             "yugipedia": settings.yugipedia_request_interval,
             "konami": settings.konami_request_interval,
+            "news": settings.news_request_interval,
         }[source]
         self.allowed_hosts = {
             "ygoprodeck": {"db.ygoprodeck.com", "images.ygoprodeck.com"},
             "yugipedia": {"yugipedia.com", "ms.yugipedia.com"},
             "konami": {"www.db.yugioh-card.com"},
+            # Only the configured feeds and the GitHub API.
+            "news": {
+                urlsplit(feed.split("|", 1)[-1].strip()).hostname for feed in settings.news_feeds
+            }
+            | {"api.github.com"},
         }[source]
         self.client = httpx.AsyncClient(
             timeout=settings.http_timeout,
@@ -111,6 +117,8 @@ class PoliteHttpClient:
             self.settings.konami_enabled and self.settings.konami_authorization_reference.strip()
         ):
             raise AccessDenied("Konami requiere autorización escrita de extracción y uso comercial")
+        if self.source == "news" and not self.settings.news_enabled:
+            raise AccessDenied("Noticias externas deshabilitadas en la configuración")
         if self.source == "yugipedia" and not self.settings.yugipedia_enabled:
             raise AccessDenied(
                 "Yugipedia deshabilitada: revisar políticas y configurar el servicio"
@@ -130,10 +138,16 @@ class PoliteHttpClient:
     async def close(self):
         await self.client.aclose()
 
-    async def get(self, url, *, params=None, ttl=30 * 86400, refresh=False, redirects=0):
+    async def get(
+        self, url, *, params=None, ttl=30 * 86400, refresh=False, redirects=0, robots=True
+    ):
+        """robots=False only for documented APIs meant for programs (GitHub's),
+        whose robots.txt speaks to crawlers of the website."""
         self.check_policy()
         request_url = str(httpx.URL(url, params=params))
         self.validate_url(request_url)
+        if not robots:
+            return await self._fetch(request_url, ttl=ttl, refresh=refresh)
         origin = urlsplit(request_url)
         robots_url = f"{origin.scheme}://{origin.netloc}/robots.txt"
         robots_response = await self._fetch(

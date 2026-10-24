@@ -31,6 +31,20 @@ class Settings(BaseSettings):
     http_timeout: float = Field(default=25, gt=0)
     http_retries: int = Field(default=3, ge=0, le=8)
     cache_directory: Path = ROOT / ".cache/http"
+    # News of the home page, refreshed by `cardmatica news-worker`
+    # (app/services/news_feeds.py). Each feed is "Name|https://… RSS or Atom".
+    news_enabled: bool = True
+    news_feeds: list[str] = [
+        "Konami|https://yugiohblog.konami.com/feed/",
+        "YGOrganization|https://ygorganization.com/feed/",
+        "YGOPRODeck|https://ygoprodeck.com/feed_rss.xml",
+    ]
+    # Site news: merged pull requests of this public GitHub repository.
+    news_site_repo: str = "santapepsi/Cardmatica"
+    # Pull requests whose title starts like this are maintenance, not news.
+    news_site_skip_prefixes: list[str] = ["CI:", "Limpieza", "Bump", "Prueba"]
+    news_refresh_hours: float = Field(default=3, ge=0.5, le=48)
+    news_request_interval: float = Field(default=5, ge=1)
     image_directory: Path = ROOT / "data/images"
     cors_origins: list[str] = ["http://localhost:8000", "http://localhost:5500"]
     # Host names the site answers to. "*" accepts any; set the real domain in

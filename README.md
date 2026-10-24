@@ -139,7 +139,7 @@ python -m uvicorn app.main:app --reload
 Tras crear `.env`:
 
 ```bash
-docker compose up --build -d db api
+docker compose up --build -d db api news
 docker compose --profile maintenance up --build -d worker
 docker compose logs -f api worker
 ```
@@ -313,10 +313,19 @@ publica una tienda. Las listas referencian el UUID y la impresión del catálogo
 de datos del catálogo (`backend/app/services/trending.py`): bajan de precio (ventas
 completadas), vuelven al juego (una banlist nueva las libera), más deseadas (en las
 listas de varias personas, solo el recuento), vuelven con reimpresión e impresiones
-destacadas por rareza. Una lista sin datos no se muestra. Las noticias vienen con la
-aplicación en `backend/app/data/news.json` (se cargan al arrancar con
-`cardmatica import-news`) y un administrador puede publicar o quitar más desde su
-panel; las de Yu-Gi-Oh! siempre llevan su fuente.
+destacadas por rareza. Una lista sin datos no se muestra.
+
+Las noticias se actualizan solas: el servicio `news` (`cardmatica news-worker`, arranca
+con el Codespace) las trae cada `NEWS_REFRESH_HOURS` (3 h). Las de Yu-Gi-Oh! salen de
+los feeds RSS/Atom de `NEWS_FEEDS` (el blog oficial de Konami, YGOrganization y
+YGOPRODeck): título, enlace, fecha y un extracto corto, siempre con su fuente; el
+artículo se lee en su sitio. Las de Cardmática son las pull requests unidas del
+repositorio público `NEWS_SITE_REPO` (API de GitHub), sin las de mantenimiento. Se
+respeta robots.txt de cada feed, una consulta cada 5 s, y la API nunca sale a internet
+al atender una visita. Si una fuente falla quedan sus noticias anteriores. Para traerlas
+ya: `docker compose exec api cardmatica fetch-news`. También hay noticias incluidas en
+`backend/app/data/news.json` (`cardmatica import-news`) y un administrador puede
+publicar o quitar más desde su panel; un feed nunca las reemplaza.
 
 **Asistente de compra.** Como el Shopping Wizard de Cardmarket: arma la compra de una
 lista entre los vendedores, con «Menos envíos» o «Menor precio» (contando el envío de

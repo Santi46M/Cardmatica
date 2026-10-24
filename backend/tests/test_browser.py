@@ -879,10 +879,17 @@ def test_latest_set_banner_and_set_page(live_server, browser_page, factory, reco
 
 
 def test_home_news_columns(live_server, browser_page, factory):
-    from app.services import news
+    from datetime import date
+
+    from app.services import news, news_feeds
 
     with factory.begin() as session:
         news.import_bundled(session)
+        # Site news arrive from the repository's merged pull requests.
+        entry = news_feeds.Entry(
+            "Noticias al día", "https://github.com/santapepsi/Cardmatica/pull/30", date.today(), ""
+        )
+        news_feeds.store(session, "site", None, [entry])
     page = browser_page
     page.goto(live_server)
     columns = page.locator(".news > div")

@@ -55,6 +55,20 @@ services:
       db:
         condition: service_healthy
     command: ["cardmatica", "worker", "--poll-seconds", "5"]
+  # Noticias del inicio desde sus fuentes (RSS y GitHub), cada NEWS_REFRESH_HOURS.
+  news:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cardmatica}
+      CACHE_DIRECTORY: /data/cache
+    volumes:
+      - catalog_data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+    command: ["cardmatica", "news-worker"]
 volumes:
   postgres_data:
   catalog_data:

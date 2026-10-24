@@ -1,33 +1,5 @@
 [
     {
-        "key": "2026-10-24-asistente-de-compra",
-        "section": "site",
-        "title": "Asistente de compra",
-        "summary": "Desde tu lista de deseados, arma la compra entre los vendedores: con menos envíos o al menor precio, con el estado y el país que elijas.",
-        "published_on": "2026-10-24"
-    },
-    {
-        "key": "2026-10-24-pagina-de-cada-set",
-        "section": "site",
-        "title": "Una página para cada set",
-        "summary": "Cada set y cada arquetipo tienen su página con sus cartas, y el inicio muestra el último set lanzado y las cartas en tendencia.",
-        "published_on": "2026-10-24"
-    },
-    {
-        "key": "2026-10-24-rarezas",
-        "section": "site",
-        "title": "Rarezas en orden",
-        "summary": "Cada rareza tiene un solo nombre y se agrupa por familia, como en Cardmarket y TCGplayer. El filtro muestra solo las que hay.",
-        "published_on": "2026-10-24"
-    },
-    {
-        "key": "2026-10-24-telefono",
-        "section": "site",
-        "title": "Mejor en el teléfono",
-        "summary": "Cabecera más compacta que se esconde al bajar, pestañas deslizables, filtros plegables y búsqueda con sugerencias.",
-        "published_on": "2026-10-24"
-    },
-    {
         "key": "2026-10-19-banlist-tcg",
         "section": "yugioh",
         "title": "Nueva lista Forbidden & Limited de la TCG",

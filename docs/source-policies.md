@@ -128,3 +128,23 @@ descritas arriba, y ajuste o retire los archivos según esa revisión.
 Los precios del historial provienen solo de ventas completadas en Cardmática. No se
 importan precios de terceros ni de guías de precios.
 
+
+## Noticias
+
+Consultado el 24 de octubre de 2026. Las noticias de Yu-Gi-Oh! del inicio salen de
+feeds RSS/Atom públicos, hechos para que otros programas los lean:
+
+- Blog oficial de Konami (`https://yugiohblog.konami.com/feed/`): coberturas de
+  eventos y anuncios de la TCG.
+- YGOrganization (`https://ygorganization.com/feed/`): traducciones y novedades de la
+  OCG y la TCG.
+- YGOPRODeck (`https://ygoprodeck.com/feed_rss.xml`): artículos y novedades de sets.
+
+Solo se guardan título, enlace, fecha y un extracto de hasta 220 caracteres sin HTML,
+con el nombre de la fuente; el artículo completo se lee en su sitio. No se copian
+imágenes ni textos enteros. Se pide robots.txt antes de cada feed y se espera
+`NEWS_REQUEST_INTERVAL` (5 s) entre consultas; un feed con DOCTYPE no se procesa. Las
+novedades del sitio son las pull requests unidas del repositorio público
+`NEWS_SITE_REPO`, por la API REST de GitHub sin token (60 consultas por hora; se usa
+una cada 3 h). Esa API es para programas: su robots.txt habla del sitio web, por eso
+es la única consulta sin él. `NEWS_ENABLED=false` corta todas.
