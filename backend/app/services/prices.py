@@ -4,6 +4,7 @@ from sqlalchemy import and_, func, select
 
 from app.models import CardPrinting, PriceObservation, Rarity
 from app.schemas.catalog import PriceHistoryView, PriceObservationInput, PricePoint
+from app.services.rarities import canonical
 
 MAX_POINTS = 5000
 
@@ -17,7 +18,7 @@ def point(observation, printing, rarity) -> PricePoint:
     return PricePoint(
         printing_id=printing.id,
         code=printing.code,
-        rarity=rarity,
+        rarity=canonical(rarity),
         language=printing.language,
         edition=printing.edition,
         observed_at=as_utc(observation.observed_at),

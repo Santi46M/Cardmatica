@@ -21,6 +21,7 @@ from app.schemas.catalog import (
     PrintingView,
     SetView,
 )
+from app.services import rarities
 from app.services.banlists import current_lists, list_view, statuses_for_cards
 from app.services.card_types import RACES, taxonomy
 from app.services.catalog import card_detail, card_summary, errata_views, printing_view
@@ -48,6 +49,7 @@ def cards(
     level: Annotated[int | None, Query(ge=0, le=13)] = None,
     card_property: Annotated[str | None, Query(alias="property", max_length=20)] = None,
     rarity: Annotated[str | None, Query(max_length=100)] = None,
+    rarity_family: rarities.Family | None = None,
     set_id: UUID | None = None,
     archetype_id: UUID | None = None,
     product_type: Annotated[str | None, Query(max_length=60)] = None,
@@ -67,7 +69,7 @@ def cards(
         attribute=attribute,
         level=level,
         card_property=card_property,
-        rarity=rarity,
+        rarity_names=rarity_names(session, rarity, rarity_family),
         set_id=set_id,
         archetype_id=archetype_id,
         product_type=product_type,
@@ -108,6 +110,14 @@ def suggest(
             )
         )
     return suggestions
+
+
+def rarity_names(session, rarity, family):
+    """Stored spellings for a rarity or a family; None when neither is asked."""
+    if not rarity and not family:
+        return None
+    stored = session.scalars(select(Rarity.name))
+    return rarities.stored_names(stored, rarity=rarity or None, family=family)
 
 
 def require_card(session, card_id):
@@ -273,33 +283,19 @@ def races_present(session):
 
 
 @router.get("/facets")
-def facets(session: SessionDep):
+def facets(session: SessionDep, market: Market | None = None):
+    """Filter options. Only what the catalogue has for this market is listed."""
+    printings = select(CardPrinting.rarity_id)
+    sets = select(CardSet.product_type).where(CardSet.product_type.is_not(None))
+    if market:
+        printings = printings.where(CardPrinting.market == market)
+        sets = sets.where(CardSet.market == market)
+    names = session.scalars(select(Rarity.name).where(Rarity.id.in_(printings.distinct())))
+    groups = rarities.groups(names)
     return {
-        "rarities": list(session.scalars(select(Rarity.name).order_by(Rarity.name))),
-        "product_types": list(
-            session.scalars(
-                select(CardSet.product_type)
-                .where(CardSet.product_type.is_not(None))
-                .distinct()
-                .order_by(CardSet.product_type)
-            )
-        ),
-        "subtypes": [
-            "Normal",
-            "Effect",
-            "Fusion",
-            "Ritual",
-            "Synchro",
-            "Xyz",
-            "Link",
-            "Pendulum",
-            "Tuner",
-            "Quick-Play",
-            "Continuous",
-            "Equip",
-            "Field",
-            "Counter",
-        ],
+        "rarities": [name for group in groups for name in group["names"]],
+        "rarity_groups": groups,
+        "product_types": list(session.scalars(sets.distinct().order_by(CardSet.product_type))),
         # Ordered levels for the filters; races present in the catalogue only.
         "types": {**taxonomy(), "races_present": races_present(session)},
     }

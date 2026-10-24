@@ -33,6 +33,7 @@ frontend/js/catalog.js          Punto de entrada: pestañas, lista, ficha, direc
 frontend/js/catalog-view.js     HTML de la lista, la cuadrícula y la ficha de carta
 frontend/js/card-types.js       Tipos de carta por niveles, en español, y sus filtros
 frontend/js/search-suggest.js   Sugerencias con miniatura mientras se escribe en la búsqueda
+frontend/js/rarities.js         Rarezas: familias en español, filtro agrupado y etiqueta de color
 frontend/js/header-scroll.js    En el teléfono, la cabecera se esconde al bajar y vuelve al subir
 frontend/js/auth.js, account-menu.js, profile.js, wantlists.js   Cuenta y sus datos
 frontend/js/admin.js            Panel de administración
@@ -43,7 +44,7 @@ frontend/demo/store.js          Tienda demo y piezas compartidas (pestañas, mon
 backend/app/core/               Configuración, logging JSON, cabeceras de seguridad, caché y versiones de archivos
 backend/app/models/             Catálogo, procedencia, cuentas, wantlists y estadísticas
 backend/app/repositories/       SQL paginado y upserts
-backend/app/services/           Reconciliación, tipos de carta, cuentas, correo, precios e imágenes
+backend/app/services/           Reconciliación, tipos de carta, rarezas, cuentas, correo, precios e imágenes
 backend/app/integrations/       HTTP respetuoso, YGOPRODeck y Yugipedia
 backend/app/ingestion/          Normalización, checkpoints y worker
 backend/app/api/                Catálogo, cuentas, administración, estadísticas y páginas HTML

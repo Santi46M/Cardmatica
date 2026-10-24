@@ -31,6 +31,7 @@ import { installHeaderScroll } from "./header-scroll.js";
 import { cardMeta, tabMeta } from "./page-meta.js";
 import { priceChartHtml, priceSummary } from "./price-chart.js";
 import { installProfile, renderProfile } from "./profile.js";
+import { rarityOptionsHtml, rarityParams } from "./rarities.js";
 import { installSearchSuggest } from "./search-suggest.js";
 import { readJson, writeJson } from "./storage.js";
 import { cardWantsHtml, installWantlists, refreshAlerts, renderWantlists } from "./wantlists.js";
@@ -48,6 +49,7 @@ let controller;
 let timer;
 let facets;
 let facetsRequest;
+let facetsMarket;
 let detail;
 let printingPage;
 let selectedPrinting = "";
@@ -256,29 +258,41 @@ new MutationObserver(() => {
 
 // ---- Catalogue list ---------------------------------------------------------
 
-// Filter options, asked once for every tab. The home page asks for them in the
-// background, so the first catalogue tab does not wait for them.
+// Filter options of the market on screen, asked once per market for every tab.
+// The home page asks for them in the background, so the first catalogue tab
+// does not wait for them.
 function loadFacets() {
-    facetsRequest ??= api.get("facets").then(fillFacets, (error) => {
-        facetsRequest = undefined;
-        throw error;
-    });
+    if (facetsMarket !== window.market) {
+        const market = (facetsMarket = window.market);
+        facetsRequest = api.get("facets", { market }).then(
+            (data) => {
+                if (market === facetsMarket) fillFacets(data);
+            },
+            (error) => {
+                if (market === facetsMarket) facetsMarket = undefined;
+                throw error;
+            }
+        );
+    }
     return facetsRequest;
+}
+
+// Options are redrawn keeping the choice when the new market has it too.
+function fillSelect(select, html) {
+    const previous = select.value;
+    select.innerHTML = html;
+    select.value = [...select.options].some((option) => option.value === previous) ? previous : "";
 }
 
 function fillFacets(data) {
     facets = data;
-    for (const [id, items, label] of [
-        ["rar", facets.rarities, "Todas las rarezas"],
-        ["stp", facets.product_types, "Cualquier origen"]
-    ]) {
-        const select = element(id);
-        const previous = select.value;
-        select.innerHTML =
-            `<option value="">${label}</option>` +
-            items.map((value) => `<option value="${h(value)}">${h(value)}</option>`).join("");
-        select.value = items.includes(previous) ? previous : "";
-    }
+    fillSelect(element("rar"), rarityOptionsHtml(facets.rarity_groups));
+    fillSelect(
+        element("stp"),
+        `<option value="">Cualquier origen</option>${facets.product_types
+            .map((value) => `<option value="${h(value)}">${h(value)}</option>`)
+            .join("")}`
+    );
 }
 
 // Type filters depend on the tab (card-types.js). They are redrawn only when
@@ -406,7 +420,7 @@ async function loadCards(reset = false) {
                 q: element("q").value.trim(),
                 card_type: cardTypes[window.tab],
                 ...(home ? {} : typeParams()),
-                rarity: home ? undefined : element("rar").value,
+                ...(home ? {} : rarityParams(element("rar").value)),
                 product_type: home ? undefined : element("stp").value,
                 sort: home ? "updated" : element("srt").value,
                 language: "es"
@@ -511,6 +525,14 @@ window.showTab = function () {
     if (openCardId()) openCard(openCardId(), { push: false });
 };
 
+// A card opened from a list filtered by rarity shows that printing first.
+function printingInChosenRarity(items) {
+    const { rarity, rarity_family: family } = isCatalog() ? rarityParams(element("rar").value) : {};
+    if (!rarity && !family) return "";
+    const match = items.find((item) => (rarity ? item.rarity === rarity : item.rarity_family === family));
+    return match?.id || "";
+}
+
 async function openCard(id, { push = true } = {}) {
     const current = ++detailGeneration;
     element("md").dataset.mode = "catalog";
@@ -541,7 +563,7 @@ async function openCard(id, { push = true } = {}) {
         cardMeta(card.name);
         track("carta");
         printingPage = printings;
-        selectedPrinting = "";
+        selectedPrinting = printingInChosenRarity(printings.items);
         renderDetail();
         history.then((data) => {
             if (current !== detailGeneration || element("md").dataset.mode !== "catalog") return;
@@ -577,7 +599,7 @@ document.addEventListener(
             return;
         }
         if (target.hasAttribute("data-catalog-retry")) {
-            facetsRequest = undefined;
+            facetsMarket = undefined;
             api.cache.clear();
             return loadCards();
         }

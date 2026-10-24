@@ -27,6 +27,7 @@ from app.schemas.catalog import (
     SourceView,
     TextView,
 )
+from app.services import rarities
 from app.services.banlists import card_statuses
 from app.services.card_types import normalize_kind
 
@@ -77,13 +78,16 @@ def artwork_view(image):
 
 
 def printing_view(printing):
+    rarity = rarities.info(printing.rarity.name)
     return PrintingView(
         id=printing.id,
         card_id=printing.card_id,
         code=printing.code,
         set_id=printing.set_id,
         set_name=printing.card_set.name,
-        rarity=printing.rarity.name,
+        rarity=rarity.name,
+        rarity_code=rarity.code,
+        rarity_family=rarity.family,
         language=printing.language,
         market=printing.market,
         edition=printing.edition,

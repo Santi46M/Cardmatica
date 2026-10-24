@@ -44,7 +44,7 @@ class CatalogRepository:
         attribute=None,
         level=None,
         card_property=None,
-        rarity=None,
+        rarity_names=None,
         set_id=None,
         archetype_id=None,
         product_type=None,
@@ -55,8 +55,9 @@ class CatalogRepository:
         printing_filters = []
         if market:
             printing_filters.append(CardPrinting.market == market)
-        if rarity:
-            printing_filters.append(Rarity.name == rarity)
+        # Every stored spelling of the chosen rarity or family (app/services/rarities.py).
+        if rarity_names is not None:
+            printing_filters.append(Rarity.name.in_(rarity_names))
         if set_id:
             printing_filters.append(CardPrinting.set_id == set_id)
         if product_type:
@@ -70,7 +71,7 @@ class CatalogRepository:
         )
         if market:
             query = query.where(in_market(market))
-        if rarity or set_id or product_type:
+        if rarity_names is not None or set_id or product_type:
             # Evaluated once for the whole query. A per-card EXISTS made the planner
             # walk every printing of a common rarity for each card (seconds, not ms).
             matching_cards = (

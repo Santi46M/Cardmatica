@@ -36,6 +36,9 @@ class PrintingView(BaseModel):
     set_id: UUID
     set_name: str
     rarity: str
+    # Yugipedia abbreviation and family (app/services/rarities.py).
+    rarity_code: str | None = None
+    rarity_family: str = "other"
     language: str
     market: str
     edition: str

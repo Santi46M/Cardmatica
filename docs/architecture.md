@@ -29,6 +29,16 @@ local y permite integridad, búsquedas e historial con concurrencia. FastAPI sir
 la API y archivos frontend permitidos desde el mismo origen. El mantenimiento es
 un CLI/worker independiente; las rutas públicas solo consultan PostgreSQL.
 
+Rarezas (24 de octubre de 2026): cada fuente escribe la misma rareza de varias
+formas ("ScR", "SE", "Secret", "Collectors Rare"; la OCG llama "Normal" a la
+Common). backend/app/services/rarities.py las une bajo el nombre que usan
+Cardmarket, TCGplayer y Yugipedia, con su abreviatura de Yugipedia, y las agrupa
+en familias como TCGplayer: básicas (Common a Secret Rare; Short Print y Super
+Short Print son Commons menos frecuentes), alta gama, Secret especiales, Gold y
+Platinum, Parallel y texturas, ediciones especiales y otras. Un nombre
+desconocido se conserva tal cual en "otras". El filtro muestra solo las rarezas
+presentes en el mercado elegido; la migración 011 unió las grafías ya guardadas.
+
 Velocidad de carga sin paso de compilación (24 de octubre de 2026): cada página
 enlaza sus scripts y estilos como `archivo?v=<hash de su contenido>`
 (backend/app/core/assets.py) y el navegador los guarda un año sin volver a

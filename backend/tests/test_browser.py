@@ -733,3 +733,16 @@ def test_phone_layout(live_server, browser_page):
     expect(page.locator("#mb")).to_contain_text("Synthetic official test text.")
     assert page.evaluate("document.documentElement.scrollWidth") <= 360
     assert page.locator("#md .box").bounding_box()["y"] < 60
+
+
+def test_rarity_filter_grouped_by_family(live_server, browser_page):
+    page = browser_page
+    page.goto(f"{live_server}/?tab=Todas")
+    expect(page.locator("#list [data-catalog-card]").first).to_be_visible()
+    basic = page.locator('#rar optgroup[label="Básicas"] option')
+    expect(basic).to_have_text(["Super Rare", "Ultra Rare"])
+    page.locator("#rar").select_option("Super Rare")
+    page.locator("#list [data-catalog-card]").first.click()
+    # The card opens on the printing of the rarity being looked for.
+    expect(page.locator(".card-detail .rr").first).to_have_text("Super Rare")
+    expect(page.locator(".card-detail .rr").first).to_have_attribute("data-tone", "super")

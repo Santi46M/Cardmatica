@@ -2,7 +2,7 @@ from uuid import uuid4
 
 from sqlalchemy import event, select
 
-from app.models import CardImage
+from app.models import CardImage, CardPrinting
 from app.schemas.ingestion import GroupInput, ImageInput
 from app.services.ingestion import IngestionService
 
@@ -45,6 +45,36 @@ def test_catalog_endpoints_and_filters(factory, client, record, wiki_record):
     assert client.get(f"/api/v1/archetypes/{group_id}/cards").json()["total"] == 1
     assert client.get("/api/v1/sets").json()["items"][0]["name"] == "Synthetic Test Set"
     assert "Ultra Rare" in client.get("/api/v1/facets").json()["rarities"]
+
+
+def test_rarities_grouped_by_market_and_filtered_by_spelling_or_family(factory, client, record):
+    from app.models import Rarity
+
+    seed(factory, record)
+    # Another source stored a printing of the same card as "QCSR".
+    with factory.begin() as session:
+        printing = session.scalars(select(CardPrinting)).first()
+        printing.rarity = Rarity(name="QCSR")
+    facets = client.get("/api/v1/facets", params={"market": "TCG"}).json()
+    assert facets["rarity_groups"] == [
+        {"family": "secret", "names": ["Quarter Century Secret Rare"]},
+    ]
+    assert client.get("/api/v1/facets", params={"market": "OCG"}).json()["rarity_groups"] == []
+    for parameters in (
+        {"rarity": "Quarter Century Secret Rare"},
+        {"rarity": "QCSR"},
+        {"rarity_family": "secret"},
+    ):
+        assert client.get("/api/v1/cards", params=parameters).json()["total"] == 1, parameters
+    assert client.get("/api/v1/cards", params={"rarity_family": "gold"}).json()["total"] == 0
+    assert client.get("/api/v1/cards", params={"rarity_family": "sql"}).status_code == 422
+    card_id = client.get("/api/v1/cards").json()["items"][0]["id"]
+    shown = client.get(f"/api/v1/cards/{card_id}/printings").json()["items"][0]
+    assert (shown["rarity"], shown["rarity_code"], shown["rarity_family"]) == (
+        "Quarter Century Secret Rare",
+        "QCScR",
+        "secret",
+    )
 
 
 def test_pagination_sort_validation_and_errors(factory, client, record):

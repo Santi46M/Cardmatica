@@ -54,11 +54,12 @@ DEMO.sets = {
     MP26: { name: "Mega-Tin 2026", type: "T", released: "2026-08-08" }
 };
 
-// Rarezas por abreviatura. "priceFactor" multiplica el precio base de la
-// carta; "background" y "color" pintan la etiqueta de rareza.
+// Rarezas por abreviatura, con el nombre que usan Cardmarket y TCGplayer
+// (también en español). "priceFactor" multiplica el precio base de la carta;
+// "background" y "color" pintan la etiqueta de rareza.
 DEMO.rarities = {
-    C: { name: "Común", priceFactor: 1, background: "rgba(255,255,255,.1)", color: "#c5d0de" },
-    R: { name: "Rara", priceFactor: 1.6, background: "rgba(120,160,230,.25)", color: "#a9c4f5" },
+    C: { name: "Common", priceFactor: 1, background: "rgba(255,255,255,.1)", color: "#c5d0de" },
+    R: { name: "Rare", priceFactor: 1.6, background: "rgba(120,160,230,.25)", color: "#a9c4f5" },
     SR: { name: "Super Rare", priceFactor: 2.4, background: "rgba(80,190,240,.25)", color: "#8fdcff" },
     UR: { name: "Ultra Rare", priceFactor: 4, background: "rgba(240,190,70,.25)", color: "#ffd773" },
     UtR: { name: "Ultimate Rare", priceFactor: 9, background: "rgba(230,130,220,.25)", color: "#f5aaee" },
@@ -119,7 +120,7 @@ DEMO.ocgLanguages = ["JP", "KR", "SC", "AE"];
 // Cartas de la demo. Cada impresión es "PREFIJO###:RAREZA"; el prefijo es
 // una clave de DEMO.sets y la rareza una de DEMO.rarities. "level" es el
 // nivel, el rango (Xyz) o el valor LINK según el subtipo. "basePrice" está en
-// euros para una Común en inglés y en buen estado.
+// euros para una Common en inglés y en buen estado.
 DEMO.cards = [
     { name: "Blue-Eyes White Dragon", kind: "Monstruo", subtypes: ["Normal"], attribute: "LUZ", level: 8, atk: 3000, def: 2500, basePrice: 6, printings: ["LOB001:UR","SDK001:UR","LDK2001:C"] },
     { name: "Dark Magician", kind: "Monstruo", subtypes: ["Normal"], attribute: "OSCURIDAD", level: 7, atk: 2500, def: 2100, basePrice: 5, printings: ["LOB005:UR","SDY006:UR","LC01005:UR"] },

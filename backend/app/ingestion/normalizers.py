@@ -3,6 +3,8 @@ import json
 import re
 import unicodedata
 
+from app.services import rarities
+
 
 def normalized_name(value: str) -> str:
     """Comparison only; display names and source text retain accents and spelling."""
@@ -22,14 +24,5 @@ def plain_text(value: str) -> str:
 
 
 def rarity_name(value: str) -> str:
-    aliases = {
-        "C": "Common",
-        "R": "Rare",
-        "SR": "Super Rare",
-        "UR": "Ultra Rare",
-        "UTR": "Ultimate Rare",
-        "SCR": "Secret Rare",
-        "GR": "Ghost Rare",
-        "STR": "Starlight Rare",
-    }
-    return aliases.get(value.upper().strip(), value.strip() or "Unknown")
+    """Every spelling of a rarity becomes one name (app/services/rarities.py)."""
+    return rarities.canonical(value)

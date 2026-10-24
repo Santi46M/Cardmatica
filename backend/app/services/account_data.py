@@ -22,6 +22,7 @@ from app.schemas.accounts import (
     WantlistsData,
 )
 from app.services.accounts import AccountError, as_aware
+from app.services.rarities import canonical
 
 
 def _profile_row(session: Session, user: User) -> UserProfile:
@@ -112,7 +113,7 @@ def wantlists(session: Session, user: User) -> WantlistsData:
             subtypes=card.subtypes or [],
             code=printing.code if printing else None,
             setName=printing.set_name if printing else None,
-            rarity=printing.rarity if printing else None,
+            rarity=canonical(printing.rarity) if printing else None,
         )
 
     return WantlistsData(

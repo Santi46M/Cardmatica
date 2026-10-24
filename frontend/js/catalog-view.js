@@ -2,6 +2,7 @@ import { badgeHtml, banlistSectionHtml, statusFor } from "./banlist.js";
 import { formatDate, money } from "./format.js";
 import { typeLine } from "./card-types.js";
 import { escapeHtml } from "./html.js";
+import { rarityBadge } from "./rarities.js";
 
 
 const h = escapeHtml;
@@ -24,9 +25,6 @@ const BANLIST_LABELS = {
 };
 const banlistLabel = (status) => BANLIST_LABELS[status.status] || "Sin estado verificado";
 
-function rarityBadge(rarity) {
-    return rarity ? `<span class="rr">${h(rarity)}</span>` : "";
-}
 
 // Tabs of the info panel. (Demo cards draw only "Info": they cannot go to a wantlist.)
 const CARD_TABS =
@@ -361,7 +359,7 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
             : "";
     const banlist = statusFor(card, market);
     const facts = printing
-        ? `${factRow("Rareza", rarityBadge(printing.rarity))}${factRow("Número", h(printing.code))}${factRow(
+        ? `${factRow("Rareza", rarityBadge(printing))}${factRow("Número", h(printing.code))}${factRow(
               "Impreso en",
               h(printing.set_name)
           )}${printingChoice ? factRow("Impresión", printingChoice) : ""}${factRow(

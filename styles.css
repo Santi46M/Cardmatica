@@ -1736,10 +1736,55 @@ button:disabled {
     min-width: 0;
 }
 
-/* Rareza sin color propio (catálogo real). */
-.rr:not([style]) {
+/* Rarezas del catálogo por escalón y familia (rarities.js); la demo pinta las suyas. */
+.rr[data-tone="common"] {
     background: rgba(255, 255, 255, .1);
     color: var(--tx);
+}
+
+.rr[data-tone="rare"] {
+    background: rgba(200, 212, 230, .18);
+    color: #dfe8f4;
+}
+
+.rr[data-tone="super"] {
+    background: rgba(80, 190, 240, .25);
+    color: #8fdcff;
+}
+
+.rr[data-tone="ultra"] {
+    background: rgba(240, 190, 70, .25);
+    color: #ffd773;
+}
+
+.rr[data-tone="secret"] {
+    background: rgba(160, 130, 245, .28);
+    color: #cbb9ff;
+}
+
+.rr[data-tone="premium"] {
+    background: linear-gradient(90deg, rgba(255, 119, 170, .35), rgba(255, 221, 102, .3), rgba(102, 221, 255, .35));
+    color: #fff;
+}
+
+.rr[data-tone="gold"] {
+    background: linear-gradient(90deg, rgba(212, 160, 40, .45), rgba(255, 226, 130, .3));
+    color: #ffe9a8;
+}
+
+.rr[data-tone="parallel"] {
+    background: rgba(60, 200, 180, .22);
+    color: #8ff0de;
+}
+
+.rr[data-tone="special"] {
+    background: rgba(230, 130, 220, .25);
+    color: #f5aaee;
+}
+
+.rr[data-tone="other"] {
+    background: rgba(255, 255, 255, .06);
+    color: var(--mu);
 }
 
 /* Menú de cuenta: avatar redondo arriba a la derecha y su desplegable */
