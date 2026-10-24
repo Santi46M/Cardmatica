@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -7,9 +8,19 @@ from sqlalchemy import func, select
 
 from app.api.dependencies import SessionDep
 from app.core.config import get_settings
-from app.models import Archetype, Card, CardArtwork, CardImage, CardPrinting, CardSet, Rarity
+from app.models import (
+    Archetype,
+    Card,
+    CardArchetype,
+    CardArtwork,
+    CardImage,
+    CardPrinting,
+    CardSet,
+    Rarity,
+)
 from app.repositories.catalog import CatalogRepository, printing_loads
 from app.schemas.catalog import (
+    ArchetypeView,
     BanlistListView,
     CardDetail,
     CardSuggestion,
@@ -231,6 +242,17 @@ def archetypes(
     )
 
 
+@router.get("/archetypes/{archetype_id}", response_model=ArchetypeView)
+def archetype(archetype_id: UUID, session: SessionDep):
+    row = session.get(Archetype, archetype_id)
+    if not row:
+        raise HTTPException(404, "Arquetipo inexistente")
+    members = select(func.count(func.distinct(CardArchetype.card_id))).where(
+        CardArchetype.archetype_id == archetype_id, CardArchetype.relation == "member"
+    )
+    return ArchetypeView(id=row.id, name=row.name, card_count=session.scalar(members) or 0)
+
+
 @router.get("/archetypes/{archetype_id}/cards", response_model=Page[CardSummary])
 def archetype_cards(
     archetype_id: UUID,
@@ -252,6 +274,21 @@ def archetype_cards(
     )
 
 
+def set_card_counts(session, set_ids):
+    """Cards of the catalogue printed in each set."""
+    return dict(
+        session.execute(
+            select(CardPrinting.set_id, func.count(func.distinct(CardPrinting.card_id)))
+            .where(CardPrinting.set_id.in_(set_ids))
+            .group_by(CardPrinting.set_id)
+        ).all()
+    )
+
+
+def set_view(row, card_count):
+    return SetView.model_validate(row).model_copy(update={"card_count": card_count})
+
+
 @router.get("/sets", response_model=Page[SetView])
 def sets(
     session: SessionDep,
@@ -271,12 +308,49 @@ def sets(
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()
+    counts = set_card_counts(session, [row.id for row in rows])
     return Page(
-        items=[SetView.model_validate(row) for row in rows],
+        items=[set_view(row, counts.get(row.id, 0)) for row in rows],
         total=total,
         page=page,
         page_size=page_size,
     )
+
+
+# A set with fewer cards than this in the catalogue (a promo, a prize card) is
+# not the "latest set" of the home banner, unless no set has more.
+LATEST_SET_MIN_CARDS = 5
+
+
+@router.get("/sets/latest", response_model=SetView)
+def latest_set(session: SessionDep, market: Market = "TCG"):
+    """The most recently released set of a market, for the home banner."""
+    cards = func.count(func.distinct(CardPrinting.card_id)).label("cards")
+    counts = select(CardPrinting.set_id, cards).group_by(CardPrinting.set_id).subquery()
+    query = (
+        select(CardSet, counts.c.cards)
+        .join(counts, counts.c.set_id == CardSet.id)
+        .where(
+            CardSet.market == market,
+            CardSet.release_date.is_not(None),
+            CardSet.release_date <= date.today(),
+        )
+        .order_by(CardSet.release_date.desc(), counts.c.cards.desc(), CardSet.name)
+        .limit(1)
+    )
+    row = session.execute(query.where(counts.c.cards >= LATEST_SET_MIN_CARDS)).first()
+    row = row or session.execute(query).first()
+    if not row:
+        raise HTTPException(404, "Ningún set con fecha de lanzamiento")
+    return set_view(*row)
+
+
+@router.get("/sets/{set_id}", response_model=SetView)
+def card_set(set_id: UUID, session: SessionDep):
+    row = session.get(CardSet, set_id)
+    if not row:
+        raise HTTPException(404, "Set inexistente")
+    return set_view(row, set_card_counts(session, [set_id]).get(set_id, 0))
 
 
 def present(session, column):

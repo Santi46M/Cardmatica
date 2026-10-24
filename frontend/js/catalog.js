@@ -23,12 +23,21 @@ import {
     skeletonTiles
 } from "./catalog-view.js";
 import { TYPE_FILTERS, typeFiltersHtml, typeParams } from "./card-types.js";
+import {
+    dismissPromo,
+    promoHtml,
+    scopeFromPath,
+    scopeHeadHtml,
+    scopeInfoPath,
+    scopeParams,
+    scopePath
+} from "./collections.js";
 import { CATALOG } from "./config.js";
 import { escapeHtml } from "./html.js";
 import { installBackToTop } from "./back-to-top.js";
 import { installCardPreview } from "./card-preview.js";
 import { installHeaderScroll } from "./header-scroll.js";
-import { cardMeta, tabMeta } from "./page-meta.js";
+import { cardMeta, scopeMeta, tabMeta } from "./page-meta.js";
 import { priceChartHtml, priceSummary } from "./price-chart.js";
 import { installProfile, renderProfile } from "./profile.js";
 import { rarityOptionsHtml, rarityParams } from "./rarities.js";
@@ -50,6 +59,12 @@ let timer;
 let facets;
 let facetsRequest;
 let facetsMarket;
+// The set or archetype whose page is open ({ kind, id }), and what the API says of it.
+let scope = null;
+let scopeInfo = null;
+// The latest set of the market on screen, for the banner.
+let latestSet = null;
+let promoMarket = null;
 let detail;
 let printingPage;
 let selectedPrinting = "";
@@ -109,9 +124,18 @@ viewToggle.setAttribute("role", "group");
 viewToggle.setAttribute("aria-label", "Vista");
 element("cnt").before(viewToggle);
 
+// The banner of the latest set, above every catalogue view, and the header
+// of a set or archetype page, above its filters.
+const promoSlot = document.createElement("div");
+promoSlot.id = "promo";
+element("home").before(promoSlot);
+const scopeSlot = document.createElement("div");
+scopeSlot.id = "scope-head";
+
 // Phones show the filters behind one button that says how many are in use;
 // the order stays in view (styles.css, "Teléfono").
 const catalogTools = element("cat-tools");
+catalogTools.before(scopeSlot);
 const filtersToggle = document.createElement("button");
 filtersToggle.type = "button";
 filtersToggle.className = "ghost filters-toggle";
@@ -182,7 +206,8 @@ function readUrl() {
         srt: params.get("srt") || "name",
         page: Math.max(1, Number(params.get("page")) || 1),
         view: params.get("view"),
-        card: location.pathname.match(CARD_PATH)?.[1] || params.get("card")
+        card: location.pathname.match(CARD_PATH)?.[1] || params.get("card"),
+        scope: scopeFromPath(location.pathname)
     };
 }
 
@@ -192,6 +217,10 @@ function applyUrl(state) {
     // "Wantlists" is the tab's former name, still in shared links.
     const requested = state.tab === "Wantlists" ? "Deseados" : state.tab;
     window.tab = tabs.includes(requested) ? requested : "Inicio";
+    // A set or archetype page is the list of all cards, limited to it.
+    if (scope?.id !== state.scope?.id) scopeInfo = null;
+    scope = state.scope;
+    if (scope) window.tab = "Todas";
     if (["TCG", "OCG"].includes(state.mk)) window.market = state.mk;
     element("q").value = state.q;
     Object.assign(wanted, state.types, { rar: state.rar, stp: state.stp, srt: state.srt });
@@ -222,7 +251,8 @@ function openCardId() {
 
 function writeUrl(mode = "replace") {
     const params = new URLSearchParams();
-    if (window.tab !== "Inicio") params.set("tab", window.tab);
+    // A set or archetype page already says where it is.
+    if (window.tab !== "Inicio" && !(scope && isCatalog())) params.set("tab", window.tab);
     if (window.market !== "TCG") params.set("mk", window.market);
     const q = element("q").value.trim();
     if (q) params.set("q", q);
@@ -238,7 +268,7 @@ function writeUrl(mode = "replace") {
         if (view !== "list") params.set("view", view);
     }
     const card = openCardId();
-    const path = card ? `/carta/${card}` : "/";
+    const path = card ? `/carta/${card}` : scope && isCatalog() ? scopePath(scope) : "/";
     const url = `${path}${params.toString() ? `?${params}` : ""}${location.hash}`;
     if (url === `${location.pathname}${location.search}${location.hash}`) return;
     if (mode === "push") history.pushState({ card }, "", url);
@@ -260,7 +290,7 @@ window.addEventListener("popstate", () => {
 // Closing the card returns to the list entry the card was opened from.
 new MutationObserver(() => {
     if (element("md").classList.contains("on")) return;
-    tabMeta(window.tab);
+    pageMeta();
     if (closingFromHistory) {
         closingFromHistory = false;
         return;
@@ -349,6 +379,105 @@ document.addEventListener("click", (event) => {
     if (tab && panel && detail) panel.innerHTML = cardWantsHtml(detail.id);
 });
 
+// ---- Set and archetype pages, and the banner of the latest set ---------------
+
+// Title and description of what is on screen.
+function pageMeta() {
+    if (scope && scopeInfo && isCatalog()) scopeMeta(scope.kind, scopeInfo.name);
+    else tabMeta(window.tab);
+}
+
+function renderScopeHead() {
+    scopeSlot.hidden = !scope || !isCatalog();
+    if (scopeSlot.hidden) return (scopeSlot.innerHTML = "");
+    scopeSlot.innerHTML = scopeHeadHtml(scope, scopeInfo);
+    if (scopeInfo) return;
+    const asked = scope;
+    api.get(scopeInfoPath(asked))
+        .then((info) => {
+            if (asked !== scope) return;
+            scopeInfo = info;
+            scopeMeta(scope.kind, info.name);
+            // A set belongs to one market: the page follows it.
+            if (info.market && info.market !== window.market) {
+                window.market = info.market;
+                window.updateMarketButtons();
+            }
+            scopeSlot.innerHTML = scopeHeadHtml(scope, scopeInfo);
+            renderPromo();
+        })
+        .catch((error) => {
+            if (asked === scope)
+                scopeSlot.innerHTML = `<div class="scope-head gl"><p role="alert">${h(error.message)}</p></div>`;
+        });
+}
+
+function openScope(next) {
+    // From a card's detail: its page closes without going back in history.
+    if (openCardId()) {
+        closingFromHistory = true;
+        element("md").classList.remove("on");
+    }
+    scope = next;
+    scopeInfo = null;
+    window.tab = "Todas";
+    element("q").value = "";
+    for (const id of ["rar", "stp", ...TYPE_FILTERS.map((filter) => filter.id)])
+        if (element(id)) element(id).value = "";
+    pendingPage = 1;
+    writeUrl("push");
+    window.showTab();
+    window.scrollTo(0, 0);
+}
+
+function renderPromo() {
+    if (promoMarket !== window.market) {
+        const market = (promoMarket = window.market);
+        latestSet = null;
+        api.get("sets/latest", { market })
+            .then((set) => {
+                if (market !== window.market) return;
+                latestSet = set;
+                renderPromo();
+            })
+            .catch(() => {
+                /* A catalogue without dated sets simply has no banner. */
+            });
+    }
+    // Not on the page of that same set, nor in the account panels.
+    const sameSet = scope?.kind === "set" && scope.id === latestSet?.id;
+    const shown = (window.tab === "Inicio" || isCatalog()) && !sameSet;
+    promoSlot.innerHTML = shown ? promoHtml(latestSet) : "";
+}
+
+document.addEventListener(
+    "click",
+    (event) => {
+        // Moving to a tab leaves the set or archetype page.
+        if (event.target.closest("[data-g], [data-go]")) scope = null;
+        const close = event.target.closest("[data-promo-close]");
+        if (close) {
+            dismissPromo(close.dataset.promoClose);
+            renderPromo();
+            return;
+        }
+        if (event.target.closest("[data-scope-clear]")) {
+            event.preventDefault();
+            scope = null;
+            window.tab = "Todas";
+            window.showTab();
+            return;
+        }
+        const link = event.target.closest("[data-scope]");
+        // A modified click opens the page in a new tab, as any link.
+        if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.button) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        openScope({ kind: link.dataset.scope, id: link.dataset.scopeId });
+    },
+    true
+);
+
 async function showHomeBanlist(request) {
     const slot = element("home-banlist");
     if (!slot) return;
@@ -420,6 +549,7 @@ async function loadCards(reset = false) {
     banlist?.catch(() => {});
     try {
         if (!home) {
+            renderScopeHead();
             await loadFacets();
             renderTypeFilters();
             applyWanted();
@@ -432,7 +562,8 @@ async function loadCards(reset = false) {
             {
                 page: home ? 1 : page,
                 page_size: home ? CATALOG.homeSize : CATALOG.pageSize,
-                market: window.market,
+                market: scope?.kind === "set" && !home ? undefined : window.market,
+                ...(home ? {} : scopeParams(scope)),
                 q: element("q").value.trim(),
                 card_type: cardTypes[window.tab],
                 ...(home ? {} : typeParams()),
@@ -492,7 +623,7 @@ window.refreshList = function () {
 
 window.showTab = function () {
     if (!openCardId()) {
-        tabMeta(window.tab);
+        pageMeta();
         trackPage(`tab:${window.tab}`);
     }
     ++generation;
@@ -510,6 +641,7 @@ window.showTab = function () {
         writeUrl();
         demoShowTab();
         showCurrentTab();
+        renderPromo();
         return;
     }
     element("tabs").innerHTML = window.TABS.map(
@@ -519,6 +651,8 @@ window.showTab = function () {
             )}</button>`
     ).join("");
     showCurrentTab();
+    renderPromo();
+    renderScopeHead();
     const panel = localPanels[window.tab] || (window.tab === "Inicio" ? "home" : "cat");
     for (const id of ["home", "cat", "prod", "vend", ...Object.values(localPanels)])
         element(id).style.display = id === panel ? "" : "none";

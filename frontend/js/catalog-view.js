@@ -2,6 +2,7 @@ import { badgeHtml, banlistSectionHtml, statusFor } from "./banlist.js";
 import { formatDate, money } from "./format.js";
 import { typeLine } from "./card-types.js";
 import { escapeHtml } from "./html.js";
+import { scopeLink } from "./collections.js";
 import { editionName, languageName, printingOptionsHtml } from "./printings.js";
 import { rarityBadge } from "./rarities.js";
 
@@ -257,10 +258,12 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
         texts.find((item) => item.language === printing?.language) ||
         texts.find((item) => item.language === "es") ||
         texts[0];
-    const groups = (items, relation) =>
+    const groups = (items, relation, kind) =>
         items
             .filter((item) => item.relation === relation)
-            .map((item) => chip(item.name))
+            .map((item) =>
+                kind ? `<span class="chip">${scopeLink(kind, item.id, item.name)}</span>` : chip(item.name)
+            )
             .join("");
     const sourceLinks = card.sources
         .map((source) => {
@@ -358,7 +361,7 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
     const facts = printing
         ? `${factRow("Rareza", rarityBadge(printing))}${factRow("Número", h(printing.code))}${factRow(
               "Impreso en",
-              h(printing.set_name)
+              scopeLink("set", printing.set_id, printing.set_name)
           )}${printingChoice ? factRow("Impresión", printingChoice) : ""}${factRow(
               "Idioma",
               h(languageName(printing.language))
@@ -388,10 +391,10 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
         stats ? `<p class="cd-stats">${stats}</p>` : ""
     }${textHtml}</div></div><div class="cd-panel" data-cd-panel="wants" hidden></div><div id="wl-picker"></div></div></div><section class="cd-offers"><div class="gl wrap"><table class="cd-table"><thead><tr><th>Vendedor</th><th>Información del producto</th><th class="num">Oferta</th></tr></thead><tbody><tr><td colspan="3" class="empty">Todavía no hay ofertas de esta impresión en Cardmática.</td></tr></tbody></table></div></section>${section(
         "Arquetipos · clasificación comunitaria",
-        groups(card.archetypes, "member")
+        groups(card.archetypes, "member", "archetype")
     )}${section("Series · clasificación comunitaria", groups(card.series, "member"))}${section(
         "Soporte a arquetipos · clasificación comunitaria",
-        groups(card.archetypes, "supports")
+        groups(card.archetypes, "supports", "archetype")
     )}${section(
         "Relaciones complementarias",
         [...card.archetypes, ...card.series]

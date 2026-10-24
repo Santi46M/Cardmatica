@@ -822,3 +822,57 @@ def test_shopping_wizard_plans_by_shipments_or_price(live_server, browser_page):
     page.locator('[data-wz-cart="all"]').click()
     expect(page.locator("#cc")).to_have_text(str(found))
     assert not errors
+
+
+def test_latest_set_banner_and_set_page(live_server, browser_page, factory, record):
+    from datetime import date
+
+    from app.schemas.ingestion import PrintingInput
+    from app.services.ingestion import IngestionService
+
+    # The demo store sells boxes and packs of a set with this name.
+    copy = record.model_copy(
+        update={
+            "konami_id": 994001,
+            "external_id": "994001",
+            "passcode": "99400100",
+            "printings": [
+                PrintingInput(
+                    code="CRFR-EN001",
+                    set_key="Crimson Frontier",
+                    set_name="Crimson Frontier",
+                    language="en",
+                    market="TCG",
+                    set_release_date=date(2026, 9, 12),
+                )
+            ],
+        },
+        deep=True,
+    )
+    with factory.begin() as session:
+        IngestionService(session).ingest(copy)
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(live_server)
+    banner = page.locator(".promo a")
+    expect(banner).to_contain_text("Crimson Frontier")
+    banner.click()
+    expect(page).to_have_url(re.compile(r"/set/[0-9a-f-]{36}$"))
+    expect(page.locator(".scope-head h2")).to_have_text("Crimson Frontier")
+    expect(page.locator(".scope-products")).to_contain_text("Caja sellada Crimson Frontier")
+    expect(page.locator("#list [data-catalog-card]")).to_have_count(1)
+    expect(page.locator(".promo")).to_have_count(0)
+    # From the card, its set name opens the set page again.
+    page.locator("#list [data-catalog-card]").first.click()
+    page.locator('.card-detail [data-scope="set"]').click()
+    expect(page.locator("#md")).not_to_have_class(re.compile("on"))
+    expect(page.locator(".scope-head h2")).to_have_text("Crimson Frontier")
+    # A tab leaves the set page; the banner can be closed for good.
+    page.locator('[data-g="Inicio"]').click()
+    expect(page).to_have_url(re.compile(r"/$"))
+    page.locator("[data-promo-close]").click()
+    page.reload()
+    expect(page.locator("#home h1")).to_be_visible()
+    expect(page.locator(".promo")).to_have_count(0)
+    assert not errors

@@ -1,5 +1,6 @@
-"""HTML pages: the single-page app, a card's own address, legal pages, 404,
-plus what search engines and browsers ask for (robots.txt, sitemap.xml, icons).
+"""HTML pages: the single-page app, the address of each card, set and archetype,
+legal pages, 404, plus what search engines and browsers ask for (robots.txt,
+sitemap.xml, icons).
 
 Every page is sent with its own title, description and Open Graph tags, and
 with absolute addresses in og:url, og:image and the canonical link, as link
@@ -20,7 +21,7 @@ from app.api.dependencies import SessionDep, site_url
 from app.core import assets
 from app.core.config import ROOT
 from app.core.security import content_security_policy
-from app.models import Card
+from app.models import Archetype, Card, CardSet
 
 router = APIRouter(include_in_schema=False)
 PAGES = ROOT / "frontend" / "pages"
@@ -114,6 +115,38 @@ def card_page(card_id: UUID, request: Request, session: SessionDep, slug: str | 
     )
 
 
+@router.get("/set/{set_id}")
+@router.get("/set/{set_id}/{slug}")
+def set_page(set_id: UUID, request: Request, session: SessionDep, slug: str | None = None):
+    row = session.get(CardSet, set_id)
+    if not row:
+        return not_found_page(request)
+    return render(
+        INDEX,
+        request,
+        path=f"/set/{set_id}",
+        title=f"{row.name} · Set de Yu-Gi-Oh! {row.market} · {SITE}",
+        description=f"{row.name}: cartas sueltas, cajas y sobres del set en {SITE}.",
+    )
+
+
+@router.get("/arquetipo/{archetype_id}")
+@router.get("/arquetipo/{archetype_id}/{slug}")
+def archetype_page(
+    archetype_id: UUID, request: Request, session: SessionDep, slug: str | None = None
+):
+    row = session.get(Archetype, archetype_id)
+    if not row:
+        return not_found_page(request)
+    return render(
+        INDEX,
+        request,
+        path=f"/arquetipo/{archetype_id}",
+        title=f"Arquetipo {row.name} · {SITE}",
+        description=f"Todas las cartas del arquetipo {row.name} en {SITE}.",
+    )
+
+
 @router.get("/robots.txt")
 def robots(request: Request):
     return PlainTextResponse(
@@ -131,6 +164,11 @@ def sitemap(request: Request, session: SessionDep):
         .limit(SITEMAP_LIMIT - len(entries))
     )
     entries += [(f"{base}/carta/{card_id}", updated) for card_id, updated in cards]
+    for path, model in (("set", CardSet), ("arquetipo", Archetype)):
+        rows = session.execute(
+            select(model.id, model.updated_at).limit(max(0, SITEMAP_LIMIT - len(entries)))
+        )
+        entries += [(f"{base}/{path}/{row_id}", updated) for row_id, updated in rows]
     urls = "".join(
         f"<url><loc>{xml_escape(loc)}</loc>"
         + (f"<lastmod>{updated.date().isoformat()}</lastmod>" if updated else "")

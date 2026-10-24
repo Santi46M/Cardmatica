@@ -41,3 +41,9 @@ export function cardMeta(name) {
         `${name}: impresiones, rarezas, estado en la banlist e historial de precios en ${SITE}.`
     );
 }
+
+export function scopeMeta(kind, name) {
+    if (kind === "set")
+        set(`${name} · Set de Yu-Gi-Oh! · ${SITE}`, `${name}: cartas sueltas, cajas y sobres del set en ${SITE}.`);
+    else set(`Arquetipo ${name} · ${SITE}`, `Todas las cartas del arquetipo ${name} en ${SITE}.`);
+}

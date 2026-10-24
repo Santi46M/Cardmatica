@@ -35,6 +35,7 @@ frontend/js/card-types.js       Tipos de carta por niveles, en español, y sus f
 frontend/js/search-suggest.js   Sugerencias con miniatura mientras se escribe en la búsqueda
 frontend/js/rarities.js         Rarezas: familias en español, filtro agrupado y etiqueta de color
 frontend/js/printings.js        Impresiones legibles y agrupadas por set
+frontend/js/collections.js      Página de cada set y arquetipo, y banner del último set
 frontend/js/shopping-wizard.js  Asistente de compra de la lista de deseados
 frontend/js/header-scroll.js    En el teléfono, la cabecera se esconde al bajar y vuelve al subir
 frontend/js/auth.js, account-menu.js, profile.js, wantlists.js   Cuenta y sus datos

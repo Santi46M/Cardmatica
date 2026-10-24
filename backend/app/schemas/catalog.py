@@ -247,6 +247,12 @@ class SetView(NamedView):
     market: str
     release_date: date | None
     product_type: str | None
+    # Cards of the catalogue printed in this set.
+    card_count: int | None = None
+
+
+class ArchetypeView(NamedView):
+    card_count: int
 
 
 class JobRequest(BaseModel):

@@ -359,3 +359,56 @@ def test_every_css_class_is_used():
         and not re.search(rf"(?<![\w-]){re.escape(name)}(?![\w-])", text)
     }
     assert not unused, sorted(unused)
+
+
+def test_latest_set_set_and_archetype_pages(factory, client, record):
+    from datetime import date
+
+    from app.schemas.ingestion import GroupInput, PrintingInput
+
+    def printing(code, set_name, released):
+        return PrintingInput(
+            code=code,
+            set_key=set_name,
+            set_name=set_name,
+            language="en",
+            market="TCG",
+            set_release_date=released,
+        )
+
+    record.groups = [GroupInput(name="Synthetic Archetype", kind="archetype")]
+    record.printings = [
+        printing("OLD-EN001", "Old Set", date(2020, 1, 1)),
+        # A promo released later, with a single card, is not "the latest set".
+        printing("PRM-EN001", "Promo", date(2026, 2, 1)),
+    ]
+    seed(factory, record)
+    for index in range(5):
+        copy = record.model_copy(
+            update={
+                "konami_id": 993000 + index,
+                "external_id": str(993000 + index),
+                "passcode": str(99300000 + index),
+                "groups": [],
+                "printings": [printing(f"NEW-EN00{index}", "New Set", date(2025, 6, 1))],
+            },
+            deep=True,
+        )
+        seed(factory, copy)
+    latest = client.get("/api/v1/sets/latest", params={"market": "TCG"}).json()
+    assert (latest["name"], latest["card_count"]) == ("New Set", 5)
+    assert client.get("/api/v1/sets/latest", params={"market": "OCG"}).status_code == 404
+    assert client.get(f"/api/v1/sets/{latest['id']}").json()["card_count"] == 5
+    assert client.get("/api/v1/cards", params={"set_id": latest["id"]}).json()["total"] == 5
+    archetype = client.get("/api/v1/archetypes").json()["items"][0]
+    assert client.get(f"/api/v1/archetypes/{archetype['id']}").json()["card_count"] == 1
+    # Their own addresses, with a title, and in the sitemap.
+    page = client.get(f"/set/{latest['id']}")
+    assert "<title>New Set · Set de Yu-Gi-Oh! TCG · Cardmática</title>" in page.text
+    assert "Arquetipo Synthetic Archetype" in client.get(f"/arquetipo/{archetype['id']}").text
+    html = {"Accept": "text/html"}
+    assert client.get(f"/set/{uuid4()}", headers=html).status_code == 404
+    sitemap = client.get("/sitemap.xml").text
+    assert (
+        f"/set/{latest['id']}</loc>" in sitemap and f"/arquetipo/{archetype['id']}</loc>" in sitemap
+    )

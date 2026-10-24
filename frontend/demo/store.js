@@ -10,7 +10,8 @@
 // Es un script clásico (no un módulo) para que sus funciones y su estado sean
 // globales. Los módulos de frontend/js usan estos nombres desde `window`:
 //   estado:     tab, market, currency, cart, cartClearArmed
-//   datos:      TABS, TAB_LABELS, LISTINGS, CURRENCIES, SHIPPING
+//   datos:      DEMO, TABS, TAB_LABELS, CARDS, SELLERS, LISTINGS, PRODUCTS,
+//               CURRENCIES, SHIPPING
 //   funciones:  showTab, refreshList, formatPrice, currencyOptions, flag, toast, alignDialogs,
 //               updateMarketButtons, updateCartCount, cartTotals, cartLine,
 //               openDemoCard, openSeller, openProduct, showCart
