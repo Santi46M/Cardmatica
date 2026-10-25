@@ -33,12 +33,7 @@ class SyncRunner:
 
     def enqueue(self, request: JobRequest):
         with self.factory.begin() as session:
-            job = SyncJob(
-                source=request.source,
-                mode=request.mode,
-                parameters=request.model_dump(mode="json"),
-                cursor={"since": request.since.isoformat()} if request.since else {},
-            )
+            job = SyncJob.requested(request)
             session.add(job)
             session.flush()
             return job.id

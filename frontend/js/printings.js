@@ -28,7 +28,7 @@ export const editionName = (value) => EDITION_NAMES[String(value || "").toLowerC
 
 // "LOB-EN001 · Ultra Rare · Inglés · 1st Edition"; without the last two when
 // the language and edition are chosen apart (the list of deseados).
-export function printingLabel(item, { details = true } = {}) {
+function printingLabel(item, { details = true } = {}) {
     const parts = [item.code, item.rarity === "Unknown" ? "" : item.rarity];
     if (details) parts.push(languageName(item.language), editionName(item.edition));
     return parts.filter(Boolean).join(" · ");

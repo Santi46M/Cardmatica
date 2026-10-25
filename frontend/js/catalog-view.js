@@ -12,10 +12,6 @@ const h = escapeHtml;
 const chip = (value) => `<span class="chip">${h(value)}</span>`;
 const section = (title, content) =>
     content ? `<section class="catalog-section"><h3>${h(t(title))}</h3>${content}</section>` : "";
-const fact = (label, value) =>
-    value == null || value === ""
-        ? ""
-        : `<div><span>${h(t(label))}</span><b>${h(value)}</b></div>`;
 
 // One row of the facts list beside the chart; empty values are left out.
 const factRow = (label, html) => (html ? `<div><dt>${h(t(label))}</dt><dd>${html}</dd></div>` : "");

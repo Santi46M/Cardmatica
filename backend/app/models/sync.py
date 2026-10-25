@@ -21,6 +21,16 @@ class SyncJob(Entity, Base):
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     worker_id: Mapped[str | None] = mapped_column(String(64))
 
+    @classmethod
+    def requested(cls, request) -> "SyncJob":
+        """A pending job for a JobRequest (from the admin API or the CLI)."""
+        return cls(
+            source=request.source,
+            mode=request.mode,
+            parameters=request.model_dump(mode="json"),
+            cursor={"since": request.since.isoformat()} if request.since else {},
+        )
+
 
 class SyncError(Entity, Base):
     __tablename__ = "sync_errors"

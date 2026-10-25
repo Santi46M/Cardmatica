@@ -7,7 +7,7 @@ import { t } from "./lang.js";
 
 const h = escapeHtml;
 
-export const FAMILY_LABELS = {
+const FAMILY_LABELS = {
     basic: "Básicas",
     premium: "Alta gama",
     secret: "Secret especiales",

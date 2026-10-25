@@ -32,12 +32,7 @@ router = APIRouter(
 @router.post("/sync-jobs", response_model=JobView, status_code=202)
 def enqueue(request: JobRequest, session: SessionDep):
     # Enqueue only: no network requests or scraping in the API process.
-    job = SyncJob(
-        source=request.source,
-        mode=request.mode,
-        parameters=request.model_dump(mode="json"),
-        cursor={"since": request.since.isoformat()} if request.since else {},
-    )
+    job = SyncJob.requested(request)
     session.add(job)
     session.commit()
     return job

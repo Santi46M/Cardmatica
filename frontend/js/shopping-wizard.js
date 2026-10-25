@@ -166,7 +166,7 @@ const comparable = (name) =>
 
 // A list entry asks for a card (and maybe a printing and a language) in one
 // market. The demo store names its cards in English, as the catalogue does.
-export function demoCandidates(items, { condition, country, rating }) {
+function demoCandidates(items, { condition, country, rating }) {
     const { CARDS: cards, LISTINGS: listings, SELLERS: sellers, cart = {} } = window;
     return items.map((item) => {
         const want = { id: item.id, name: item.name, quantity: item.quantity, code: item.code, rarity: item.rarity };
