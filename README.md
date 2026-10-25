@@ -43,7 +43,8 @@ frontend/js/auth.js, account-menu.js, profile.js, wantlists.js   Cuenta y sus da
 frontend/js/admin.js            Panel de administración
 frontend/js/config.js           Valores ajustables del frontend (paginación, tiempos, cachés)
 frontend/pages/, assets/        Páginas legales y 404; íconos e imagen Open Graph
-frontend/demo/data.js           Datos inventados de la tienda demo (vendedores, productos, monedas, envío)
+frontend/demo/data.js           Datos de la tienda demo: cartas, sets y productos reales; vendedores, precios y stock inventados
+frontend/theme.js               PROVISIONAL: botón de modo claro (Frutiger Aero) y oscuro
 frontend/demo/store.js          Tienda demo y piezas compartidas (pestañas, moneda, ventanas, carrito)
 backend/app/core/               Configuración, logging JSON, cabeceras de seguridad, caché y versiones de archivos
 backend/app/models/             Catálogo, procedencia, cuentas, wantlists y estadísticas
@@ -326,6 +327,18 @@ al atender una visita. Si una fuente falla quedan sus noticias anteriores. Para 
 ya: `docker compose exec api cardmatica fetch-news`. También hay noticias incluidas en
 `backend/app/data/news.json` (`cardmatica import-news`) y un administrador puede
 publicar o quitar más desde su panel; un feed nunca las reemplaza.
+
+**Tienda de demostración.** Las cartas, impresiones (código y rareza), sets, cajas,
+sobres, mazos y accesorios de la tienda demo son reales: salen de Yugipedia y de las
+páginas de Konami, Dragon Shield, Ultra Pro, Ultimate Guard y Chessex (octubre de
+2026). Vendedores, precios, stock e historial siguen siendo inventados y la página lo
+avisa. Para cambiarla basta con editar las tablas de `frontend/demo/data.js`.
+
+**Modo claro (provisional).** El botón ☀/☾ de la cabecera cambia entre el modo oscuro
+de siempre y uno claro estilo Frutiger Aero; la elección queda en el navegador. Todos
+los colores salen de las variables de `styles.css` (`:root` y
+`:root[data-theme="light"]`); para quitarlo, borrar `frontend/theme.js`, sus `<script>`,
+el botón `#theme` y los bloques marcados PROVISIONAL.
 
 **Asistente de compra.** Como el Shopping Wizard de Cardmarket: arma la compra de una
 lista entre los vendedores, con «Menos envíos» o «Menor precio» (contando el envío de

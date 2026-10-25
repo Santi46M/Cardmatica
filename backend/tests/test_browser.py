@@ -838,12 +838,12 @@ def test_latest_set_banner_and_set_page(live_server, browser_page, factory, reco
             "passcode": "99400100",
             "printings": [
                 PrintingInput(
-                    code="CRFR-EN001",
-                    set_key="Crimson Frontier",
-                    set_name="Crimson Frontier",
+                    code="BETB-EN001",
+                    set_key="Beyond the Brave",
+                    set_name="Beyond the Brave",
                     language="en",
                     market="TCG",
-                    set_release_date=date(2026, 9, 12),
+                    set_release_date=date(2026, 10, 9),
                 )
             ],
         },
@@ -856,18 +856,18 @@ def test_latest_set_banner_and_set_page(live_server, browser_page, factory, reco
     page.on("pageerror", lambda error: errors.append(str(error)))
     page.goto(live_server)
     banner = page.locator(".promo a")
-    expect(banner).to_contain_text("Crimson Frontier")
+    expect(banner).to_contain_text("Beyond the Brave")
     banner.click()
     expect(page).to_have_url(re.compile(r"/set/[0-9a-f-]{36}$"))
-    expect(page.locator(".scope-head h2")).to_have_text("Crimson Frontier")
-    expect(page.locator(".scope-products")).to_contain_text("Caja sellada Crimson Frontier")
+    expect(page.locator(".scope-head h2")).to_have_text("Beyond the Brave")
+    expect(page.locator(".scope-products")).to_contain_text("Caja de sobres Beyond the Brave")
     expect(page.locator("#list [data-catalog-card]")).to_have_count(1)
     expect(page.locator(".promo")).to_have_count(0)
     # From the card, its set name opens the set page again.
     page.locator("#list [data-catalog-card]").first.click()
     page.locator('.card-detail [data-scope="set"]').click()
     expect(page.locator("#md")).not_to_have_class(re.compile("on"))
-    expect(page.locator(".scope-head h2")).to_have_text("Crimson Frontier")
+    expect(page.locator(".scope-head h2")).to_have_text("Beyond the Brave")
     # A tab leaves the set page; the banner can be closed for good.
     page.locator('[data-g="Inicio"]').click()
     expect(page).to_have_url(re.compile(r"/$"))
@@ -901,3 +901,18 @@ def test_home_news_columns(live_server, browser_page, factory):
     link = columns.nth(1).locator("a").first
     expect(link).to_have_attribute("rel", "noopener noreferrer")
     expect(columns.nth(1)).to_contain_text("Fuente:")
+
+
+def test_provisional_theme_toggle(live_server, browser_page):
+    page = browser_page
+    page.goto(live_server)
+    root = page.locator("html")
+    expect(root).to_have_attribute("data-theme", "dark")
+    page.locator("#theme").click()
+    expect(root).to_have_attribute("data-theme", "light")
+    expect(page.locator("#theme")).to_have_attribute("aria-pressed", "true")
+    # The choice stays in this browser, and the legal pages follow it.
+    page.reload()
+    expect(root).to_have_attribute("data-theme", "light")
+    page.goto(f"{live_server}/terminos")
+    expect(root).to_have_attribute("data-theme", "light")

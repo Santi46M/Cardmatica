@@ -11,7 +11,8 @@ const RANGES = [
     ["2A", 730],
     ["Todo", 3650]
 ];
-const COLORS = ["#6fd3f2", "#ffd773", "#f5aaee", "#9be58a", "#ff9b92", "#b8b2ff"];
+// One colour per printing, from the theme (styles.css, --c1 … --c6).
+const COLORS = ["var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)", "var(--c5)", "var(--c6)"];
 const SIZE = { width: 640, height: 190, left: 66, right: 10, top: 8, bottom: 22 };
 let rendered = null;
 
@@ -105,15 +106,15 @@ export function priceChartHtml(history, { printingId = "", days = 365, stats = t
         const value = low + ((high - low) * step) / 2;
         svg += `<line x1="${left}" x2="${width - right}" y1="${y(value)}" y2="${y(
             value
-        )}" stroke="rgba(170,215,255,.15)"/><text x="${left - 6}" y="${
+        )}" class="ch-grid"/><text x="${left - 6}" y="${
             y(value) + 4
-        }" text-anchor="end" font-size="11" fill="#9db0c6">${h(window.formatPrice(value))}</text>`;
+        }" text-anchor="end" font-size="11" class="ch-axis">${h(window.formatPrice(value))}</text>`;
     }
-    svg += `<text x="${left}" y="${height - 5}" font-size="11" fill="#9db0c6">${h(
+    svg += `<text x="${left}" y="${height - 5}" font-size="11" class="ch-axis">${h(
         formatDate(start)
     )}</text><text x="${width - right}" y="${
         height - 5
-    }" text-anchor="end" font-size="11" fill="#9db0c6">${h(formatDate(end))}</text>`;
+    }" text-anchor="end" font-size="11" class="ch-axis">${h(formatDate(end))}</text>`;
     const keys = [...series.keys()];
     keys.forEach((key, index) => {
         const line = series.get(key);
@@ -124,21 +125,21 @@ export function priceChartHtml(history, { printingId = "", days = 365, stats = t
         if (keys.length === 1 && line.length > 1)
             svg += `<path d="${path}L${x(line[line.length - 1].time)} ${height - bottom}L${x(
                 line[0].time
-            )} ${height - bottom}Z" fill="rgba(111,211,242,.12)"/>`;
+            )} ${height - bottom}Z" class="ch-area"/>`;
         if (line.length > 1)
-            svg += `<path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>`;
+            svg += `<path d="${path}" fill="none" style="stroke:${color}" stroke-width="2" stroke-linejoin="round"/>`;
         svg += line
             .map(
                 (item) =>
                     `<circle cx="${x(item.time).toFixed(1)}" cy="${y(item.euro).toFixed(
                         1
-                    )}" r="${line.length > 1 ? 2.5 : 4}" fill="${color}"/>`
+                    )}" r="${line.length > 1 ? 2.5 : 4}" style="fill:${color}"/>`
             )
             .join("");
     });
     svg += `<line id="ph-cursor" y1="${top}" y2="${
         height - bottom
-    }" stroke="rgba(255,255,255,.4)" style="display:none"/><rect id="ph-hit" x="${left}" y="0" width="${
+    }" class="ch-cursor" style="display:none"/><rect id="ph-hit" x="${left}" y="0" width="${
         width - left - right
     }" height="${height}" fill="transparent"/>`;
     rendered = { series, keys, start, end, x };

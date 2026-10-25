@@ -57,7 +57,8 @@ const DEMO_HISTORY = {
         ["2A", 730]
     ],
     defaultRangeDays: 365,
-    lineColors: ["#6fd3f2", "#ffd773", "#f5aaee", "#9be58a"],
+    // Colores del tema (styles.css), uno por impresión.
+    lineColors: ["var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)"],
     size: { width: 640, height: 190, left: 64, right: 10, top: 8, bottom: 22 }
 };
 
@@ -116,49 +117,42 @@ function formatDate(time) {
 // Datos de la demo: cartas, vendedores, productos y stock
 // ---------------------------------------------------------------------------
 
-// "LOB001:UR" → impresión LOB-EN001, Ultra Rare, del set LOB.
+// "LOB-EN001:UR" → impresión LOB-EN001, Ultra Rare, del set LOB, en inglés.
+// Los códigos sin idioma (SDK-001) son de la primera edición en inglés.
 function parsePrinting(text) {
     const [code, rarityCode] = text.split(":");
-    const [, prefix, number] = code.match(/^(.*?)(\d{3})$/);
+    const [prefix, number] = code.split("-");
     const set = DEMO.sets[prefix];
     return {
-        code: `${prefix}-EN${number}`,
+        code,
+        prefix,
         set: set.name,
         setType: set.type,
-        rarity: DEMO.rarities[rarityCode].name
+        rarity: DEMO.rarities[rarityCode].name,
+        language: number.match(/^[A-Z]{2}/)?.[0] || "EN"
     };
 }
 
-var CARDS = DEMO.cards.map((card, index) => ({
-    id: index,
-    name: card.name,
-    kind: card.kind,
-    subtypes: card.subtypes,
-    attribute: card.attribute || "",
-    level: card.level || 0,
-    atk: card.atk || 0,
-    def: card.def || 0,
-    basePrice: card.basePrice,
-    ocg: false,
-    printings: card.printings.map(parsePrinting)
-}));
-
-for (const { card, printing } of DEMO.newPrintings)
-    CARDS.find((item) => item.name === card).printings.unshift(parsePrinting(printing));
-
-// Cada carta TCG tiene una versión OCG con una impresión por idioma asiático,
-// tomada de sus impresiones TCG.
-for (const card of CARDS.slice()) {
-    const ocgCard = JSON.parse(JSON.stringify(card));
-    ocgCard.id = CARDS.length;
-    ocgCard.ocg = true;
-    ocgCard.printings = DEMO.ocgLanguages.map((language, index) => {
-        const source = card.printings[index % card.printings.length];
-        const [, prefix, number] = source.code.match(/^(.*)-EN(\d{3})$/);
-        return { ...source, code: `${prefix}-${language}${number}`, language };
-    });
-    CARDS.push(ocgCard);
+function demoCard(card, id, ocg) {
+    return {
+        id,
+        name: card.name,
+        kind: card.kind,
+        subtypes: card.subtypes,
+        attribute: card.attribute || "",
+        level: card.level || 0,
+        atk: card.atk || 0,
+        def: card.def || 0,
+        basePrice: card.basePrice,
+        ocg,
+        printings: (ocg ? card.ocg : card.printings).map(parsePrinting)
+    };
 }
+
+// Cada carta es TCG; las que tienen impresiones japonesas también tienen su
+// versión OCG.
+var CARDS = DEMO.cards.map((card, index) => demoCard(card, index, false));
+for (const card of DEMO.cards) if (card.ocg) CARDS.push(demoCard(card, CARDS.length, true));
 
 // El orden de las llamadas a random() importa: decide qué datos salen.
 const random = seededRandom(DEMO_STOCK.seed);
@@ -195,9 +189,7 @@ function addCardListings(seller, card) {
             card: card.id,
             printing,
             condition,
-            language: card.ocg
-                ? card.printings[printing].language
-                : DEMO.tcgLanguages[pickIndex(random, DEMO.tcgLanguages.length)],
+            language: card.printings[printing].language,
             quantity: 1 + Math.floor(random() * 6),
             price: Math.max(
                 0.05,
@@ -220,19 +212,11 @@ for (const card of CARDS) {
 
 // market: "TCG", "OCG" o null para los accesorios, que valen para ambos.
 var PRODUCTS = DEMO.products.map((product, index) => ({
-    id: index,
     ...product,
-    market: product.set ? "TCG" : null
+    id: index,
+    market: product.market || null,
+    released: product.released || DEMO.sets[product.set]?.released || ""
 }));
-for (const product of PRODUCTS.slice())
-    if (product.market === "TCG")
-        PRODUCTS.push({
-            ...product,
-            id: PRODUCTS.length,
-            name: `${product.name} (OCG)`,
-            market: "OCG",
-            basePrice: Math.round(product.basePrice * DEMO.ocgProductPriceFactor * 100) / 100
-        });
 
 function productLanguage(product) {
     if (!product.market) return "";
@@ -265,7 +249,7 @@ for (const product of PRODUCTS) {
             card: null,
             product: product.id,
             condition: 0,
-            language: "",
+            language: productLanguage(product),
             quantity: 3,
             price: product.basePrice
         });
@@ -343,7 +327,7 @@ function thumbnail(card, className) {
 
 function rarityBadge(name) {
     const rarity = Object.values(DEMO.rarities).find((item) => item.name === name);
-    return `<span class="rr" style="background:${rarity.background};color:${rarity.color}">${name}</span>`;
+    return `<span class="rr" data-tone="${rarity.tone}">${name}</span>`;
 }
 
 function marketTag(item) {
@@ -368,9 +352,10 @@ function languageName(code) {
     return code ? DEMO.languages[code].name : "—";
 }
 
-function releaseDate(setPrefix) {
-    const released = DEMO.sets[setPrefix]?.released;
-    return released ? formatDate(Date.parse(released)) : "—";
+// "2026-10-09" es un día del calendario: se lee a medianoche local, no en UTC,
+// para que no se muestre el día anterior en América.
+function releaseDate(released) {
+    return released ? formatDate(Date.parse(`${released}T00:00`)) : "—";
 }
 
 // "Estado mínimo": Mint solo, y del resto ese estado o uno mejor.
@@ -501,7 +486,7 @@ function inventoryRow(listing) {
         return `<tr><td><button class="lk" data-pd="${product.id}">${escapeText(product.name)}</button><small>${productTag(
             product
         )}${product.category}</small></td><td>${
-            product.set ? DEMO.sets[product.set].name : "—"
+            productOrigin(product)
         }</td><td>${NEW_CONDITION}</td>${tail}`;
     }
     const card = CARDS[listing.card];
@@ -522,7 +507,7 @@ function inventoryRow(listing) {
 // sus filtros a la izquierda.
 function openDemoCard(id) {
     const card = CARDS[id];
-    const languages = card.ocg ? DEMO.ocgLanguages : DEMO.tcgLanguages;
+    const languages = [...new Set(card.printings.map((printing) => printing.language))];
     const stats = [
         card.kind,
         card.subtypes.join(" / "),
@@ -584,7 +569,7 @@ function renderDemoFacts(card, selected, summary) {
         factRow("Mínimo / máximo", `${formatPrice(summary.low)} / ${formatPrice(summary.high)}`) +
         factRow(
             "Variación",
-            `<b style="color:${summary.change >= 0 ? "#8fe3a5" : "#ff9b92"}">${summary.change >= 0 ? "+" : ""}${summary.change.toFixed(1)}%</b>`
+            `<b class="${summary.change >= 0 ? "up" : "down"}">${summary.change >= 0 ? "+" : ""}${summary.change.toFixed(1)}%</b>`
         );
 }
 
@@ -695,13 +680,13 @@ function drawChart() {
         const value = low + ((high - low) * step) / 2;
         svg += `<line x1="${left}" x2="${width - right}" y1="${y(value)}" y2="${y(
             value
-        )}" stroke="rgba(170,215,255,.15)"/><text x="${left - 6}" y="${
+        )}" class="ch-grid"/><text x="${left - 6}" y="${
             y(value) + 4
-        }" text-anchor="end" font-size="11" fill="#9db0c6">${formatPrice(value)}</text>`;
+        }" text-anchor="end" font-size="11" class="ch-axis">${formatPrice(value)}</text>`;
     }
-    svg += `<text x="${left}" y="${height - 5}" font-size="11" fill="#9db0c6">${formatDate(start)}</text><text x="${
+    svg += `<text x="${left}" y="${height - 5}" font-size="11" class="ch-axis">${formatDate(start)}</text><text x="${
         width - right
-    }" y="${height - 5}" text-anchor="end" font-size="11" fill="#9db0c6">${formatDate(end)}</text>`;
+    }" y="${height - 5}" text-anchor="end" font-size="11" class="ch-axis">${formatDate(end)}</text>`;
     series.forEach((sales, index) => {
         const path = sales
             .map((sale, step) => `${step ? "L" : "M"}${x(sale.time).toFixed(1)} ${y(sale.price).toFixed(1)}`)
@@ -709,14 +694,14 @@ function drawChart() {
         if (series.length === 1)
             svg += `<path d="${path}L${x(sales[sales.length - 1].time)} ${height - bottom}L${x(sales[0].time)} ${
                 height - bottom
-            }Z" fill="rgba(111,211,242,.12)"/>`;
-        svg += `<path d="${path}" fill="none" stroke="${
+            }Z" class="ch-area"/>`;
+        svg += `<path d="${path}" fill="none" style="stroke:${
             colors[printings[index] % colors.length]
         }" stroke-width="2" stroke-linejoin="round"/>`;
     });
     svg += `<line id="cv" y1="${top}" y2="${
         height - bottom
-    }" stroke="rgba(255,255,255,.4)" style="display:none"/><rect id="cs" x="${left}" y="0" width="${
+    }" class="ch-cursor" style="display:none"/><rect id="cs" x="${left}" y="0" width="${
         width - left - right
     }" height="${height}" fill="transparent"/>`;
 
@@ -807,22 +792,29 @@ document.addEventListener("pointermove", (event) => {
 // Productos sellados y accesorios
 // ---------------------------------------------------------------------------
 
+// De qué set es un producto sellado, o de qué marca un accesorio.
+function productOrigin(product) {
+    return product.set ? DEMO.sets[product.set].name : product.brand || "—";
+}
+
 function inMarket(product) {
     return !product.market || product.market === market;
 }
 
 function openProduct(id) {
     const product = PRODUCTS[id];
-    const set = product.set
-        ? `${DEMO.sets[product.set].name} (${DEMO.setTypes[DEMO.sets[product.set].type]})`
-        : "Accesorio, sin set";
+    const origin = product.set
+        ? ["Set", `${DEMO.sets[product.set].name} · ${DEMO.setTypes[DEMO.sets[product.set].type]}`]
+        : ["Marca", product.brand || "—"];
+    const facts = [origin, ["Lanzamiento", releaseDate(product.released)], ["Contenido", product.detail]]
+        .filter(([, value]) => value && value !== "—")
+        .map(([label, value]) => `<div><span>${label}</span>${escapeText(value)}</div>`)
+        .join("");
     byId("mb").innerHTML = `<div class="top"><div><h2>${escapeText(product.name)}</h2>${productTag(
         product
     )}<span class="chip">${product.category}</span></div>${closeButton(
         "md"
-    )}</div><div class="facts" style="margin-bottom:10px"><div><span>Set</span>${set}</div><div><span>Lanzamiento</span>${releaseDate(
-        product.set
-    )}</div></div><div class="wrap"><table><thead><tr><th>Vendedor</th><th>Idioma</th><th>Estado</th><th class="num">Disp.</th><th class="num">Precio</th><th></th></tr></thead><tbody id="pt"></tbody></table></div>`;
+    )}</div><div class="facts" style="margin-bottom:10px">${facts}</div><div class="wrap"><table><thead><tr><th>Vendedor</th><th>Idioma</th><th>Estado</th><th class="num">Disp.</th><th class="num">Precio</th><th></th></tr></thead><tbody id="pt"></tbody></table></div>`;
     openDialog("p", id);
     renderProductOffers();
     byId("md").classList.add("on");
@@ -845,11 +837,9 @@ function renderProductOffers() {
         : '<tr><td colspan="6" class="empty">Nadie lo tiene a la venta ahora.</td></tr>';
 }
 
-// Novedades primero (por fecha de lanzamiento del set), luego por nombre.
+// Novedades primero (por fecha de lanzamiento), luego por nombre.
 function byReleaseThenName(a, b) {
-    const releasedA = DEMO.sets[a.set]?.released || "";
-    const releasedB = DEMO.sets[b.set]?.released || "";
-    if (releasedA !== releasedB) return releasedB < releasedA ? -1 : 1;
+    if (a.released !== b.released) return b.released < a.released ? -1 : 1;
     return a.name.localeCompare(b.name);
 }
 
@@ -873,7 +863,7 @@ function renderProducts() {
         (product) =>
             inMarket(product) &&
             (!category || product.category === category) &&
-            `${product.name} ${product.set ? DEMO.sets[product.set].name : ""}`.toLowerCase().includes(search)
+            `${product.name} ${productOrigin(product)} ${product.detail}`.toLowerCase().includes(search)
     ).sort(byReleaseThenName);
     byId("pcnt").textContent = `${products.length} productos`;
     byId("pl").innerHTML = products.length
@@ -886,10 +876,10 @@ function renderProducts() {
                   }"><td><div class="nm"><div class="thumb" style="background:#3b4a6b"><i>${
                       product.icon
                   }</i></div><div><b>${escapeText(product.name)}</b><small>${
-                      product.set ? DEMO.sets[product.set].name : "Accesorio"
+                      escapeText(productOrigin(product))
                   }</small></div></div></td><td>${productTag(product)}<span class="chip">${
                       product.category
-                  }</span></td><td class="hide">${releaseDate(product.set)}</td><td class="num price">${
+                  }</span></td><td class="hide">${releaseDate(product.released)}</td><td class="num price">${
                       lowest === null ? "Sin stock" : formatPrice(lowest)
                   }</td><td class="num hide">${offers.length}</td></tr>`;
               })
