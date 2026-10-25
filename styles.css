@@ -2048,7 +2048,7 @@ button.acc-avatar:hover,
     flex: 1;
     padding: 9px;
     border: 0;
-    background: rgba(var(--shade), .18);
+    background: rgba(var(--tint), .04);
     color: var(--mu);
     cursor: pointer;
 }
@@ -2862,4 +2862,96 @@ button.acc-avatar:hover,
     color: var(--on-btn);
     background: var(--btn);
     border-color: rgba(var(--btn-line), .5);
+}
+
+/* Marca de lo provisional: un lápiz pequeño junto a borradores (páginas legales,
+   datos pendientes, modo claro). Lo nombra su aria-label o su title. */
+.prov {
+    display: inline-block;
+    width: .85em;
+    height: .85em;
+    margin-left: .3em;
+    vertical-align: -.05em;
+    background: var(--gold);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.2V21h3.8L18 9.8 14.2 6 3 17.2Zm17.7-10.1a1 1 0 0 0 0-1.4l-2.4-2.4a1 1 0 0 0-1.4 0l-1.9 1.9 3.8 3.8 1.9-1.9Z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.2V21h3.8L18 9.8 14.2 6 3 17.2Zm17.7-10.1a1 1 0 0 0 0-1.4l-2.4-2.4a1 1 0 0 0-1.4 0l-1.9 1.9 3.8 3.8 1.9-1.9Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.theme-toggle {
+    position: relative;
+}
+
+.theme-toggle::after {
+    content: "";
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: var(--gold);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.2V21h3.8L18 9.8 14.2 6 3 17.2Zm17.7-10.1a1 1 0 0 0 0-1.4l-2.4-2.4a1 1 0 0 0-1.4 0l-1.9 1.9 3.8 3.8 1.9-1.9Z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.2V21h3.8L18 9.8 14.2 6 3 17.2Zm17.7-10.1a1 1 0 0 0 0-1.4l-2.4-2.4a1 1 0 0 0-1.4 0l-1.9 1.9 3.8 3.8 1.9-1.9Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* Aviso de cookies: informa y se cierra; no tapa el contenido ni pide nada. */
+.cookie-note {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    z-index: 25;
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 14px;
+}
+
+.cookie-note p {
+    margin: 0 0 8px;
+}
+
+.cookie-note p:last-child {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+}
+
+.cookie-note[hidden] {
+    display: none;
+}
+
+/* Datos del responsable en el aviso legal */
+.business {
+    display: grid;
+    gap: 6px;
+    margin: 8px 0 12px;
+}
+
+.business div {
+    display: grid;
+    grid-template-columns: minmax(140px, 1fr) 2fr;
+    gap: 12px;
+}
+
+.business dt {
+    color: var(--mu);
+}
+
+.business dd {
+    margin: 0;
+}
+
+/* Tus datos: descargar una copia o borrar la cuenta */
+.danger {
+    border-color: rgba(198, 47, 42, .55);
+}
+
+/* Enlaces dentro del aviso de cookies y de las casillas del registro. */
+.cookie-note a,
+.check a {
+    color: var(--ac);
 }

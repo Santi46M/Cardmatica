@@ -331,6 +331,13 @@ una fuente falla quedan sus noticias anteriores. Para traerlas ya:
 `docker compose exec api cardmatica fetch-news`. Un administrador puede publicar o
 quitar noticias desde su panel, eligiendo el idioma; un feed nunca las reemplaza.
 
+**Legal y privacidad.** Términos, privacidad, cookies, devoluciones y arrepentimiento,
+normas y aviso legal, en los tres idiomas; son borradores y lo marca un lápiz ✎. El pie
+común (`frontend/pages/footer.html`) lleva esos enlaces, el botón de arrepentimiento y el
+aviso de cookies. Cada persona puede descargar sus datos o borrar su cuenta desde
+«Seguridad e inicio de sesión». Los datos del responsable se configuran con `BUSINESS_*`.
+El estado de cada punto está en [compliance.md](docs/compliance.md).
+
 **Idiomas.** Todo el sitio está en español, portugués e inglés, en ese orden. Cada
 visitante lo ve en el idioma que eligió (selector de la cabecera, del pie y del menú de
 la cuenta; cookie `cm_lang`) o, si no eligió, en el primero de los tres que pida su

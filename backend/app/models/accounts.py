@@ -42,6 +42,8 @@ class User(Entity, Base):
     role: Mapped[str] = mapped_column(String(20), default="user")
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     terms_accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # Declared on signing up: the site is for adults (migration 014).
+    adult_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Failed logins in a row; the account locks for a while after too many.
     failed_logins: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

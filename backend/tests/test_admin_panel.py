@@ -23,6 +23,7 @@ def people(client, settings, monkeypatch, factory):
                 "password": PASSWORD,
                 "display_name": email[:3],
                 "accept_terms": True,
+                "confirm_adult": True,
             },
         )
     with factory.begin() as session:

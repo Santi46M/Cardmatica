@@ -65,9 +65,9 @@ def test_pages_come_in_the_visitors_language(client):
 
 def test_legal_pages_have_their_own_translation(client):
     page = client.get("/privacidad?lang=pt")
-    assert "<h1>Política de privacidade</h1>" in page.text
+    assert '<h1>Política de privacidade<span class="prov"' in page.text
     assert "<title>Política de privacidade · Cardmática</title>" in page.text
-    assert "<h1>Community rules</h1>" in client.get("/normas?lang=en").text
+    assert "<h1>Community rules<span" in client.get("/normas?lang=en").text
 
 
 def test_account_emails_go_in_the_visitors_language(client, monkeypatch):
@@ -83,8 +83,28 @@ def test_account_emails_go_in_the_visitors_language(client, monkeypatch):
             "email": "ana@example.com",
             "password": "uma frase longa e segura",
             "accept_terms": True,
+            "confirm_adult": True,
         },
     )
     subject, body = sent[0]
     assert subject == "Confirme seu e-mail na Cardmática"
     assert body.startswith("Olá, Ana:") and "&lang=pt" in body
+
+
+def test_legal_pages_in_three_languages_with_shared_footer(client, settings, monkeypatch):
+    for name in ["terminos", "privacidad", "normas", "cookies", "reembolsos", "aviso-legal"]:
+        for lang in ["es", "pt", "en"]:
+            page = client.get(f"/{name}?lang={lang}")
+            assert page.status_code == 200, (name, lang)
+            # Every page has the same footer, with the withdrawal button and the cookie notice.
+            assert 'href="/reembolsos#arrepentimiento"' in page.text
+            assert 'class="cookie-note' in page.text
+            assert 'class="prov"' in page.text
+    assert "Botão de arrependimento" in client.get("/cookies?lang=pt").text
+    assert "Withdrawal button" in client.get("/?lang=en").text
+    # The legal notice shows the operator's details, or says they are pending.
+    assert "Pendiente de completar" in client.get("/aviso-legal?lang=es").text
+    monkeypatch.setattr(settings, "business_name", "Cardmática SAS")
+    assert "<dd>Cardmática SAS</dd>" in client.get("/aviso-legal?lang=es").text
+    sitemap = client.get("/sitemap.xml").text
+    assert "/cookies</loc>" in sitemap and "/reembolsos</loc>" in sitemap

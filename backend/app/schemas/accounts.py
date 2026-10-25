@@ -14,6 +14,8 @@ class RegisterInput(BaseModel):
     password: str = Field(min_length=1, max_length=200)
     display_name: str = Field(min_length=2, max_length=60)
     accept_terms: bool
+    # The person declares being 18 or older; both boxes start unticked.
+    confirm_adult: bool = False
 
 
 class LoginInput(BaseModel):
@@ -78,19 +80,23 @@ class ProfileData(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     store: str = Field(default="", max_length=80)
     country: Country
-    address: str = Field(min_length=3, max_length=200)
-    phone: str = Field(min_length=6, max_length=30)
-    payments: list[str] = Field(min_length=1, max_length=len(PAYMENT_METHODS))
+    # Only what is needed now: address and phone are for shipping, which does
+    # not exist yet, so they are optional; payment methods only matter to sellers.
+    address: str = Field(default="", max_length=200)
+    phone: str = Field(default="", max_length=30)
+    payments: list[str] = Field(default_factory=list, max_length=len(PAYMENT_METHODS))
 
     @model_validator(mode="after")
     def check(self):
-        if self.role != "buyer" and not self.store.strip():
+        sells = self.role != "buyer"
+        if sells and not self.store.strip():
             raise ValueError("Escribe el nombre de tu tienda.")
-        if sum(ch.isdigit() for ch in self.phone) < 6:
+        if self.phone.strip() and sum(ch.isdigit() for ch in self.phone) < 6:
             raise ValueError("El teléfono debe tener al menos 6 dígitos.")
-        unknown = set(self.payments) - set(PAYMENT_METHODS)
-        if unknown:
+        if set(self.payments) - set(PAYMENT_METHODS):
             raise ValueError("Método de pago desconocido.")
+        if sells and not self.payments:
+            raise ValueError("Elige al menos un método de pago.")
         return self
 
 

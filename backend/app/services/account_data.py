@@ -6,12 +6,12 @@ person's lists in one transaction, and reading fills in the card names, codes
 and rarities from the catalogue, so they never go stale.
 """
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.base import utcnow
 from app.models import Card, CardPrinting, CardSet, Rarity
-from app.models.accounts import User, UserProfile, Wantlist, WantlistItem
+from app.models.accounts import User, UserProfile, UserSession, Wantlist, WantlistItem
 from app.schemas.accounts import (
     AccountData,
     Preferences,
@@ -42,8 +42,8 @@ def account_data(session: Session, user: User) -> AccountData:
             name=row.full_name,
             store=row.store_name or "",
             country=row.country,
-            address=row.address,
-            phone=row.phone,
+            address=row.address or "",
+            phone=row.phone or "",
             payments=row.payment_methods,
         )
     return AccountData(profile=profile, preferences=Preferences(**(row.preferences if row else {})))
@@ -55,9 +55,10 @@ def save_profile(session: Session, user: User, data: ProfileData) -> None:
     row.full_name = data.name.strip()
     row.store_name = data.store.strip() if data.role != "buyer" else None
     row.country = data.country
-    row.address = data.address.strip()
-    row.phone = data.phone.strip()
-    row.payment_methods = list(dict.fromkeys(data.payments))
+    row.address = data.address.strip() or None
+    row.phone = data.phone.strip() or None
+    # A buyer's payment methods are not needed, so they are not kept.
+    row.payment_methods = list(dict.fromkeys(data.payments)) if data.role != "buyer" else []
 
 
 def save_preferences(session: Session, user: User, data: Preferences) -> None:
@@ -175,3 +176,43 @@ def save_wantlists(session: Session, user: User, data: WantlistsData) -> Wantlis
         )
     session.flush()
     return wantlists(session, user)
+
+
+def _iso(value):
+    return as_aware(value).isoformat() if value else None
+
+
+def export(session: Session, user: User) -> dict:
+    """Everything the account holds about the person, to download (privacy policy)."""
+    data = account_data(session, user)
+    sessions = session.scalars(select(UserSession).where(UserSession.user_id == user.id))
+    return {
+        "account": {
+            "email": user.email,
+            "display_name": user.display_name,
+            "role": user.role,
+            "created_at": _iso(user.created_at),
+            "email_verified_at": _iso(user.email_verified_at),
+            "terms_accepted_at": _iso(user.terms_accepted_at),
+            "adult_confirmed_at": _iso(user.adult_confirmed_at),
+            "password_changed_at": _iso(user.password_changed_at),
+        },
+        "profile": data.profile.model_dump() if data.profile else None,
+        "preferences": data.preferences.model_dump(),
+        "wantlists": wantlists(session, user).model_dump(mode="json"),
+        "sessions": [
+            {
+                "started_at": _iso(row.created_at),
+                "last_seen_at": _iso(row.last_seen_at),
+                "browser": row.user_agent,
+            }
+            for row in sessions
+        ],
+        "exported_at": utcnow().isoformat(),
+    }
+
+
+def delete_account(session: Session, user: User) -> None:
+    """Removes the account and everything tied to it: profile, preferences,
+    wantlists, sessions and email links (ON DELETE CASCADE in the database)."""
+    session.execute(delete(User).where(User.id == user.id))

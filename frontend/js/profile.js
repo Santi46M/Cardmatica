@@ -69,9 +69,13 @@ function summaryHtml() {
         profile.name
     )}</b> · ${h(role)}${
         profile.store ? ` · ${t("Tienda")} <b>${h(profile.store)}</b>` : ""
-    }</div><small>${h(profile.address)}, ${h(t(profile.country))} · ${h(profile.phone)}</small><small>${h(
-        t("Pagos aceptados: {methods}", { methods: profile.payments.map((method) => t(method)).join(", ") })
-    )}</small></div>`;
+    }</div><small>${h([profile.address, t(profile.country), profile.phone].filter(Boolean).join(" · "))}</small>${
+        profile.payments?.length
+            ? `<small>${h(
+                  t("Pagos aceptados: {methods}", { methods: profile.payments.map((method) => t(method)).join(", ") })
+              )}</small>`
+            : ""
+    }</div>`;
 }
 
 export function renderProfile(container) {
@@ -87,11 +91,13 @@ export function renderProfile(container) {
     )}"></label><label>${t("País")}<select id="pf-country" autocomplete="country-name">${COUNTRIES.map(
         (country) =>
             `<option value="${country}"${value.country === country ? " selected" : ""}>${t(country)}</option>`
-    ).join("")}</select></label><label class="full">${t("Dirección")}<input id="pf-address" autocomplete="street-address" maxlength="200" value="${h(
+    ).join("")}</select></label><label class="full">${t("Dirección (opcional, para envíos)")}<input id="pf-address" autocomplete="street-address" maxlength="200" value="${h(
         value.address
-    )}"></label><label>${t("Teléfono")}<input id="pf-phone" type="tel" autocomplete="tel" maxlength="30" value="${h(
+    )}"></label><label>${t("Teléfono (opcional)")}<input id="pf-phone" type="tel" autocomplete="tel" maxlength="30" value="${h(
         value.phone
-    )}"></label><fieldset class="full"><legend>${t("Métodos de pago")}</legend><div class="chk">${PAYMENTS.map(
+    )}"></label><fieldset class="full" id="pf-payments"${sells(value.role) ? "" : " hidden"}><legend>${t(
+        "Métodos de pago que aceptas"
+    )}</legend><div class="chk">${PAYMENTS.map(
         (method) =>
             `<label><input type="checkbox" name="pf-payment" value="${h(method)}"${
                 value.payments.includes(method) ? " checked" : ""
@@ -99,6 +105,8 @@ export function renderProfile(container) {
     ).join("")}</div></fieldset></div><p id="pf-error" class="warn" role="alert" hidden></p><p><button class="btn" type="submit">${t(
         "Guardar perfil"
     )}</button></p><small>${t(
+        "Solo pedimos lo necesario: la dirección y el teléfono se usarán para envíos cuando existan, y los métodos de pago solo si vendes."
+    )}</small> <small>${t(
         currentUser()
             ? "El perfil se guarda en tu cuenta. Un perfil de vendedor todavía no publica una tienda."
             : "Sin sesión iniciada, el perfil se guarda solo en este navegador. Inicia sesión para guardarlo en tu cuenta."
@@ -119,19 +127,19 @@ function read() {
         country: field("pf-country"),
         address: field("pf-address"),
         phone: field("pf-phone"),
-        payments: [...document.querySelectorAll('input[name="pf-payment"]:checked')].map(
-            (input) => input.value
-        )
+        // A buyer's payment methods are not needed, so they are not sent.
+        payments: sells(field("pf-role"))
+            ? [...document.querySelectorAll('input[name="pf-payment"]:checked')].map((input) => input.value)
+            : []
     };
 }
 
 function problem(data) {
     if (!data.name) return ["pf-name", t("Escribe tu nombre completo.")];
     if (sells(data.role) && !data.store) return ["pf-store", t("Escribe el nombre de tu tienda.")];
-    if (!data.address) return ["pf-address", t("Escribe tu dirección para los envíos.")];
-    if (data.phone.replace(/\D/g, "").length < 6)
+    if (data.phone && data.phone.replace(/\D/g, "").length < 6)
         return ["pf-phone", t("El teléfono debe tener al menos 6 dígitos.")];
-    if (!data.payments.length) return [null, t("Elige al menos un método de pago.")];
+    if (sells(data.role) && !data.payments.length) return [null, t("Elige al menos un método de pago.")];
     return null;
 }
 
@@ -261,7 +269,9 @@ export function installProfile({ panel }) {
             writeJson("cm_view", value);
             document.dispatchEvent(new CustomEvent("cm:view", { detail: value }));
         }
-        if (event.target.id === "pf-role")
+        if (event.target.id === "pf-role") {
             document.getElementById("pf-store-field").hidden = !sells(event.target.value);
+            document.getElementById("pf-payments").hidden = !sells(event.target.value);
+        }
     });
 }

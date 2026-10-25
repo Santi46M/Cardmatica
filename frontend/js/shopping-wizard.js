@@ -256,7 +256,7 @@ function optionsHtml() {
         options.country
     )}${select(
         "wz-rating",
-        "Valoración mínima",
+        "Valoración mínima (ficticia)",
         [
             [0, "Cualquiera"],
             [4.5, "4,5 ★ o más"],

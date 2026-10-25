@@ -82,7 +82,9 @@ export function renderCart(container) {
         sellers: t(totals.sellers.length === 1 ? "{count} vendedor" : "{count} vendedores", { count: totals.sellers.length })
     })}</span><span>${totals.ship ? window.formatPrice(totals.ship) : t("Gratis")}</span></div><div class="tot"><span>${t(
         "Total"
-    )}</span><span>${window.formatPrice(totals.total)}</span></div><button class="btn" data-cart-buy>${t(
+    )}</span><span>${window.formatPrice(totals.total)}</span></div><small>${t(
+        "El total ya incluye el envío de cada vendedor; no se suma ningún otro cargo. Los importes en otras monedas son conversiones aproximadas."
+    )}</small><button class="btn" data-cart-buy>${t(
         "Finalizar compra"
     )}</button><button class="ghost" data-go="Todas">${t("Seguir comprando")}</button><button class="ghost" data-cart-clear>${t(
         window.cartClearArmed ? "Confirmar: vaciar carrito" : "Vaciar carrito"

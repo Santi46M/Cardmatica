@@ -1,9 +1,12 @@
-"""Accounts: registration, login, lockout, CSRF and sessions."""
+"""Accounts: registration, login, lockout, CSRF and sessions, and the
+person's rights over their data."""
+
+import json
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 
-from app.models.accounts import User, UserSession
+from app.models.accounts import User, UserProfile, UserSession
 from app.services import accounts, passwords
 
 PASSWORD = "dragon blanco de ojos azules"
@@ -29,6 +32,7 @@ def register(client, email="Ana@Example.com", password=PASSWORD, **extra):
             "password": password,
             "display_name": "Ana",
             "accept_terms": True,
+            "confirm_adult": True,
             **extra,
         },
     )
@@ -58,6 +62,9 @@ def test_register_rejects_weak_passwords_duplicates_and_missing_terms(client):
     assert register(client, password="corta").status_code == 400
     assert "fácil" in register(client, password="contraseña1").json()["error"]["message"]
     assert register(client, accept_terms=False).status_code == 400
+    # The site is for adults: the box must be ticked.
+    under_age = register(client, confirm_adult=False)
+    assert under_age.status_code == 400 and "18" in under_age.json()["error"]["message"]
     assert register(client).status_code == 201
     client.cookies.clear()
     duplicate = register(client, email="ANA@example.com")
@@ -246,3 +253,52 @@ def test_attempt_limiter_forgets_idle_addresses(monkeypatch):
     clock[0] += 120
     limiter.allow("c", 5)  # third call: prunes before counting
     assert set(limiter._attempts) == {"c"}
+
+
+# ---- What people are owed: their data to take or delete, only the data needed,
+# and emails that are notices, not advertising.
+
+
+def test_download_and_delete_my_data(client, factory):
+    assert register(client).status_code == 201
+    headers = csrf_headers(client)
+    profile = {"role": "buyer", "name": "Ana Pérez", "country": "Uruguay"}
+    assert client.put("/api/v1/account/profile", json=profile, headers=headers).status_code == 204
+    export = client.get("/api/v1/account/export")
+    assert export.status_code == 200
+    assert "attachment" in export.headers["Content-Disposition"]
+    data = json.loads(export.text)
+    assert data["account"]["email"] == "ana@example.com"
+    assert data["account"]["adult_confirmed_at"]
+    assert data["profile"]["name"] == "Ana Pérez" and data["sessions"]
+    # Deleting asks for the password again and leaves nothing behind.
+    wrong = client.post("/api/v1/account/delete", json={"password": "otra cosa"}, headers=headers)
+    assert wrong.status_code == 400
+    gone = client.post("/api/v1/account/delete", json={"password": PASSWORD}, headers=headers)
+    assert gone.status_code == 204
+    with factory() as session:
+        assert session.scalar(select(func.count()).select_from(User)) == 0
+        assert session.scalar(select(func.count()).select_from(UserSession)) == 0
+        assert session.scalar(select(func.count()).select_from(UserProfile)) == 0
+    assert client.get("/api/v1/auth/me").status_code == 401
+
+
+def test_a_buyer_profile_needs_only_name_and_country(client, factory):
+    register(client)
+    headers = csrf_headers(client)
+    buyer = {"role": "buyer", "name": "Ana Pérez", "country": "Uruguay", "payments": ["PIX"]}
+    assert client.put("/api/v1/account/profile", json=buyer, headers=headers).status_code == 204
+    with factory() as session:
+        row = session.scalar(select(UserProfile))
+        # A buyer's payment methods are not needed, so they are not kept.
+        assert row.address is None and row.phone is None and row.payment_methods == []
+    seller = {"role": "seller", "name": "Ana", "store": "Duelos", "country": "Uruguay"}
+    refused = client.put("/api/v1/account/profile", json=seller, headers=headers)
+    assert refused.status_code == 422 and "pago" in refused.text
+
+
+def test_account_emails_say_they_are_not_advertising(client, monkeypatch):
+    sent = []
+    monkeypatch.setattr("app.services.mail.send", lambda to, subject, body: sent.append(body))
+    register(client)
+    assert "no enviamos publicidad" in sent[0] and "/?tab=Seguridad" in sent[0]

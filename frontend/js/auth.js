@@ -133,8 +133,14 @@ function registerForm() {
         "Contraseña"
     )}<input id="auth-password" type="password" autocomplete="new-password" required minlength="10" maxlength="200" aria-describedby="auth-password-help"></label><small id="auth-password-help">${t(
         "Al menos 10 caracteres. Una frase de varias palabras es fácil de recordar y difícil de adivinar."
-    )}</small><label class="check"><input id="auth-terms" type="checkbox" required> ${t(
-        "Acepto los términos y condiciones y la política de privacidad"
+    )}</small><label class="check"><input id="auth-adult" type="checkbox" required> ${t(
+        "Tengo 18 años o más"
+    )}</label><label class="check"><input id="auth-terms" type="checkbox" required> ${t(
+        "Acepto los {terms} y la {privacy}",
+        {
+            terms: `<a href="/terminos" target="_blank">${t("términos y condiciones")}</a>`,
+            privacy: `<a href="/privacidad" target="_blank">${t("política de privacidad")}</a>`
+        }
     )}</label><button class="btn" type="submit">${t("Crear cuenta")}</button></form>`;
 }
 
@@ -162,7 +168,7 @@ export async function renderSecurity(container) {
         "Al cambiarla se cierran las sesiones abiertas en otros equipos."
     )}</small><p class="warn" role="alert" data-auth-error hidden></p></form><section class="gl pnl" id="auth-sessions"><b>${t(
         "Sesiones abiertas"
-    )}</b><p class="catalog-status">${t("Cargando…")}</p></section>`;
+    )}</b><p class="catalog-status">${t("Cargando…")}</p></section>${dataHtml()}`;
     try {
         const sessions = await call("/sessions");
         const slot = container.querySelector("#auth-sessions");
@@ -186,6 +192,20 @@ export async function renderSecurity(container) {
             error.message
         )}</p>`;
     }
+}
+
+// "Tus datos": a copy of everything the account holds, and deleting it for
+// good (backend/app/api/account.py). The password is asked again to delete.
+function dataHtml() {
+    return `<section class="gl pnl fm-stack"><b>${t("Tus datos")}</b><p>${t(
+        "Descarga una copia de todo lo que tu cuenta guarda: perfil, preferencias, listas de deseados y sesiones."
+    )}</p><p><a class="ghost" href="/api/v1/account/export" download>${t("Descargar mis datos")}</a></p></section><form class="gl pnl fm-stack danger" id="auth-delete-form" novalidate><b>${t(
+        "Borrar mi cuenta"
+    )}</b><p>${t(
+        "Se borran tu cuenta, tu perfil, tus preferencias, tus listas de deseados y tus sesiones. No se puede deshacer."
+    )}</p><label>${t("Contraseña actual")}<input id="auth-delete-password" type="password" autocomplete="current-password" required></label><label class="check"><input id="auth-delete-confirm" type="checkbox" required> ${t(
+        "Entiendo que se borra todo y no se puede recuperar"
+    )}</label><button class="ghost" type="submit">${t("Borrar mi cuenta para siempre")}</button><p class="warn" role="alert" data-auth-error hidden></p></form>`;
 }
 
 function browserName(agent) {
@@ -217,7 +237,9 @@ function browserName(agent) {
 
 // Errors show inside the panel of the form that failed.
 function showError(message, form) {
-    const slot = form?.closest(".auth, #secv")?.querySelector("[data-auth-error]");
+    const slot = (form?.querySelector("[data-auth-error]") ? form : form?.closest(".auth, #secv"))?.querySelector(
+        "[data-auth-error]"
+    );
     if (!slot) return window.toast?.(message);
     slot.textContent = message;
     slot.hidden = false;
@@ -233,7 +255,16 @@ export function installAuth({ panel, go }) {
     });
     document.addEventListener("submit", async (event) => {
         const form = event.target;
-        if (!["auth-login", "auth-register", "auth-forgot", "auth-reset", "auth-password-form"].includes(form.id))
+        if (
+            ![
+                "auth-login",
+                "auth-register",
+                "auth-forgot",
+                "auth-reset",
+                "auth-password-form",
+                "auth-delete-form"
+            ].includes(form.id)
+        )
             return;
         event.preventDefault();
         const button = form.querySelector("button[type=submit]");
@@ -271,6 +302,8 @@ export function installAuth({ panel, go }) {
                 notice = t("Contraseña cambiada. Inicia sesión con la nueva.");
                 renderAuth(panel("Acceso"));
             } else if (form.id === "auth-register") {
+                if (!document.getElementById("auth-adult").checked)
+                    return showError(t("Para crear una cuenta debes tener 18 años o más."), form);
                 if (!document.getElementById("auth-terms").checked)
                     return showError(t("Debes aceptar los términos y condiciones."), form);
                 user = await call("/register", {
@@ -279,13 +312,25 @@ export function installAuth({ panel, go }) {
                         display_name: value("auth-name"),
                         email: value("auth-email"),
                         password: document.getElementById("auth-password").value,
-                        accept_terms: true
+                        accept_terms: true,
+                        confirm_adult: true
                     }
                 });
                 window.toast?.(t("Cuenta creada"));
                 track("cuenta:registro");
                 changed();
                 go("Perfil");
+            } else if (form.id === "auth-delete-form") {
+                if (!document.getElementById("auth-delete-confirm").checked)
+                    return showError(t("Marca la casilla para confirmar que quieres borrar la cuenta."), form);
+                await request("/api/v1/account/delete", {
+                    method: "POST",
+                    body: { password: document.getElementById("auth-delete-password").value }
+                });
+                user = null;
+                changed();
+                window.toast?.(t("Tu cuenta y tus datos se borraron"));
+                go("Inicio");
             } else {
                 await call("/password", {
                     method: "POST",

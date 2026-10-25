@@ -48,7 +48,9 @@ def token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def register(session: Session, *, email: str, password: str, display_name: str) -> User:
+def register(
+    session: Session, *, email: str, password: str, display_name: str, adult: bool = True
+) -> User:
     email = normalize_email(email)
     if problem := password_problem(password, email):
         raise AccountError(problem)
@@ -60,6 +62,7 @@ def register(session: Session, *, email: str, password: str, display_name: str) 
         display_name=display_name.strip(),
         password_hash=hash_password(password),
         terms_accepted_at=now,
+        adult_confirmed_at=now if adult else None,
         password_changed_at=now,
     )
     session.add(user)
@@ -251,6 +254,17 @@ def _link(base_url: str, path: str, token: str, lang: str) -> str:
     )
 
 
+def _footer(base_url: str, lang: str) -> str:
+    """Account emails are notices, never advertising, so there is nothing to
+    unsubscribe from; the footer says so and where the account can be deleted."""
+    security = f"{base_url}/?tab=Seguridad" + ("" if lang == languages.DEFAULT else f"&lang={lang}")
+    return "\n\n—\n" + languages.translate(
+        lang,
+        "Es un aviso de tu cuenta en Cardmática: no enviamos publicidad. Para descargar o borrar tus datos: {link}",
+        link=security,
+    )
+
+
 def send_confirmation(session: Session, user: User, base_url: str, lang: str = "es") -> None:
     """The email goes in the language the person was using (app/core/languages.py)."""
     hours = get_settings().email_confirmation_hours
@@ -265,7 +279,8 @@ def send_confirmation(session: Session, user: User, base_url: str, lang: str = "
             name=user.display_name,
             link=_link(base_url, "/verificar", token, lang),
             hours=hours,
-        ),
+        )
+        + _footer(base_url, lang),
     )
 
 
@@ -293,7 +308,8 @@ def request_password_reset(session: Session, email: str, base_url: str, lang: st
             name=user.display_name,
             link=_link(base_url, "/restablecer", token, lang),
             minutes=minutes,
-        ),
+        )
+        + _footer(base_url, lang),
     )
 
 

@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     http_timeout: float = Field(default=25, gt=0)
     http_retries: int = Field(default=3, ge=0, le=8)
     cache_directory: Path = ROOT / ".cache/http"
+    # Who runs the site, shown in the legal notice (/aviso-legal). Empty until
+    # there is a registered business: the page then says the detail is pending.
+    business_name: str = ""
+    business_tax_id: str = ""
+    business_address: str = ""
+    business_country: str = ""
+    business_email: str = ""
     # News of the home page, refreshed by `cardmatica news-worker`
     # (app/services/news_feeds.py).
     news_enabled: bool = True

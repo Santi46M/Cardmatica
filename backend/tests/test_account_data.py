@@ -25,6 +25,7 @@ def signed_in(client, settings, monkeypatch, factory, record):
             "password": PASSWORD,
             "display_name": "Ana",
             "accept_terms": True,
+            "confirm_adult": True,
         },
     )
     assert response.status_code == 201

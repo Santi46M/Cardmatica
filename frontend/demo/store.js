@@ -427,9 +427,9 @@ function renderSellers() {
         const inventory = inventoryOf(seller.id);
         return `<tr class="row" tabindex="0" data-v="${seller.id}"><td>${flag(seller.country)}<b class="lk">${escapeText(
             seller.name
-        )}</b><small>${t("Desde {year}", { year: seller.since })}</small></td><td class="hide">${t(seller.country)}</td><td>★ ${
-            seller.rating
-        }</td><td class="num">${inventory.listings.length}</td><td class="num hide">${
+        )}</b><small>${t("Desde {year}", { year: seller.since })}</small></td><td class="hide">${t(
+            seller.country
+        )}</td><td title="${t("Valoración ficticia de la tienda de demostración")}">★ ${seller.rating}</td><td class="num">${inventory.listings.length}</td><td class="num hide">${
             inventory.units
         }</td><td class="num price">${formatPrice(inventory.value)}</td></tr>`;
     }).join("");
@@ -1036,7 +1036,9 @@ function showCart() {
             }
         )}</span><span>${totals.ship ? formatPrice(totals.ship) : t("Gratis")}</span></div><div class="tot"><span>${t(
             "Total"
-        )}</span><span>${formatPrice(totals.total)}</span></div><p class="cart-actions"><button class="ghost" data-cart-expand>${t(
+        )}</span><span>${formatPrice(totals.total)}</span></div><small class="catalog-status">${t(
+            "El total ya incluye el envío de cada vendedor; no se suma ningún otro cargo. Los importes en otras monedas son conversiones aproximadas."
+        )}</small><p class="cart-actions"><button class="ghost" data-cart-expand>${t(
             "Ampliar carrito"
         )}</button><button class="btn" data-buy="1">${t("Finalizar compra")}</button></p>`;
     }

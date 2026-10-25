@@ -100,6 +100,8 @@ def fail(error: accounts.AccountError, status: int = 400):
 def register(payload: RegisterInput, request: Request, response: Response, session: SessionDep):
     if not payload.accept_terms:
         raise HTTPException(400, "Debes aceptar los términos y condiciones.")
+    if not payload.confirm_adult:
+        raise HTTPException(400, "Para crear una cuenta debes tener 18 años o más.")
     try:
         user = accounts.register(
             session,

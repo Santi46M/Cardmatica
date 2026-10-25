@@ -24,7 +24,7 @@ from sqlalchemy import select
 
 from app.api.dependencies import SessionDep, site_url
 from app.core import assets, languages
-from app.core.config import ROOT
+from app.core.config import ROOT, get_settings
 from app.core.security import content_security_policy
 from app.models import Archetype, Card, CardSet
 
@@ -32,7 +32,12 @@ router = APIRouter(include_in_schema=False)
 PAGES = ROOT / "frontend" / "pages"
 ASSETS = ROOT / "frontend" / "assets"
 INDEX = ROOT / "index.html"
-LEGAL_PAGES = {"terminos", "privacidad", "normas"}
+LEGAL_PAGES = {"terminos", "privacidad", "normas", "cookies", "reembolsos", "aviso-legal"}
+# One footer for every page: legal links, language and the cookie notice.
+FOOTER = PAGES / "footer.html"
+_FOOTER = re.compile(r'<footer class="site-footer">.*?</footer>', re.S)
+# The legal notice's details (settings business_*), one <dd data-business="…">.
+_BUSINESS = re.compile(r'<dd data-business="(\w+)"></dd>')
 # Search engines read at most 50,000 addresses per sitemap file.
 SITEMAP_LIMIT = 50000
 
@@ -72,6 +77,17 @@ def translate_static(page: str, lang: str) -> str:
     return _ATTRIBUTE.sub(attribute, _TEXT.sub(text, page))
 
 
+def _business_detail(match) -> str:
+    value = getattr(get_settings(), f"business_{match.group(1)}", "")
+    if value:
+        return f"<dd>{html.escape(value)}</dd>"
+    # Not filled in yet: said in words (translated with the page) and marked.
+    return (
+        '<dd>Pendiente de completar<span class="prov" role="img" '
+        'aria-label="Borrador provisional" title="Borrador provisional"></span></dd>'
+    )
+
+
 def _alternates(base: str, path: str) -> str:
     links = [
         f'<link rel="alternate" hreflang="{languages.HTML_LANG[code]}" href="{base}{path}'
@@ -101,12 +117,15 @@ def render(
     # A legal page may have its own version in this language (terminos.pt.html).
     translated = file.with_name(f"{file.stem}.{lang}{file.suffix}")
     page = (translated if translated.is_file() else file).read_text(encoding="utf-8")
+    page = _FOOTER.sub(lambda _: FOOTER.read_text(encoding="utf-8").strip(), page, count=1)
+    page = _BUSINESS.sub(_business_detail, page)
     if lang != languages.DEFAULT:
         page = translate_static(page, lang)
     page = page.replace('<html lang="es">', f'<html lang="{languages.HTML_LANG[lang]}">', 1)
     page = _meta(page, "property", "og:locale", languages.OG_LOCALE[lang])
-    # The dictionary for what the scripts write, right after the code that uses it.
-    if lang != languages.DEFAULT:
+    # The dictionary for what the scripts write, right after the code that uses
+    # it; only the catalogue page has scripts that write text.
+    if lang != languages.DEFAULT and "/frontend/demo/data.js" in page:
         page = page.replace(
             '<script src="/frontend/i18n.js"></script>',
             f'<script src="/frontend/i18n.js"></script><script src="/frontend/i18n/{lang}.js"></script>',

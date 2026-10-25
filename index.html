@@ -67,6 +67,7 @@
     <nav id="tabs"></nav>
 </header>
 <main>
+    <h1 id="view-title" class="sr-only" hidden></h1>
     <div id="home"></div><div id="prod" style="display:none"><div class="tools"><select id="pc" aria-label="Categoría"></select><span class="cnt" id="pcnt"></span></div><div class="pn gl wrap"><table><thead><tr><th>Producto</th><th>Categoría</th><th class="hide">Lanzamiento</th><th class="num">Desde</th><th class="num hide">Ofertas</th></tr></thead><tbody id="pl"></tbody></table></div></div><div id="cat" style="display:none">
     <div class="tools" id="cat-tools">
         <span id="type-filters" class="type-filters"></span><select id="rar" aria-label="Rareza"></select><select id="stp" aria-label="Tipo de producto"></select>
@@ -76,15 +77,16 @@
     <div class="pn gl wrap"><table><thead><tr><th>Carta</th><th class="num hide">Impresiones</th><th class="num">Última venta</th></tr></thead><tbody id="list"></tbody></table></div>
 </div>
     <div id="wlv" style="display:none"></div><div id="pfv" style="display:none"></div><div id="cartv" style="display:none"></div><div id="authv" style="display:none"></div><div id="secv" style="display:none"></div><div id="admv" style="display:none"></div>
-    <div id="vend" style="display:none"><div class="pn gl wrap"><table><thead><tr><th>Vendedor</th><th class="hide">País</th><th>Valoración</th><th class="num">Artículos</th><th class="num hide">Unidades</th><th class="num">Valor</th></tr></thead><tbody id="vl"></tbody></table></div></div>
+    <div id="vend" style="display:none"><div class="pn gl wrap"><table><thead><tr><th>Vendedor</th><th class="hide">País</th><th>Valoración (ficticia)</th><th class="num">Artículos</th><th class="num hide">Unidades</th><th class="num">Valor</th></tr></thead><tbody id="vl"></tbody></table></div></div>
     <p id="catalog-status" class="catalog-status" role="status" aria-live="polite"></p>
     <p id="commercial-notice" class="catalog-status" hidden>Productos, vendedores, precios, tipos de cambio y carrito pertenecen al comercio de demostración original. No representan ofertas del catálogo importado.</p>
 </main>
-<footer class="site-footer"><label class="lang-pick">Idioma <select class="lang-select"><option value="es">Español</option><option value="pt">Português</option><option value="en">English</option></select></label><nav aria-label="Información legal"><a href="/terminos">Términos y condiciones</a><a href="/privacidad">Privacidad</a><a href="/normas">Normas de convivencia</a></nav><small>Cardmática no está afiliada a Konami. Yu-Gi-Oh! es una marca de sus respectivos dueños.</small></footer>
+<footer class="site-footer"></footer>
 <div id="md" role="dialog" aria-modal="true"><div class="box" id="mb"></div></div>
 <div id="cart" role="dialog" aria-modal="true"><div class="box" id="cbx"></div></div>
 <div class="toast" id="ts"></div>
 <script src="/frontend/i18n.js"></script>
+<script src="/frontend/cookie-notice.js" defer></script>
 <script src="/frontend/demo/data.js"></script>
 <script src="/frontend/demo/store.js"></script>
 <script type="module" src="/frontend/js/catalog.js"></script>

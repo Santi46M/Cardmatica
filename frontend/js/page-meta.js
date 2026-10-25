@@ -43,6 +43,13 @@ function set(title, description) {
 export function tabMeta(tab) {
     const [title, description] = TABS[tab] || TABS.Inicio;
     set(t(title), t(description));
+    // Every view has one <h1>: the home page draws its own; the others name
+    // the tab for screen readers (index.html, #view-title).
+    const heading = document.getElementById("view-title");
+    if (heading) {
+        heading.hidden = tab === "Inicio";
+        heading.textContent = t(title).replace(/ · Cardmática$/, "");
+    }
 }
 
 export function cardMeta(name) {

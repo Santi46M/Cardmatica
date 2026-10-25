@@ -476,6 +476,10 @@ def test_register_sign_out_and_sign_in_from_the_account_menu(live_server, browse
     page.locator("#auth-email").fill("martin@example.com")
     page.locator("#auth-password").fill("una frase larga de prueba")
     page.locator("#auth-register button[type=submit]").click()
+    # Both boxes start unticked: being an adult first, then the terms.
+    expect(page.locator("#authv [data-auth-error]")).to_contain_text("18 años")
+    page.locator("#auth-adult").check()
+    page.locator("#auth-register button[type=submit]").click()
     expect(page.locator("#authv [data-auth-error]")).to_contain_text("términos")
     page.locator("#auth-terms").check()
     page.locator("#auth-register button[type=submit]").click()
@@ -517,6 +521,7 @@ def test_browser_data_moves_into_the_account(live_server, browser_page):
     page.locator("#auth-name").fill("Lucía")
     page.locator("#auth-email").fill("lucia@example.com")
     page.locator("#auth-password").fill("una frase larga de prueba")
+    page.locator("#auth-adult").check()
     page.locator("#auth-terms").check()
     page.locator("#auth-register button[type=submit]").click()
     expect(page.locator("#ts")).to_contain_text("se guardaron en tu cuenta")
@@ -576,6 +581,7 @@ def test_admin_panel_for_admin_accounts(live_server, browser_page, factory):
     page.locator("#auth-name").fill("Admin")
     page.locator("#auth-email").fill("admin@example.com")
     page.locator("#auth-password").fill("una frase larga de prueba")
+    page.locator("#auth-adult").check()
     page.locator("#auth-terms").check()
     page.locator("#auth-register button[type=submit]").click()
     expect(page.locator("#ts")).to_contain_text("Cuenta creada")
@@ -606,6 +612,7 @@ def test_email_links_confirm_and_reset(live_server, browser_page, monkeypatch):
     page.locator("#auth-name").fill("Sofía")
     page.locator("#auth-email").fill("sofia@example.com")
     page.locator("#auth-password").fill("una frase larga de prueba")
+    page.locator("#auth-adult").check()
     page.locator("#auth-terms").check()
     page.locator("#auth-register button[type=submit]").click()
     expect(page.locator("#ts")).to_contain_text("Cuenta creada")
@@ -652,11 +659,13 @@ def test_launch_checklist(live_server, browser_page, factory):
         box = page.locator(".hero2 .btn").first.bounding_box()
         assert box and box["y"] + box["height"] <= height
     page.set_viewport_size({"width": 1280, "height": 900})
-    expect(page.locator("h1")).to_have_count(1)
+    # One heading 1 per view: the home page's own; the hidden one names other tabs.
+    expect(page.locator("h1:not([hidden])")).to_have_count(1)
     assert page.locator('link[rel="icon"][type="image/svg+xml"]').count() == 1
     assert page.locator('meta[property="og:image"]').get_attribute("content").startswith("http")
     page.locator('[data-g="Trampa"]').click()
     expect(page).to_have_title(re.compile("^Trampas"))
+    expect(page.locator("#view-title")).to_have_text("Trampas")
     assert "contraefecto" in page.locator('meta[name="description"]').get_attribute("content")
     page.locator('[data-g="Todas"]').click()
     expect(page.locator("#list [data-catalog-card]").first).to_be_visible()
@@ -943,3 +952,26 @@ def test_the_site_in_portuguese_and_english(live_server, browser_page):
     page.reload()
     expect(page.locator('[data-g="Productos"]')).to_have_text("Products (demo)")
     assert not errors
+
+
+def test_delete_my_account_from_security(live_server, browser_page):
+    page = browser_page
+    page.goto(f"{live_server}/?tab=Acceso")
+    page.locator('#authv [data-auth-mode="register"]').click()
+    page.locator("#auth-name").fill("Lucía")
+    page.locator("#auth-email").fill("lucia@example.com")
+    page.locator("#auth-password").fill("una frase larga de prueba")
+    page.locator("#auth-adult").check()
+    page.locator("#auth-terms").check()
+    page.locator("#auth-register button[type=submit]").click()
+    expect(page.locator("#account-button")).to_have_text("L")
+    page.goto(f"{live_server}/?tab=Seguridad")
+    expect(page.locator('a[href="/api/v1/account/export"]')).to_be_visible()
+    page.locator("#auth-delete-password").fill("una frase larga de prueba")
+    page.locator("#auth-delete-form button[type=submit]").click()
+    expect(page.locator("#auth-delete-form [data-auth-error]")).to_contain_text("casilla")
+    page.locator("#auth-delete-confirm").check()
+    page.locator("#auth-delete-form button[type=submit]").click()
+    expect(page.locator("#ts")).to_contain_text("se borraron")
+    page.locator("#account-button").click()
+    expect(page.locator("#account-menu")).to_contain_text("Invitado")
