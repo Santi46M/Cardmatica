@@ -16,7 +16,6 @@ from app.models import Card, CardArtwork, CardImage, SyncError, SyncJob, User
 from app.models.accounts import ROLES
 from app.schemas.catalog import JobRequest
 from app.schemas.ingestion import CardRecord
-from app.services import news
 from app.services.accounts import normalize_email, remove_expired
 from app.services.banlists import bundled_files, import_banlist, load_file
 from app.services.ingestion import IngestionService
@@ -84,13 +83,6 @@ def import_banlists(paths: list[Path]):
         with factory.begin() as session:
             results.append({"file": path.name, **import_banlist(session, data)})
     print(json.dumps(results, ensure_ascii=False))
-    return 0
-
-
-def import_news_file():
-    """Add or update the news bundled with the app (app/data/news.json)."""
-    with session_factory().begin() as session:
-        print(json.dumps({"news": news.import_bundled(session)}))
     return 0
 
 
@@ -184,7 +176,6 @@ def main():
         "import-banlist", help="Importar listas Forbidden & Limited fechadas con su procedencia"
     )
     banlist.add_argument("paths", nargs="*", type=Path)
-    commands.add_parser("import-news", help="Importar las noticias incluidas con la aplicación")
     commands.add_parser("fetch-news", help="Actualizar ahora las noticias desde sus fuentes")
     commands.add_parser(
         "news-worker", help="Actualizar las noticias cada NEWS_REFRESH_HOURS, sin parar"
@@ -230,8 +221,6 @@ def main():
         return 0
     if args.command == "import-banlist":
         return import_banlists(args.paths)
-    if args.command == "import-news":
-        return import_news_file()
     if args.command in ("fetch-news", "news-worker"):
         return asyncio.run(refresh_news(forever=args.command == "news-worker"))
     if args.command == "worker":

@@ -1,4 +1,5 @@
 import { escapeHtml } from "./html.js";
+import { lang, t } from "./lang.js";
 import { countItems, listCount } from "./wantlists.js";
 import { currentUser } from "./auth.js";
 import { request } from "./session-api.js";
@@ -39,57 +40,74 @@ function preferencesHtml() {
     const currencies = window.currencyOptions?.(window.currency) || "";
     const option = (value, label, current) =>
         `<option value="${value}"${value === current ? " selected" : ""}>${label}</option>`;
-    return `<section class="gl pnl" id="pf-prefs"><b>Personalización</b><div class="fm"><label>Moneda<select id="pf-pref-currency">${currencies}</select></label><label>Mercado<select id="pf-pref-market">${option(
+    const languages = window.I18N.languages.map(([code, name]) => option(code, name, lang)).join("");
+    return `<section class="gl pnl" id="pf-prefs"><b>${t("Personalización")}</b><div class="fm"><label>${t(
+        "Idioma"
+    )}<select class="lang-select" id="pf-pref-language">${languages}</select></label><label>${t(
+        "Moneda"
+    )}<select id="pf-pref-currency">${currencies}</select></label><label>${t("Mercado")}<select id="pf-pref-market">${option(
         "TCG",
-        "TCG (cartas occidentales)",
+        t("TCG (cartas occidentales)"),
         window.market
-    )}${option("OCG", "OCG (cartas asiáticas)", window.market)}</select></label><label>Vista del catálogo<select id="pf-pref-view">${option(
-        "list",
-        "Lista",
+    )}${option("OCG", t("OCG (cartas asiáticas)"), window.market)}</select></label><label>${t(
+        "Vista del catálogo"
+    )}<select id="pf-pref-view">${option("list", t("Lista"), view)}${option(
+        "grid",
+        t("Cuadrícula"),
         view
-    )}${option("grid", "Cuadrícula", view)}</select></label></div><small>Se aplican al instante${currentUser() ? " y se guardan en tu cuenta" : " y se guardan en este navegador"}.</small></section>`;
+    )}</select></label></div><small>${t(
+        currentUser() ? "Se aplican al instante y se guardan en tu cuenta." : "Se aplican al instante y se guardan en este navegador."
+    )}</small></section>`;
 }
 
 const sells = (role) => role === "seller" || role === "both";
 
 function summaryHtml() {
     if (!profile) return "";
-    const role = ROLES.find(([value]) => value === profile.role)?.[1] || "";
+    const role = t(ROLES.find(([value]) => value === profile.role)?.[1] || "");
     return `<div class="gl pnl profile-card"><div>${window.flag ? window.flag(profile.country) : ""}<b>${h(
         profile.name
     )}</b> · ${h(role)}${
-        profile.store ? ` · Tienda <b>${h(profile.store)}</b>` : ""
-    }</div><small>${h(profile.address)}, ${h(profile.country)} · ${h(profile.phone)}</small><small>Pagos aceptados: ${h(
-        profile.payments.join(", ")
+        profile.store ? ` · ${t("Tienda")} <b>${h(profile.store)}</b>` : ""
+    }</div><small>${h(profile.address)}, ${h(t(profile.country))} · ${h(profile.phone)}</small><small>${h(
+        t("Pagos aceptados: {methods}", { methods: profile.payments.map((method) => t(method)).join(", ") })
     )}</small></div>`;
 }
 
 export function renderProfile(container) {
     const value = profile || { role: "buyer", country: "Uruguay", payments: [] };
-    container.innerHTML = `<h3>Mi perfil</h3>${summaryHtml()}<form class="gl pnl" id="pf-form" novalidate><div class="fm"><label>Quiero registrarme como<select id="pf-role">${ROLES.map(
-        ([key, label]) => `<option value="${key}"${value.role === key ? " selected" : ""}>${label}</option>`
-    ).join("")}</select></label><label>Nombre completo<input id="pf-name" autocomplete="name" maxlength="120" value="${h(
+    container.innerHTML = `<h3>${t("Mi perfil")}</h3>${summaryHtml()}<form class="gl pnl" id="pf-form" novalidate><div class="fm"><label>${t(
+        "Quiero registrarme como"
+    )}<select id="pf-role">${ROLES.map(
+        ([key, label]) => `<option value="${key}"${value.role === key ? " selected" : ""}>${t(label)}</option>`
+    ).join("")}</select></label><label>${t("Nombre completo")}<input id="pf-name" autocomplete="name" maxlength="120" value="${h(
         value.name
-    )}"></label><label id="pf-store-field"${sells(value.role) ? "" : " hidden"}>Nombre de la tienda<input id="pf-store" autocomplete="organization" maxlength="80" value="${h(
+    )}"></label><label id="pf-store-field"${sells(value.role) ? "" : " hidden"}>${t("Nombre de la tienda")}<input id="pf-store" autocomplete="organization" maxlength="80" value="${h(
         value.store
-    )}"></label><label>País<select id="pf-country" autocomplete="country-name">${COUNTRIES.map(
-        (country) => `<option${value.country === country ? " selected" : ""}>${country}</option>`
-    ).join("")}</select></label><label class="full">Dirección<input id="pf-address" autocomplete="street-address" maxlength="200" value="${h(
+    )}"></label><label>${t("País")}<select id="pf-country" autocomplete="country-name">${COUNTRIES.map(
+        (country) =>
+            `<option value="${country}"${value.country === country ? " selected" : ""}>${t(country)}</option>`
+    ).join("")}</select></label><label class="full">${t("Dirección")}<input id="pf-address" autocomplete="street-address" maxlength="200" value="${h(
         value.address
-    )}"></label><label>Teléfono<input id="pf-phone" type="tel" autocomplete="tel" maxlength="30" value="${h(
+    )}"></label><label>${t("Teléfono")}<input id="pf-phone" type="tel" autocomplete="tel" maxlength="30" value="${h(
         value.phone
-    )}"></label><fieldset class="full"><legend>Métodos de pago</legend><div class="chk">${PAYMENTS.map(
+    )}"></label><fieldset class="full"><legend>${t("Métodos de pago")}</legend><div class="chk">${PAYMENTS.map(
         (method) =>
             `<label><input type="checkbox" name="pf-payment" value="${h(method)}"${
                 value.payments.includes(method) ? " checked" : ""
-            }> ${h(method)}</label>`
-    ).join("")}</div></fieldset></div><p id="pf-error" class="warn" role="alert" hidden></p><p><button class="btn" type="submit">Guardar perfil</button></p><small>${
+            }> ${h(t(method))}</label>`
+    ).join("")}</div></fieldset></div><p id="pf-error" class="warn" role="alert" hidden></p><p><button class="btn" type="submit">${t(
+        "Guardar perfil"
+    )}</button></p><small>${t(
         currentUser()
             ? "El perfil se guarda en tu cuenta. Un perfil de vendedor todavía no publica una tienda."
             : "Sin sesión iniciada, el perfil se guarda solo en este navegador. Inicia sesión para guardarlo en tu cuenta."
-    }</small></form><div class="gl pnl" style="margin-top:12px"><b>Listas de deseados</b><small>${listCount()} ${
-        listCount() === 1 ? "lista" : "listas"
-    } · ${countItems()} cartas</small><p><button class="btn s" data-go="Deseados">Ver mis listas</button></p></div>${preferencesHtml()}`;
+    )}</small></form><div class="gl pnl" style="margin-top:12px"><b>${t("Listas de deseados")}</b><small>${t(
+        listCount() === 1 ? "{count} lista" : "{count} listas",
+        { count: listCount() }
+    )} · ${t("{count} cartas", { count: countItems() })}</small><p><button class="btn s" data-go="Deseados">${t(
+        "Ver mis listas"
+    )}</button></p></div>${preferencesHtml()}`;
 }
 
 function read() {
@@ -108,19 +126,19 @@ function read() {
 }
 
 function problem(data) {
-    if (!data.name) return ["pf-name", "Escribe tu nombre completo."];
-    if (sells(data.role) && !data.store) return ["pf-store", "Escribe el nombre de tu tienda."];
-    if (!data.address) return ["pf-address", "Escribe tu dirección para los envíos."];
+    if (!data.name) return ["pf-name", t("Escribe tu nombre completo.")];
+    if (sells(data.role) && !data.store) return ["pf-store", t("Escribe el nombre de tu tienda.")];
+    if (!data.address) return ["pf-address", t("Escribe tu dirección para los envíos.")];
     if (data.phone.replace(/\D/g, "").length < 6)
-        return ["pf-phone", "El teléfono debe tener al menos 6 dígitos."];
-    if (!data.payments.length) return [null, "Elige al menos un método de pago."];
+        return ["pf-phone", t("El teléfono debe tener al menos 6 dígitos.")];
+    if (!data.payments.length) return [null, t("Elige al menos un método de pago.")];
     return null;
 }
 
 // Signed in, the profile lives in the account; otherwise in this browser.
 async function saveProfile(data) {
     if (currentUser()) await request(`${ACCOUNT}/profile`, { method: "PUT", body: data });
-    else if (!writeJson(KEY, data)) throw new Error("Tu navegador no permite guardar datos en este sitio.");
+    else if (!writeJson(KEY, data)) throw new Error(t("Tu navegador no permite guardar datos en este sitio."));
     profile = data;
 }
 
@@ -162,7 +180,7 @@ function savePreferencesSoon() {
         if (!currentUser()) return;
         request(`${ACCOUNT}/preferences`, { method: "PUT", body: currentPreferences() }).catch(() => {
             // Signing out meanwhile is not an error worth announcing.
-            if (currentUser()) window.toast?.("No se pudieron guardar tus preferencias en la cuenta");
+            if (currentUser()) window.toast?.(t("No se pudieron guardar tus preferencias en la cuenta"));
         });
     }, 300);
 }
@@ -187,7 +205,7 @@ async function syncWithAccount(panel) {
             // First sign-in: keep what this browser had chosen, right away.
             else await request(`${ACCOUNT}/preferences`, { method: "PUT", body: currentPreferences() });
         } catch {
-            if (currentUser()) window.toast?.("No se pudo leer tu perfil de la cuenta");
+            if (currentUser()) window.toast?.(t("No se pudo leer tu perfil de la cuenta"));
         }
     }
     document.dispatchEvent(new CustomEvent("cm:profile"));
@@ -214,7 +232,7 @@ export function installProfile({ panel }) {
         }
         const button = event.target.querySelector("button[type=submit]");
         button.disabled = true;
-        button.textContent = "Guardando…";
+        button.textContent = t("Guardando…");
         try {
             await saveProfile(data);
         } catch (failure) {
@@ -223,9 +241,9 @@ export function installProfile({ panel }) {
             return;
         } finally {
             button.disabled = false;
-            button.textContent = "Guardar perfil";
+            button.textContent = t("Guardar perfil");
         }
-        window.toast?.(currentUser() ? "Perfil guardado en tu cuenta" : "Perfil guardado");
+        window.toast?.(t(currentUser() ? "Perfil guardado en tu cuenta" : "Perfil guardado"));
         document.dispatchEvent(new CustomEvent("cm:profile"));
         renderProfile(panel());
     });
@@ -237,6 +255,7 @@ export function installProfile({ panel }) {
             select.value = value;
             select.dispatchEvent(new Event("change", { bubbles: true }));
         }
+        if (id === "pf-pref-language") window.I18N.choose(value);
         if (id === "pf-pref-market") document.querySelector(`[data-mk="${value}"]`)?.click();
         if (id === "pf-pref-view") {
             writeJson("cm_view", value);

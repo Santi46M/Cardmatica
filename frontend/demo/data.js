@@ -161,7 +161,8 @@ DEMO.sellers = [
     { name: "PixelCarton", country: "Paraguay" }
 ];
 
-// Productos sellados y accesorios. "set" es un prefijo de DEMO.sets; "market"
+// Productos sellados y accesorios. "name" lleva {set} donde va el nombre del
+// set, y pasa por t() como los demás textos. "set" es un prefijo de DEMO.sets; "market"
 // es TCG u OCG en lo sellado y no va en los accesorios, que valen para ambos;
 // "brand" es la marca de un accesorio o de un producto sellado sin set;
 // "released" vale solo si el producto salió en otra fecha que su set.
@@ -172,23 +173,23 @@ DEMO.productCategories = {
     Accesorios: ["Fundas", "Deckbox", "Binder", "Páginas de binder", "Playmat", "Dados"]
 };
 DEMO.products = [
-    { name: "Caja de sobres Beyond the Brave", category: "Caja de sobres", set: "BETB", market: "TCG", detail: "24 sobres de 9 cartas · 100 cartas en el set", basePrice: 85, icon: "📦" },
-    { name: "Sobre Beyond the Brave", category: "Sobre", set: "BETB", market: "TCG", detail: "9 cartas", basePrice: 4.2, icon: "🎴" },
-    { name: "Caja Beyond the Brave (japonés)", category: "Caja de sobres", set: "BETB", market: "OCG", released: "2026-07-18", detail: "Edición japonesa", basePrice: 70, icon: "📦" },
-    { name: "Magnificent Monsters", category: "Caja de sobres", set: "MAMO", market: "TCG", detail: "3 sobres de 5 cartas y 3 Secret Rare, que pueden ser Starlight Rare · 126 cartas en el set", basePrice: 40, icon: "📦" },
-    { name: "Caja de sobres Chaos Origins", category: "Caja de sobres", set: "CORI", market: "TCG", detail: "24 sobres de 9 cartas · 100 cartas en el set", basePrice: 80, icon: "📦" },
-    { name: "Sobre Chaos Origins", category: "Sobre", set: "CORI", market: "TCG", detail: "9 cartas", basePrice: 4, icon: "🎴" },
-    { name: "Caja de sobres Blazing Dominion", category: "Caja de sobres", set: "BLZD", market: "TCG", detail: "24 sobres de 9 cartas · 100 cartas en el set", basePrice: 78, icon: "📦" },
-    { name: "Caja de sobres Rarity Collection 5", category: "Caja de sobres", set: "RA05", market: "TCG", detail: "24 sobres de 5 cartas, todas foil; la quinta es de arte alternativo", basePrice: 120, icon: "📦" },
-    { name: "Sobre Burst Protocol", category: "Sobre", set: "BPRO", market: "TCG", detail: "100 cartas en el set, 25 de ellas Starlight Rare", basePrice: 4, icon: "🎴" },
+    { name: "Caja de sobres {set}", category: "Caja de sobres", set: "BETB", market: "TCG", detail: "24 sobres de 9 cartas · 100 cartas en el set", basePrice: 85, icon: "📦" },
+    { name: "Sobre {set}", category: "Sobre", set: "BETB", market: "TCG", detail: "9 cartas", basePrice: 4.2, icon: "🎴" },
+    { name: "Caja {set} (japonés)", category: "Caja de sobres", set: "BETB", market: "OCG", released: "2026-07-18", detail: "Edición japonesa", basePrice: 70, icon: "📦" },
+    { name: "{set}", category: "Caja de sobres", set: "MAMO", market: "TCG", detail: "3 sobres de 5 cartas y 3 Secret Rare, que pueden ser Starlight Rare · 126 cartas en el set", basePrice: 40, icon: "📦" },
+    { name: "Caja de sobres {set}", category: "Caja de sobres", set: "CORI", market: "TCG", detail: "24 sobres de 9 cartas · 100 cartas en el set", basePrice: 80, icon: "📦" },
+    { name: "Sobre {set}", category: "Sobre", set: "CORI", market: "TCG", detail: "9 cartas", basePrice: 4, icon: "🎴" },
+    { name: "Caja de sobres {set}", category: "Caja de sobres", set: "BLZD", market: "TCG", detail: "24 sobres de 9 cartas · 100 cartas en el set", basePrice: 78, icon: "📦" },
+    { name: "Caja de sobres {set}", category: "Caja de sobres", set: "RA05", market: "TCG", detail: "24 sobres de 5 cartas, todas foil; la quinta es de arte alternativo", basePrice: 120, icon: "📦" },
+    { name: "Sobre {set}", category: "Sobre", set: "BPRO", market: "TCG", detail: "100 cartas en el set, 25 de ellas Starlight Rare", basePrice: 4, icon: "🎴" },
     { name: "Legendary Arc-V Decks", brand: "Konami", category: "Colección", market: "TCG", released: "2026-08-07", detail: "3 mazos de 55 cartas, cada uno con 6 Ultra Rare y 1 Secret Rare, y un sobre extra con una Secret Rare", basePrice: 30, icon: "🗃️" },
     { name: "Legendary Modern Decks 2026", brand: "Konami", category: "Colección", market: "TCG", released: "2026-03-13", detail: "3 mazos de 55 cartas: Sky Striker, X-Saber y Mitsurugi", basePrice: 30, icon: "🗃️" },
     { name: "The Chronicles Deck: Spirit Charmers", brand: "Konami", category: "Mazo", market: "TCG", released: "2026-01-23", detail: "Mazo de 51 cartas, todas foil; la 51.ª puede ser Starlight Rare", basePrice: 19, icon: "🃏" },
-    { name: "Caja Rarity Collection Quarter Century Edition (japonés)", category: "Caja de sobres", set: "RC04", market: "OCG", detail: "Edición japonesa", basePrice: 110, icon: "📦" },
-    { name: "Kaiba's Collector Box", category: "Colección", set: "KACB", market: "TCG", detail: "Caja de coleccionista de 2017", basePrice: 60, icon: "🗃️" },
-    { name: "Starter Deck: Kaiba (sellado)", category: "Mazo", set: "SDK", market: "TCG", detail: "Mazo de 50 cartas de 2002", basePrice: 90, icon: "🃏" },
-    { name: "Starter Deck: Yugi (sellado)", category: "Mazo", set: "SDY", market: "TCG", detail: "Mazo de 50 cartas de 2002", basePrice: 90, icon: "🃏" },
-    { name: "Dragon Shield Matte Japanese (60 fundas)", brand: "Dragon Shield", category: "Fundas", detail: "60 fundas mate para cartas de tamaño japonés (59 × 86 mm), como las de Yu-Gi-Oh!", basePrice: 9, icon: "🛡️" },
+    { name: "Caja {set} (japonés)", category: "Caja de sobres", set: "RC04", market: "OCG", detail: "Edición japonesa", basePrice: 110, icon: "📦" },
+    { name: "{set}", category: "Colección", set: "KACB", market: "TCG", detail: "Caja de coleccionista de 2017", basePrice: 60, icon: "🗃️" },
+    { name: "{set}", category: "Mazo", set: "SDK", market: "TCG", detail: "Mazo de 50 cartas de 2002", basePrice: 90, icon: "🃏" },
+    { name: "{set}", category: "Mazo", set: "SDY", market: "TCG", detail: "Mazo de 50 cartas de 2002", basePrice: 90, icon: "🃏" },
+    { name: "Dragon Shield Matte Japanese Size Sleeves (60)", brand: "Dragon Shield", category: "Fundas", detail: "60 fundas mate para cartas de tamaño japonés (59 × 86 mm), como las de Yu-Gi-Oh!", basePrice: 9, icon: "🛡️" },
     { name: "Ultimate Guard Katana Sleeves Japanese Size (60)", brand: "Ultimate Guard", category: "Fundas", detail: "60 fundas de tamaño japonés", basePrice: 8, icon: "🛡️" },
     { name: "Ultra Pro Eclipse Matte Small Sleeves (60)", brand: "Ultra Pro", category: "Fundas", detail: "60 fundas mate de 62 × 89 mm para cartas pequeñas, como las de Yu-Gi-Oh!", basePrice: 7, icon: "🛡️" },
     { name: "Card Sleeves Jaden & Yubel", brand: "Konami", category: "Fundas", released: "2025-01-24", detail: "50 fundas oficiales", basePrice: 5, icon: "🛡️" },

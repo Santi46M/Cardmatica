@@ -6,6 +6,11 @@ Every page is sent with its own title, description and Open Graph tags, and
 with absolute addresses in og:url, og:image and the canonical link, as link
 previews (WhatsApp, Telegram, X) and search engines require. Its scripts and
 stylesheet are linked by versioned address (app/core/assets.py).
+
+Pages come in the visitor's language (app/core/languages.py): the static text
+is translated here with the frontend's dictionary, which the page also loads
+for what its scripts write; each language has its own address (?lang=pt) for
+search engines, announced with hreflang links.
 """
 
 import html
@@ -18,7 +23,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Res
 from sqlalchemy import select
 
 from app.api.dependencies import SessionDep, site_url
-from app.core import assets
+from app.core import assets, languages
 from app.core.config import ROOT
 from app.core.security import content_security_policy
 from app.models import Archetype, Card, CardSet
@@ -28,9 +33,54 @@ PAGES = ROOT / "frontend" / "pages"
 ASSETS = ROOT / "frontend" / "assets"
 INDEX = ROOT / "index.html"
 LEGAL_PAGES = {"terminos", "privacidad", "normas"}
-SITE = "Cardmática"
 # Search engines read at most 50,000 addresses per sitemap file.
 SITEMAP_LIMIT = 50000
+
+
+page_language = languages.for_request
+
+
+def tr(request: Request, text: str, **values) -> str:
+    return languages.translate(page_language(request), text, **values)
+
+
+# Visible text between tags, and the attributes people read.
+_TEXT = re.compile(r">([^<>]*[^\s<>][^<>]*)<")
+_ATTRIBUTE = re.compile(r'\b(placeholder|aria-label|title|alt|content)="([^"]+)"')
+
+
+def translate_static(page: str, lang: str) -> str:
+    """Translate the page's own text (not what its scripts write later)."""
+    words = languages.dictionary(lang)
+    if not words:
+        return page
+
+    def text(match):
+        original = match.group(1)
+        found = words.get(" ".join(original.split()))
+        if found is None:
+            return match.group(0)
+        start = original[: len(original) - len(original.lstrip())]
+        end = original[len(original.rstrip()) :]
+        return f">{start}{html.escape(found, quote=False)}{end}<"
+
+    def attribute(match):
+        found = words.get(html.unescape(match.group(2)))
+        return match.group(0) if found is None else f'{match.group(1)}="{html.escape(found)}"'
+
+    # Inline scripts (the import map) are added later, so none is touched here.
+    return _ATTRIBUTE.sub(attribute, _TEXT.sub(text, page))
+
+
+def _alternates(base: str, path: str) -> str:
+    links = [
+        f'<link rel="alternate" hreflang="{languages.HTML_LANG[code]}" href="{base}{path}'
+        + ("" if code == languages.DEFAULT else f"?lang={code}")
+        + '">'
+        for code in languages.LANGUAGES
+    ]
+    links.append(f'<link rel="alternate" hreflang="x-default" href="{base}{path}">')
+    return "\n    ".join(links)
 
 
 def _meta(page: str, attribute: str, name: str, value: str) -> str:
@@ -47,8 +97,23 @@ def render(
     description: str | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
-    page = file.read_text(encoding="utf-8")
+    lang = page_language(request)
+    # A legal page may have its own version in this language (terminos.pt.html).
+    translated = file.with_name(f"{file.stem}.{lang}{file.suffix}")
+    page = (translated if translated.is_file() else file).read_text(encoding="utf-8")
+    if lang != languages.DEFAULT:
+        page = translate_static(page, lang)
+    page = page.replace('<html lang="es">', f'<html lang="{languages.HTML_LANG[lang]}">', 1)
+    page = _meta(page, "property", "og:locale", languages.OG_LOCALE[lang])
+    # The dictionary for what the scripts write, right after the code that uses it.
+    if lang != languages.DEFAULT:
+        page = page.replace(
+            '<script src="/frontend/i18n.js"></script>',
+            f'<script src="/frontend/i18n.js"></script><script src="/frontend/i18n/{lang}.js"></script>',
+            1,
+        )
     base = site_url(request)
+    address = path if lang == languages.DEFAULT else f"{path}?lang={lang}"
     if title:
         title = html.escape(title)
         page = re.sub(r"<title>.*?</title>", f"<title>{title}</title>", page, count=1, flags=re.S)
@@ -57,18 +122,24 @@ def render(
         description = html.escape(description)
         page = _meta(page, "name", "description", description)
         page = _meta(page, "property", "og:description", description)
-    page = _meta(page, "property", "og:url", f"{base}{path}")
+    page = _meta(page, "property", "og:url", f"{base}{address}")
     page = page.replace(
         'content="/frontend/assets/og-image.png"', f'content="{base}/frontend/assets/og-image.png"'
     )
     page = re.sub(
         r'<link rel="canonical" href="[^"]*">',
-        f'<link rel="canonical" href="{base}{path}">',
+        f'<link rel="canonical" href="{base}{address}">\n    {_alternates(base, path)}',
         page,
         count=1,
     )
     page, import_map = assets.version_page(page)
     response = HTMLResponse(page, status_code=status_code)
+    # The same address answers in each visitor's language.
+    response.headers["Vary"] = "Accept-Language, Cookie"
+    if languages.supported(request.query_params.get("lang")):
+        response.set_cookie(
+            languages.COOKIE, lang, max_age=365 * 86400, samesite="lax", httponly=False
+        )
     if import_map:
         response.headers["Content-Security-Policy"] = content_security_policy(import_map)
     return response
@@ -97,7 +168,9 @@ def favicon():
 @router.get("/verificar")
 @router.get("/restablecer")
 def account_link(request: Request):
-    return render(INDEX, request, path=request.url.path, title=f"Tu cuenta · {SITE}")
+    return render(
+        INDEX, request, path=request.url.path, title=tr(request, "Tu cuenta · Cardmática")
+    )
 
 
 @router.get("/carta/{card_id}")
@@ -110,8 +183,12 @@ def card_page(card_id: UUID, request: Request, session: SessionDep, slug: str | 
         INDEX,
         request,
         path=f"/carta/{card_id}",
-        title=f"{name} · Cartas sueltas · {SITE}",
-        description=f"{name}: impresiones, rarezas, estado en la banlist e historial de precios en {SITE}.",
+        title=tr(request, "{name} · Cartas sueltas · Cardmática", name=name),
+        description=tr(
+            request,
+            "{name}: impresiones, rarezas, estado en la banlist e historial de precios en Cardmática.",
+            name=name,
+        ),
     )
 
 
@@ -125,8 +202,15 @@ def set_page(set_id: UUID, request: Request, session: SessionDep, slug: str | No
         INDEX,
         request,
         path=f"/set/{set_id}",
-        title=f"{row.name} · Set de Yu-Gi-Oh! {row.market} · {SITE}",
-        description=f"{row.name}: cartas sueltas, cajas y sobres del set en {SITE}.",
+        title=tr(
+            request,
+            "{name} · Set de Yu-Gi-Oh! {market} · Cardmática",
+            name=row.name,
+            market=row.market,
+        ),
+        description=tr(
+            request, "{name}: cartas sueltas, cajas y sobres del set en Cardmática.", name=row.name
+        ),
     )
 
 
@@ -142,8 +226,10 @@ def archetype_page(
         INDEX,
         request,
         path=f"/arquetipo/{archetype_id}",
-        title=f"Arquetipo {row.name} · {SITE}",
-        description=f"Todas las cartas del arquetipo {row.name} en {SITE}.",
+        title=tr(request, "Arquetipo {name} · Cardmática", name=row.name),
+        description=tr(
+            request, "Todas las cartas del arquetipo {name} en Cardmática.", name=row.name
+        ),
     )
 
 

@@ -2,6 +2,7 @@
 // style of Cardmarket and TCGplayer. Entries that already work open their
 // panel; the rest show what is coming next (see the roadmap) and are disabled.
 import { escapeHtml } from "./html.js";
+import { lang, t } from "./lang.js";
 import { currentUser } from "./auth.js";
 import { currentProfile, ROLE_LABELS } from "./profile.js";
 import { countItems } from "./wantlists.js";
@@ -69,12 +70,12 @@ function avatarHtml() {
 function itemHtml([label, tab, anchor]) {
     if (!tab)
         return `<button role="menuitem" class="acc-item" disabled aria-disabled="true">${h(
-            label
-        )}<small>Próximamente</small></button>`;
+            t(label)
+        )}<small>${t("Próximamente")}</small></button>`;
     const badge = tab === "Deseados" && countItems() ? `<small>${countItems()}</small>` : "";
     return `<button role="menuitem" class="acc-item" data-go="${h(tab)}"${
         anchor ? ` data-acc-scroll="${h(anchor)}"` : ""
-    }>${h(label)}${badge}</button>`;
+    }>${h(t(label))}${badge}</button>`;
 }
 
 function whoHtml() {
@@ -82,23 +83,29 @@ function whoHtml() {
     const profile = currentProfile();
     if (user)
         return `<b>${h(user.display_name)}</b><small>${h(user.email)}${
-            user.email_verified ? "" : ' · <span class="warn-text">sin confirmar</span>'
+            user.email_verified ? "" : ` · <span class="warn-text">${t("sin confirmar")}</span>`
         }${
             profile?.store ? ` · ${h(profile.store)}` : ""
         }</small>`;
     // Without an account, the profile kept in this browser still names the person.
     if (profile)
-        return `<b>${h(profile.name)}</b><small>${h(ROLE_LABELS[profile.role] || "")}${
+        return `<b>${h(profile.name)}</b><small>${h(t(ROLE_LABELS[profile.role] || ""))}${
             profile.store ? ` · ${h(profile.store)}` : ""
-        } · sin cuenta</small>`;
-    return "<b>Invitado</b><small>Inicia sesión o crea una cuenta</small>";
+        } · ${t("sin cuenta")}</small>`;
+    return `<b>${t("Invitado")}</b><small>${t("Inicia sesión o crea una cuenta")}</small>`;
 }
 
 // Signed out: the way in comes first. Signed in: the way out comes last.
 function accessHtml() {
     if (currentUser())
-        return '<div class="acc-section"><button role="menuitem" class="acc-item" data-auth-logout>Cerrar sesión</button></div>';
-    return '<div class="acc-access"><button role="menuitem" class="btn s acc-item-main" data-go="Acceso" data-auth-mode="login">Iniciar sesión</button><button role="menuitem" class="ghost acc-item-main" data-go="Acceso" data-auth-mode="register">Crear cuenta</button></div>';
+        return `<div class="acc-section"><button role="menuitem" class="acc-item" data-auth-logout>${t(
+            "Cerrar sesión"
+        )}</button></div>`;
+    return `<div class="acc-access"><button role="menuitem" class="btn s acc-item-main" data-go="Acceso" data-auth-mode="login">${t(
+        "Iniciar sesión"
+    )}</button><button role="menuitem" class="ghost acc-item-main" data-go="Acceso" data-auth-mode="register">${t(
+        "Crear cuenta"
+    )}</button></div>`;
 }
 
 // Only administrators see the way into the panel.
@@ -108,23 +115,40 @@ function adminHtml() {
 }
 
 function sectionHtml([title, items]) {
-    return `<div class="acc-section" role="group" aria-label="${h(title)}"><span class="acc-title">${h(
-        title
+    return `<div class="acc-section" role="group" aria-label="${h(t(title))}"><span class="acc-title">${h(
+        t(title)
     )}</span>${items.map(itemHtml).join("")}</div>`;
+}
+
+// The site's three languages, each written in itself (frontend/i18n.js).
+function languageHtml() {
+    return `<div class="acc-section" role="group" aria-label="${t("Idioma")}"><span class="acc-title">${t(
+        "Idioma"
+    )}</span><div class="acc-langs">${window.I18N.languages
+        .map(
+            ([code, name]) =>
+                `<button role="menuitem" class="ghost" data-lang="${code}" lang="${code}" aria-pressed="${
+                    code === lang
+                }">${name}</button>`
+        )
+        .join("")}</div></div>`;
 }
 
 function menuHtml() {
     const signedIn = Boolean(currentUser());
-    const role = signedIn ? ROLE_LABELS[currentProfile()?.role] : "";
-    const note = signedIn
-        ? "Tu perfil, listas de deseados y preferencias se guardan en tu cuenta. El carrito es de la tienda de demostración y queda en este navegador."
-        : "Sin cuenta, el perfil y las listas de deseados se guardan solo en este navegador.";
+    const role = signedIn ? t(ROLE_LABELS[currentProfile()?.role] || "") : "";
+    const note = t(
+        signedIn
+            ? "Tu perfil, listas de deseados y preferencias se guardan en tu cuenta. El carrito es de la tienda de demostración y queda en este navegador."
+            : "Sin cuenta, el perfil y las listas de deseados se guardan solo en este navegador."
+    );
     return [
         `<div class="acc-who"><span class="acc-avatar big" aria-hidden="true">${avatarHtml()}</span><div>${whoHtml()}${
             role ? `<small>${h(role)}</small>` : ""
         }</div></div>`,
         signedIn ? "" : accessHtml(),
         ...SECTIONS.map(sectionHtml),
+        languageHtml(),
         adminHtml(),
         signedIn ? accessHtml() : "",
         `<p class="acc-note">${note}</p>`
@@ -136,14 +160,14 @@ export function installAccountMenu() {
     const wrap = document.createElement("div");
     wrap.className = "acc";
     wrap.innerHTML =
-        '<button class="acc-avatar" id="account-button" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu" title="Mi cuenta"></button><div class="acc-menu gl" id="account-menu" role="menu" aria-labelledby="account-button" hidden></div>';
+        `<button class="acc-avatar" id="account-button" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu" title="${t("Mi cuenta")}"></button><div class="acc-menu gl" id="account-menu" role="menu" aria-labelledby="account-button" hidden></div>`;
     bar.append(wrap);
     const button = wrap.querySelector("#account-button");
     const menu = wrap.querySelector("#account-menu");
     const refreshAvatar = () => {
         const name = displayName();
         button.innerHTML = avatarHtml();
-        button.setAttribute("aria-label", name ? `Mi cuenta: ${name}` : "Mi cuenta");
+        button.setAttribute("aria-label", name ? t("Mi cuenta: {name}", { name }) : t("Mi cuenta"));
     };
     const close = (focusButton = false) => {
         if (menu.hidden) return;
@@ -166,6 +190,8 @@ export function installAccountMenu() {
     // Entries carry data-go, so the store's click router changes the tab; this
     // only closes the menu and, for "Personalización", scrolls to its section.
     menu.addEventListener("click", (event) => {
+        const choice = event.target.closest("[data-lang]");
+        if (choice) return window.I18N.choose(choice.dataset.lang);
         const item = event.target.closest("[data-go], [data-auth-logout]");
         if (!item) return;
         const anchor = item.dataset.accScroll;

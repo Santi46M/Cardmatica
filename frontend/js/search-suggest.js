@@ -26,7 +26,7 @@ export function installSearchSuggest({ input, api, market, onPick }) {
     list.id = "q-suggest";
     list.className = "suggest";
     list.setAttribute("role", "listbox");
-    list.setAttribute("aria-label", "Cartas sugeridas");
+    list.setAttribute("aria-label", window.t("Cartas sugeridas"));
     list.hidden = true;
     input.closest(".search").append(list);
     input.setAttribute("role", "combobox");
@@ -68,7 +68,7 @@ export function installSearchSuggest({ input, api, market, onPick }) {
         try {
             const found = await api.get(
                 "suggest",
-                { q: text, market: market(), limit: SUGGEST.limit, language: "es" },
+                { q: text, market: market(), limit: SUGGEST.limit, language: window.I18N.lang },
                 { signal: controller.signal }
             );
             // Typing went on meanwhile: a newer request will answer.

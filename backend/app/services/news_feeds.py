@@ -1,14 +1,17 @@
 """News of the home page brought up to date from their sources.
 
-    Yu-Gi-Oh!    the RSS or Atom feeds in NEWS_FEEDS (Konami, YGOrganization,
-                 YGOPRODeck by default): title, link, date and a short excerpt,
-                 always with the source's name. The article stays on its site.
+    Yu-Gi-Oh!    the RSS or Atom feeds in NEWS_FEEDS, each in its language:
+                 Konami Europa and Latinoamérica in Spanish, Konami América
+                 Latina and Yu-Gi-Oh! Nexus in Portuguese, Konami,
+                 YGOrganization and YGOPRODeck in English. Title, link, date and
+                 a short excerpt as the source wrote them, with the source's
+                 name; nothing is translated. The article stays on its site.
     Cardmática   the merged pull requests of the site's public repository
-                 (GitHub API), without maintenance ones.
+                 (GitHub API), without maintenance ones; written in Spanish.
 
 `cardmatica news-worker` refreshes them every NEWS_REFRESH_HOURS; the API
 never goes out to the internet while answering a visitor. A source that fails
-keeps its previous news; the bundled and the administrators' ones stay.
+keeps its previous news; the administrators' ones are never replaced.
 """
 
 import hashlib
@@ -24,6 +27,7 @@ from xml.etree import ElementTree
 
 from sqlalchemy import delete, select
 
+from app.core.languages import LANGUAGES
 from app.models import NewsItem
 
 logger = logging.getLogger(__name__)
@@ -131,7 +135,17 @@ def key_for(url: str) -> str:
     return "feed:" + hashlib.sha256(url.encode()).hexdigest()[:32]
 
 
-def store(session, section: str, source_name: str | None, entries: list[Entry]) -> int:
+def feed_setting(text: str) -> tuple[str, str, str]:
+    """ "pt|Yu-Gi-Oh! Nexus|https://…" → ("pt", "Yu-Gi-Oh! Nexus", "https://…")."""
+    language, name, url = (part.strip() for part in text.split("|", 2))
+    if language not in LANGUAGES:
+        raise ValueError(f"Idioma de feed desconocido: {language}")
+    return language, name or urlsplit(url).hostname, url
+
+
+def store(
+    session, section: str, source_name: str | None, entries: list[Entry], language: str = "es"
+) -> int:
     """Add new entries and update changed ones; a link already shown is not repeated."""
     known = {
         row.url: row for row in session.scalars(select(NewsItem).where(NewsItem.url.is_not(None)))
@@ -145,8 +159,8 @@ def store(session, section: str, source_name: str | None, entries: list[Entry]) 
             known[entry.url] = row
             added += 1
         elif not row.key.startswith("feed:"):
-            continue  # Bundled or written by an administrator: theirs stays.
-        row.section, row.source_name = section, source_name
+            continue  # Written by an administrator: theirs stays.
+        row.section, row.source_name, row.language = section, source_name, language
         row.title, row.summary, row.published_on = (
             entry.title,
             entry.summary or entry.title,
@@ -167,11 +181,11 @@ async def refresh(session, client, settings) -> dict:
     ttl = int(settings.news_refresh_hours * 3600) - 60
     results = {}
     for feed in settings.news_feeds:
-        name, _, url = feed.rpartition("|")
-        name = name.strip() or urlsplit(url).hostname
+        name = feed
         try:
-            response = await client.get(url.strip(), ttl=ttl)
-            results[name] = store(session, "yugioh", name, parse_feed(response.content))
+            language, name, url = feed_setting(feed)
+            response = await client.get(url, ttl=ttl)
+            results[name] = store(session, "yugioh", name, parse_feed(response.content), language)
         except Exception as error:  # noqa: BLE001 - logged, the other sources go on
             logger.warning("Noticias de %s no disponibles: %s", name, error)
             results[name] = f"error: {type(error).__name__}"

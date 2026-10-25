@@ -1,4 +1,5 @@
 // Requests made on behalf of the signed-in person (accounts and their data).
+// The server answers in Spanish; errors are shown in the visitor's language.
 //
 // The session cookie is HttpOnly; every request that changes something also
 // sends the cm_csrf cookie's value in X-CSRF-Token (backend/app/api/auth.py).
@@ -35,9 +36,11 @@ export async function request(path, { method = "GET", body } = {}) {
     if (!response.ok) {
         const detail = data?.error?.details?.[0]?.message;
         const error = new Error(
-            data?.error?.message === "Parámetros inválidos" && detail
-                ? detail.replace(/^Value error, /, "")
-                : data?.error?.message || "No se pudo completar la operación."
+            window.t(
+                data?.error?.message === "Parámetros inválidos" && detail
+                    ? detail.replace(/^Value error, /, "")
+                    : data?.error?.message || "No se pudo completar la operación."
+            )
         );
         error.status = response.status;
         throw error;

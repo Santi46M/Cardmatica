@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from app.core import languages
 from app.core.config import get_settings
 from app.db.base import utcnow
 from app.models.accounts import AccountToken, User, UserSession
@@ -243,16 +244,28 @@ def consume_token(session: Session, token: str, purpose: str) -> User:
     return session.get(User, row.user_id)
 
 
-def send_confirmation(session: Session, user: User, base_url: str) -> None:
+def _link(base_url: str, path: str, token: str, lang: str) -> str:
+    # The page opens in the language the email is written in.
+    return f"{base_url}{path}?token={token}" + (
+        "" if lang == languages.DEFAULT else f"&lang={lang}"
+    )
+
+
+def send_confirmation(session: Session, user: User, base_url: str, lang: str = "es") -> None:
+    """The email goes in the language the person was using (app/core/languages.py)."""
     hours = get_settings().email_confirmation_hours
     token = issue_token(session, user, CONFIRM_EMAIL, timedelta(hours=hours))
     mail.send(
         user.email,
-        "Confirma tu correo en Cardmática",
-        f"Hola, {user.display_name}:\n\n"
-        f"Para confirmar que este correo es tuyo, abre este enlace:\n"
-        f"{base_url}/verificar?token={token}\n\n"
-        f"El enlace funciona durante {hours} horas. Si no creaste una cuenta, ignora este correo.",
+        languages.translate(lang, "Confirma tu correo en Cardmática"),
+        languages.translate(
+            lang,
+            "Hola, {name}:\n\nPara confirmar que este correo es tuyo, abre este enlace:\n{link}\n\n"
+            "El enlace funciona durante {hours} horas. Si no creaste una cuenta, ignora este correo.",
+            name=user.display_name,
+            link=_link(base_url, "/verificar", token, lang),
+            hours=hours,
+        ),
     )
 
 
@@ -262,7 +275,7 @@ def confirm_email(session: Session, token: str) -> User:
     return user
 
 
-def request_password_reset(session: Session, email: str, base_url: str) -> None:
+def request_password_reset(session: Session, email: str, base_url: str, lang: str = "es") -> None:
     """Sends the link if the account exists. The answer is the same either way."""
     user = session.scalar(select(User).where(User.email == normalize_email(email)))
     if not user:
@@ -271,12 +284,16 @@ def request_password_reset(session: Session, email: str, base_url: str) -> None:
     token = issue_token(session, user, RESET_PASSWORD, timedelta(minutes=minutes))
     mail.send(
         user.email,
-        "Restablecer tu contraseña de Cardmática",
-        f"Hola, {user.display_name}:\n\n"
-        f"Para elegir una contraseña nueva, abre este enlace:\n"
-        f"{base_url}/restablecer?token={token}\n\n"
-        f"El enlace funciona durante {minutes} minutos y una sola vez. "
-        f"Si no lo pediste, ignora este correo: tu contraseña no cambia.",
+        languages.translate(lang, "Restablecer tu contraseña de Cardmática"),
+        languages.translate(
+            lang,
+            "Hola, {name}:\n\nPara elegir una contraseña nueva, abre este enlace:\n{link}\n\n"
+            "El enlace funciona durante {minutes} minutos y una sola vez. "
+            "Si no lo pediste, ignora este correo: tu contraseña no cambia.",
+            name=user.display_name,
+            link=_link(base_url, "/restablecer", token, lang),
+            minutes=minutes,
+        ),
     )
 
 

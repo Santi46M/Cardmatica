@@ -32,12 +32,18 @@ class Settings(BaseSettings):
     http_retries: int = Field(default=3, ge=0, le=8)
     cache_directory: Path = ROOT / ".cache/http"
     # News of the home page, refreshed by `cardmatica news-worker`
-    # (app/services/news_feeds.py). Each feed is "Name|https://… RSS or Atom".
+    # (app/services/news_feeds.py).
     news_enabled: bool = True
+    # "language|source|feed": language of the articles (es, pt or en), the name shown
+    # next to each news item and its RSS or Atom feed.
     news_feeds: list[str] = [
-        "Konami|https://yugiohblog.konami.com/feed/",
-        "YGOrganization|https://ygorganization.com/feed/",
-        "YGOPRODeck|https://ygoprodeck.com/feed_rss.xml",
+        "es|Konami Europa|https://www.yugioh-card.com/eu/es/feed/",
+        "es|Konami Latinoamérica|https://www.yugioh-card.com/lat-am/feed/",
+        "pt|Konami América Latina|https://www.yugioh-card.com/lat-am/pt/feed/",
+        "pt|Yu-Gi-Oh! Nexus|https://www.yugiohnexus.com.br/feeds/posts/default",
+        "en|Konami|https://yugiohblog.konami.com/feed/",
+        "en|YGOrganization|https://ygorganization.com/feed/",
+        "en|YGOPRODeck|https://ygoprodeck.com/feed_rss.xml",
     ]
     # Site news: merged pull requests of this public GitHub repository.
     news_site_repo: str = "santapepsi/Cardmatica"

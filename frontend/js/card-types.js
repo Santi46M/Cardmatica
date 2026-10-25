@@ -1,4 +1,7 @@
-// Card type levels in Spanish, and the type filters of the catalogue.
+// Card type levels as each language prints them, and the type filters of the
+// catalogue. Labels are written in Spanish and go through t() (frontend/i18n.js);
+// the type line uses whole phrases ("Monstruo de Sincronía" → "Synchro
+// Monster") because the word order changes between languages.
 //
 // The API returns canonical English codes (backend/app/services/card_types.py);
 // this module only names them and builds the filters level by level:
@@ -7,20 +10,21 @@
 //   Magias     → Tipo de magia
 //   Trampas    → Tipo de trampa
 import { escapeHtml } from "./html.js";
+import { locale, t } from "./lang.js";
 
 const h = escapeHtml;
 
-const KIND_LABELS = { Monster: "Monstruo", Spell: "Magia", Trap: "Trampa", Skill: "Habilidad" };
+const KIND_LABELS = { Monster: "Monstruo", Spell: "Magia", Trap: "Trampa", Skill: "Carta de Habilidad" };
 
-// Labels as the card's type line reads in Spanish ("Monstruo de Sincronía").
-const FRAME_LABELS = {
-    Normal: "Normal",
-    Effect: "de Efecto",
-    Ritual: "de Ritual",
-    Fusion: "de Fusión",
-    Synchro: "de Sincronía",
-    Xyz: "Xyz",
-    Link: "de Enlace",
+// The head of the type line, as printed on the card.
+const MONSTER_LABELS = {
+    Normal: "Monstruo Normal",
+    Effect: "Monstruo de Efecto",
+    Ritual: "Monstruo de Ritual",
+    Fusion: "Monstruo de Fusión",
+    Synchro: "Monstruo de Sincronía",
+    Xyz: "Monstruo Xyz",
+    Link: "Monstruo de Enlace",
     Token: "Ficha"
 };
 // Short labels for filter options, grouped as the cards are built into a deck.
@@ -85,14 +89,14 @@ const ATTRIBUTE_LABELS = {
 };
 const PROPERTY_LABELS = {
     Spell: {
-        Normal: "Normal",
-        "Quick-Play": "de Juego Rápido",
-        Continuous: "Continua",
-        Equip: "de Equipo",
-        Field: "de Campo",
-        Ritual: "de Ritual"
+        Normal: "Magia Normal",
+        "Quick-Play": "Magia de Juego Rápido",
+        Continuous: "Magia Continua",
+        Equip: "Magia de Equipo",
+        Field: "Magia de Campo",
+        Ritual: "Magia de Ritual"
     },
-    Trap: { Normal: "Normal", Continuous: "Continua", Counter: "de Contraefecto" }
+    Trap: { Normal: "Trampa Normal", Continuous: "Trampa Continua", Counter: "Trampa de Contraefecto" }
 };
 const PROPERTY_OPTIONS = {
     Normal: "Normal",
@@ -138,21 +142,19 @@ const KIND_PHRASES = {
 // "Magia de Campo" · "Trampa de Contraefecto"
 export function typeLine(card) {
     const types = card.types;
-    if (!types?.kind) return KIND_LABELS[card.card_type] || card.card_type || "Sin clasificar";
-    if (types.kind !== "Monster") {
-        const property = PROPERTY_LABELS[types.kind]?.[types.property];
-        return [KIND_LABELS[types.kind], property].filter(Boolean).join(" ");
-    }
-    const head = types.frame ? `Monstruo ${FRAME_LABELS[types.frame]}` : "Monstruo";
+    if (!types?.kind) return t(KIND_LABELS[card.card_type] || card.card_type || "Sin clasificar");
+    if (types.kind !== "Monster")
+        return t(PROPERTY_LABELS[types.kind]?.[types.property] || KIND_LABELS[types.kind]);
+    const head = t(MONSTER_LABELS[types.frame] || "Monstruo");
     // Pendulum sits on top of a frame: "Monstruo de Efecto / Péndulo".
     const abilities = [
-        ...(types.pendulum ? ["Péndulo"] : []),
-        ...types.abilities.map((ability) => ABILITY_LABELS[ability] || ability)
+        ...(types.pendulum ? [t("Péndulo")] : []),
+        ...types.abilities.map((ability) => (ABILITY_LABELS[ability] ? t(ABILITY_LABELS[ability]) : ability))
     ];
     return [
         [head, ...abilities].join(" / "),
-        RACE_LABELS[types.race] || types.race,
-        ATTRIBUTE_LABELS[types.attribute] || types.attribute,
+        RACE_LABELS[types.race] ? t(RACE_LABELS[types.race]) : types.race,
+        ATTRIBUTE_LABELS[types.attribute] ? t(ATTRIBUTE_LABELS[types.attribute]) : types.attribute,
         starsLabel(types)
     ]
         .filter(Boolean)
@@ -162,8 +164,8 @@ export function typeLine(card) {
 // Link monsters have a rating, Xyz a rank, the rest a level (0 is valid).
 function starsLabel({ link_rating, rank, level }) {
     if (link_rating != null) return `LINK-${link_rating}`;
-    if (rank != null) return `Rango ${rank}`;
-    if (level != null) return `Nivel ${level}`;
+    if (rank != null) return t("Rango {number}", { number: rank });
+    if (level != null) return t("Nivel {number}", { number: level });
     return "";
 }
 
@@ -189,9 +191,11 @@ export const TYPE_FILTERS = [
 // The three numbers of a monster, each with its own API parameter.
 const STAR_PARAMS = { level: "level", rank: "rank", link: "link_rating" };
 
-const option = (value, label) => `<option value="${h(value)}">${h(label)}</option>`;
-const group = (label, html) => (html ? `<optgroup label="${h(label)}">${html}</optgroup>` : "");
-const labelOf = (filter, tab) => (typeof filter.label === "string" ? filter.label : filter.label[tab]);
+// Labels are translated here, so the tables above stay in one language.
+const option = (value, label) => `<option value="${h(value)}">${h(t(label))}</option>`;
+const group = (label, html) => (html ? `<optgroup label="${h(t(label))}">${html}</optgroup>` : "");
+const labelOf = (filter, tab) => t(typeof filter.label === "string" ? filter.label : filter.label[tab]);
+const byLabel = (a, b) => t(a[1]).localeCompare(t(b[1]), locale);
 
 // Values read "Monster::" (every monster) or "Monster:frame:Effect" (one kind).
 function cardTypeOptions(types) {
@@ -215,8 +219,8 @@ function starOptions(types) {
         values.map((value) => option(`${kind}:${value}`, label(value))).join("");
     return (
         option("", "Cualquier nivel, rango o Link") +
-        group("Nivel", numbers("level", types.levels || [], (value) => `Nivel ${value}`)) +
-        group("Rango (Xyz)", numbers("rank", types.ranks || [], (value) => `Rango ${value}`)) +
+        group("Nivel", numbers("level", types.levels || [], (value) => t("Nivel {number}", { number: value }))) +
+        group("Rango (Xyz)", numbers("rank", types.ranks || [], (value) => t("Rango {number}", { number: value }))) +
         group("Link", numbers("link", types.link_ratings || [], (value) => `LINK-${value}`))
     );
 }
@@ -241,7 +245,7 @@ function optionsFor(filter, tab, types) {
         case "f-ability": {
             // Cantante (Tuner) is by far the most searched; the rest alphabetically.
             const abilities = [...types.monster.abilities].sort((a, b) =>
-                a === "Tuner" ? -1 : b === "Tuner" ? 1 : ABILITY_LABELS[a].localeCompare(ABILITY_LABELS[b], "es")
+                a === "Tuner" ? -1 : b === "Tuner" ? 1 : byLabel([a, ABILITY_LABELS[a]], [b, ABILITY_LABELS[b]])
             );
             return (
                 option("", "Cualquier habilidad") +
@@ -253,7 +257,7 @@ function optionsFor(filter, tab, types) {
                 option("", "Todos los tipos de monstruo") +
                 (types.races_present.length ? types.races_present : types.monster.races)
                     .map((value) => [value, RACE_LABELS[value] || value])
-                    .sort((a, b) => a[1].localeCompare(b[1], "es"))
+                    .sort(byLabel)
                     .map(([value, label]) => option(value, label))
                     .join("")
             );

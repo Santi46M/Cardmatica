@@ -3,6 +3,7 @@
 // without cards does not come, so a new catalogue may show only some.
 import { escapeHtml } from "./html.js";
 import { formatDate, money } from "./format.js";
+import { t } from "./lang.js";
 
 const h = escapeHtml;
 const STATUS = {
@@ -17,18 +18,26 @@ const LISTS = {
     price_drops: [
         "Bajan de precio",
         (reason) =>
-            `${money(reason.to, reason.currency)} · antes ${money(reason.from, reason.currency)} (−${Math.round(
-                reason.drop * 100
-            )} %)`
+            t("{price} · antes {before} (−{drop} %)", {
+                price: money(reason.to, reason.currency),
+                before: money(reason.from, reason.currency),
+                drop: Math.round(reason.drop * 100)
+            })
     ],
     back_in_play: [
         "Vuelven al juego",
-        (reason) => `${STATUS[reason.from]} → ${STATUS[reason.to]} desde el ${formatDate(reason.since)}`
+        (reason) =>
+            t("{from} → {to} desde el {date}", {
+                from: t(STATUS[reason.from]),
+                to: t(STATUS[reason.to]),
+                date: formatDate(reason.since)
+            })
     ],
-    most_wanted: ["Más deseadas", (reason) => `En ${reason.lists} listas de deseados`],
+    most_wanted: ["Más deseadas", (reason) => t("En {count} listas de deseados", { count: reason.lists })],
     reprints: [
         "Vuelven con reimpresión",
-        (reason) => `Reimpresa tras ${reason.years} años · ${formatDate(reason.released)}`
+        (reason) =>
+            t("Reimpresa tras {years} años · {date}", { years: reason.years, date: formatDate(reason.released) })
     ],
     notable_printings: ["Impresiones destacadas", (reason) => `${reason.rarity} · ${reason.set_name}`]
 };
@@ -41,11 +50,11 @@ export function trendingHtml(data, tile) {
     if (!lists.length) return "";
     if (!lists.some((list) => list.key === active)) active = lists[0].key;
     const current = lists.find((list) => list.key === active);
-    return `<section class="trend" aria-labelledby="trend-title"><h2 class="sec-title" id="trend-title">En tendencia</h2><div class="trend-tabs" role="tablist">${lists
+    return `<section class="trend" aria-labelledby="trend-title"><h2 class="sec-title" id="trend-title">${t("En tendencia")}</h2><div class="trend-tabs" role="tablist">${lists
         .map(
             (list) =>
                 `<button role="tab" aria-selected="${list.key === active}" data-trend="${list.key}">${h(
-                    LISTS[list.key][0]
+                    t(LISTS[list.key][0])
                 )}</button>`
         )
         .join("")}</div><div class="grid" role="tabpanel">${current.items

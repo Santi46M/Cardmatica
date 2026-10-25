@@ -1,8 +1,9 @@
 """Short news for the home page: about Cardmática itself, and about Yu-Gi-Oh!.
 
-News about the game always carry the page they come from. Bundled entries
-(app/data/news.json) keep a stable key so importing them again changes
-nothing; an administrator can add more from the panel.
+News about the game always carry the page they come from and are in the
+language that page is written in (es, pt or en): they are never translated
+here. Most arrive from their sources (app/services/news_feeds.py); an
+administrator can add more from the panel.
 """
 
 from datetime import date
@@ -22,9 +23,11 @@ class NewsItem(Entity, Base):
     __table_args__ = (
         UniqueConstraint("key"),
         CheckConstraint("section IN ('site', 'yugioh')", name="valid_section"),
+        CheckConstraint("language IN ('es', 'pt', 'en')", name="valid_language"),
     )
     key: Mapped[str] = mapped_column(String(80))
     section: Mapped[str] = mapped_column(String(10), index=True)
+    language: Mapped[str] = mapped_column(String(2), default="es", server_default="es")
     title: Mapped[str] = mapped_column(String(140))
     summary: Mapped[str] = mapped_column(String(400))
     url: Mapped[str | None] = mapped_column(String(500))

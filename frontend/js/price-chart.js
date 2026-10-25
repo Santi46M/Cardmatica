@@ -1,5 +1,6 @@
 import { escapeHtml } from "./html.js";
 import { formatDate, money, toEuro } from "./format.js";
+import { t } from "./lang.js";
 
 const h = escapeHtml;
 
@@ -17,14 +18,16 @@ const SIZE = { width: 640, height: 190, left: 66, right: 10, top: 8, bottom: 22 
 let rendered = null;
 
 function header(days) {
-    return `<div class="cht"><b>Historial de precio</b><div class="seg m" role="group" aria-label="Periodo">${RANGES.map(
+    return `<div class="cht"><b>${t("Historial de precio")}</b><div class="seg m" role="group" aria-label="${t(
+        "Periodo"
+    )}">${RANGES.map(
         ([label, value]) =>
-            `<button data-ph-range="${value}" aria-pressed="${value === days}">${label}</button>`
+            `<button data-ph-range="${value}" aria-pressed="${value === days}">${t(label)}</button>`
     ).join("")}</div></div>`;
 }
 
 function lastSaleHtml(sale, withCode) {
-    return `<div><small>Última venta</small><b>${h(money(sale.price, sale.currency))}</b><small>${h(
+    return `<div><small>${t("Última venta")}</small><b>${h(money(sale.price, sale.currency))}</b><small>${h(
         formatDate(sale.observed_at)
     )}${withCode ? ` · ${h(sale.code)}` : ""}${
         sale.condition ? ` · ${h(sale.condition)}` : ""
@@ -57,18 +60,20 @@ export function priceSummary(history, printingId = "", now = Date.now()) {
 // priceSummary() elsewhere.
 export function priceChartHtml(history, { printingId = "", days = 365, stats = true } = {}) {
     if (history === undefined)
-        return `${header(days)}<p class="catalog-status">Cargando historial…</p>`;
+        return `${header(days)}<p class="catalog-status">${t("Cargando historial…")}</p>`;
     if (history === null)
         return `${header(
             days
-        )}<p class="catalog-status" role="alert">No se pudo cargar el historial de precios.</p>`;
+        )}<p class="catalog-status" role="alert">${t("No se pudo cargar el historial de precios.")}</p>`;
     const all = history.points.filter((item) => !printingId || item.printing_id === printingId);
     const last = printingId ? all[all.length - 1] : history.last_sale;
     if (!last) {
         rendered = null;
-        return `${header(days)}<p class="empty">Todavía no hay ventas registradas ${
-            printingId ? "de esta impresión" : "de esta carta"
-        } en Cardmática. El historial se completa con cada pedido finalizado.</p>`;
+        return `${header(days)}<p class="empty">${t(
+            printingId
+                ? "Todavía no hay ventas registradas de esta impresión en Cardmática. El historial se completa con cada pedido finalizado."
+                : "Todavía no hay ventas registradas de esta carta en Cardmática. El historial se completa con cada pedido finalizado."
+        )}</p>`;
     }
     const cut = Date.now() - days * 864e5;
     const points = all
@@ -80,9 +85,12 @@ export function priceChartHtml(history, { printingId = "", days = 365, stats = t
         return `${header(days)}<div class="cs">${lastSaleHtml(
             last,
             !printingId
-        )}</div><div class="warn">Sin ventas en este periodo. La última se registró el ${h(
-            formatDate(last.observed_at)
-        )} por ${h(money(last.price, last.currency))}.</div>`;
+        )}</div><div class="warn">${h(
+            t("Sin ventas en este periodo. La última se registró el {date} por {price}.", {
+                date: formatDate(last.observed_at),
+                price: money(last.price, last.currency)
+            })
+        )}</div>`;
     }
     const series = new Map();
     for (const item of points) {
@@ -159,20 +167,24 @@ export function priceChartHtml(history, { printingId = "", days = 365, stats = t
                   )
                   .join("")}</div>`
             : "";
-    const chart = `${header(days)}${legend}<svg id="ph-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Historial de precio: ${
-        points.length
-    } ventas en el periodo">${svg}</svg><div class="tip" id="ph-tip"></div>`;
+    const chart = `${header(days)}${legend}<svg id="ph-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${t("Historial de precio: {count} ventas en el periodo", {
+        count: points.length
+    })}">${svg}</svg><div class="tip" id="ph-tip"></div>`;
     if (!stats) return chart;
     return `${chart}<div class="cs">${lastSaleHtml(
         last,
         !printingId
-    )}<div><small>Media del periodo</small><b>${h(
+    )}<div><small>${t("Media del periodo")}</small><b>${h(
         window.formatPrice(values.reduce((sum, value) => sum + value, 0) / values.length)
-    )}</b><small>${points.length} ${points.length === 1 ? "venta" : "ventas"}</small></div><div><small>Mínimo / máximo</small><b>${h(
+    )}</b><small>${t(points.length === 1 ? "{count} venta" : "{count} ventas", {
+        count: points.length
+    })}</small></div><div><small>${t("Mínimo / máximo")}</small><b>${h(
         window.formatPrice(Math.min(...values))
-    )} / ${h(window.formatPrice(Math.max(...values)))}</b></div><div><small>Variación</small><b class="${
+    )} / ${h(window.formatPrice(Math.max(...values)))}</b></div><div><small>${t("Variación")}</small><b class="${
         change >= 0 ? "up" : "down"
-    }">${change >= 0 ? "+" : ""}${change.toFixed(1)}%</b></div></div><small class="catalog-status">Ventas completadas en Cardmática, convertidas a la moneda elegida con tipos de cambio aproximados.</small>`;
+    }">${change >= 0 ? "+" : ""}${change.toFixed(1)}%</b></div></div><small class="catalog-status">${t(
+        "Ventas completadas en Cardmática, convertidas a la moneda elegida con tipos de cambio aproximados."
+    )}</small>`;
 }
 
 document.addEventListener("pointermove", (event) => {

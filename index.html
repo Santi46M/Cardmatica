@@ -41,6 +41,7 @@
     <link rel="modulepreload" href="/frontend/js/format.js">
     <link rel="modulepreload" href="/frontend/js/header-scroll.js">
     <link rel="modulepreload" href="/frontend/js/html.js">
+    <link rel="modulepreload" href="/frontend/js/lang.js">
     <link rel="modulepreload" href="/frontend/js/news.js">
     <link rel="modulepreload" href="/frontend/js/page-meta.js">
     <link rel="modulepreload" href="/frontend/js/price-chart.js">
@@ -61,7 +62,7 @@
             Card<b>mática</b>
         </a><div class="seg" role="group" aria-label="Mercado"><button data-mk="TCG" aria-pressed="true" title="Cartas occidentales">TCG</button><button data-mk="OCG" aria-pressed="false" title="Cartas asiáticas">OCG</button></div>
         <label class="search"><input id="q" type="search" placeholder="Nombre, código, set o arquetipo" aria-label="Buscar cartas"></label>
-        <select id="cur" aria-label="Moneda"></select><button class="btn" id="cb"><span class="cb-label">Carrito </span><span class="cb-paren">(</span><span id="cc">0</span><span class="cb-paren">)</span></button><!-- PROVISIONAL: modo claro / oscuro (frontend/theme.js) --><button class="ghost theme-toggle" id="theme" type="button" aria-pressed="false" aria-label="Modo claro">☀</button>
+        <select class="lang-select" aria-label="Idioma"><option value="es">ES</option><option value="pt">PT</option><option value="en">EN</option></select><select id="cur" aria-label="Moneda"></select><button class="btn" id="cb"><span class="cb-label">Carrito </span><span class="cb-paren">(</span><span id="cc">0</span><span class="cb-paren">)</span></button><!-- PROVISIONAL: modo claro / oscuro (frontend/theme.js) --><button class="ghost theme-toggle" id="theme" type="button" aria-pressed="false" aria-label="Modo claro">☀</button>
     </div>
     <nav id="tabs"></nav>
 </header>
@@ -79,10 +80,11 @@
     <p id="catalog-status" class="catalog-status" role="status" aria-live="polite"></p>
     <p id="commercial-notice" class="catalog-status" hidden>Productos, vendedores, precios, tipos de cambio y carrito pertenecen al comercio de demostración original. No representan ofertas del catálogo importado.</p>
 </main>
-<footer class="site-footer"><nav aria-label="Información legal"><a href="/terminos">Términos y condiciones</a><a href="/privacidad">Privacidad</a><a href="/normas">Normas de convivencia</a></nav><small>Cardmática no está afiliada a Konami. Yu-Gi-Oh! es una marca de sus respectivos dueños.</small></footer>
+<footer class="site-footer"><label class="lang-pick">Idioma <select class="lang-select"><option value="es">Español</option><option value="pt">Português</option><option value="en">English</option></select></label><nav aria-label="Información legal"><a href="/terminos">Términos y condiciones</a><a href="/privacidad">Privacidad</a><a href="/normas">Normas de convivencia</a></nav><small>Cardmática no está afiliada a Konami. Yu-Gi-Oh! es una marca de sus respectivos dueños.</small></footer>
 <div id="md" role="dialog" aria-modal="true"><div class="box" id="mb"></div></div>
 <div id="cart" role="dialog" aria-modal="true"><div class="box" id="cbx"></div></div>
 <div class="toast" id="ts"></div>
+<script src="/frontend/i18n.js"></script>
 <script src="/frontend/demo/data.js"></script>
 <script src="/frontend/demo/store.js"></script>
 <script type="module" src="/frontend/js/catalog.js"></script>

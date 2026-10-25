@@ -1,4 +1,5 @@
 import { API_CACHE } from "./config.js";
+import { t } from "./lang.js";
 
 export class CatalogApi {
     constructor(
@@ -21,10 +22,10 @@ export class CatalogApi {
         try {
             data = await response.json();
         } catch {
-            throw new Error("La API no devolvió una respuesta válida.");
+            throw new Error(t("La API no devolvió una respuesta válida."));
         }
         if (!response.ok)
-            throw new Error(data.error?.message || "No se pudo consultar el catálogo.");
+            throw new Error(t(data.error?.message || "No se pudo consultar el catálogo."));
         if (this.cache.size >= API_CACHE.maxEntries)
             this.cache.delete(this.cache.keys().next().value);
         this.cache.set(url.href, { data, expires: Date.now() + API_CACHE.ttlMs });

@@ -1,21 +1,19 @@
 """News for the home page (app/models/news.py)."""
 
-import json
 import secrets
 from datetime import date
-from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field, HttpUrl, model_validator
 from sqlalchemy import select
 
+from app.core.languages import LANGUAGES
 from app.models import NewsItem
-
-BUNDLED = Path(__file__).resolve().parents[1] / "data" / "news.json"
 
 
 class NewsInput(BaseModel):
     section: Literal["site", "yugioh"]
+    language: Literal["es", "pt", "en"] = "es"
     title: str = Field(min_length=3, max_length=140)
     summary: str = Field(min_length=3, max_length=400)
     url: HttpUrl | None = None
@@ -30,36 +28,17 @@ class NewsInput(BaseModel):
         return self
 
 
-class BundledNews(NewsInput):
-    key: str = Field(min_length=3, max_length=80)
-
-
 def view(row: NewsItem) -> dict:
     return {
         "id": str(row.id),
         "section": row.section,
+        "language": row.language,
         "title": row.title,
         "summary": row.summary,
         "url": row.url,
         "source_name": row.source_name,
         "published_on": row.published_on.isoformat(),
     }
-
-
-def import_bundled(session, path=BUNDLED) -> int:
-    """Add or update the bundled news by key. Running it again changes nothing.
-
-    Within a day the file's order is the page's: the first entry is stored last,
-    so it is the newest.
-    """
-    entries = [BundledNews.model_validate(entry) for entry in json.loads(path.read_text("utf-8"))]
-    stored = {row.key: row for row in session.scalars(select(NewsItem))}
-    for entry in reversed(entries):
-        row = stored.get(entry.key) or NewsItem(key=entry.key)
-        for field, value in entry.model_dump(exclude={"key"}).items():
-            setattr(row, field, str(value) if field == "url" and value else value)
-        session.add(row)
-    return len(entries)
 
 
 def add(session, data: NewsInput) -> NewsItem:
@@ -71,10 +50,18 @@ def add(session, data: NewsInput) -> NewsItem:
     return row
 
 
-def latest(session, section: str, limit: int) -> list[NewsItem]:
-    return session.scalars(
-        select(NewsItem)
-        .where(NewsItem.section == section)
-        .order_by(NewsItem.published_on.desc(), NewsItem.created_at.desc())
-        .limit(limit)
-    ).all()
+def latest(session, section: str, limit: int, language: str = "es") -> list[NewsItem]:
+    """The newest in the visitor's language; if there are not enough, the rest
+    come in the other languages, in the site's order (Spanish, Portuguese, English)."""
+    order = [language, *(code for code in LANGUAGES if code != language)]
+    found = []
+    for code in order:
+        found += session.scalars(
+            select(NewsItem)
+            .where(NewsItem.section == section, NewsItem.language == code)
+            .order_by(NewsItem.published_on.desc(), NewsItem.created_at.desc())
+            .limit(limit - len(found))
+        ).all()
+        if len(found) == limit:
+            break
+    return found

@@ -2831,3 +2831,35 @@ button.acc-avatar:hover,
     font-size: 18px;
     line-height: 1;
 }
+
+/* Idioma: selector compacto en la cabecera (desde el teléfono, en el pie). */
+.bar > .lang-select {
+    flex: none;
+    padding-right: 4px;
+}
+
+.lang-pick {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--mu);
+    font-size: 13px;
+}
+
+@media (max-width: 760px) {
+    .bar > .lang-select {
+        display: none;
+    }
+}
+
+.acc-langs {
+    display: flex;
+    gap: 6px;
+    padding: 4px 10px 6px;
+}
+
+.acc-langs button[aria-pressed="true"] {
+    color: var(--on-btn);
+    background: var(--btn);
+    border-color: rgba(var(--btn-line), .5);
+}

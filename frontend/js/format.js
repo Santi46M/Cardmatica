@@ -1,4 +1,4 @@
-// Prices and dates as people read them.
+// Prices and dates as people read them, in the visitor's language.
 //
 // Amounts are stored in the currency they were paid in. window.CURRENCIES and
 // window.formatPrice() come from frontend/demo/store.js: formatPrice() shows a
@@ -26,5 +26,5 @@ export function formatDate(value) {
         const [year, month, day] = value.split("-").map(Number);
         date = new Date(year, month - 1, day);
     }
-    return date.toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" });
+    return date.toLocaleDateString(window.I18N.locale, { day: "numeric", month: "short", year: "numeric" });
 }

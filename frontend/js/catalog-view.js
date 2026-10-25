@@ -2,6 +2,7 @@ import { badgeHtml, banlistSectionHtml, statusFor } from "./banlist.js";
 import { formatDate, money } from "./format.js";
 import { typeLine } from "./card-types.js";
 import { escapeHtml } from "./html.js";
+import { lang, locale, t } from "./lang.js";
 import { scopeLink } from "./collections.js";
 import { editionName, languageName, printingOptionsHtml } from "./printings.js";
 import { rarityBadge } from "./rarities.js";
@@ -10,14 +11,14 @@ import { rarityBadge } from "./rarities.js";
 const h = escapeHtml;
 const chip = (value) => `<span class="chip">${h(value)}</span>`;
 const section = (title, content) =>
-    content ? `<section class="catalog-section"><h3>${h(title)}</h3>${content}</section>` : "";
+    content ? `<section class="catalog-section"><h3>${h(t(title))}</h3>${content}</section>` : "";
 const fact = (label, value) =>
     value == null || value === ""
         ? ""
-        : `<div><span>${h(label)}</span><b>${h(value)}</b></div>`;
+        : `<div><span>${h(t(label))}</span><b>${h(value)}</b></div>`;
 
 // One row of the facts list beside the chart; empty values are left out.
-const factRow = (label, html) => (html ? `<div><dt>${h(label)}</dt><dd>${html}</dd></div>` : "");
+const factRow = (label, html) => (html ? `<div><dt>${h(t(label))}</dt><dd>${html}</dd></div>` : "");
 
 const BANLIST_LABELS = {
     forbidden: "Prohibida",
@@ -25,16 +26,18 @@ const BANLIST_LABELS = {
     semi_limited: "Semi-limitada",
     unlimited: "Permitida"
 };
-const banlistLabel = (status) => BANLIST_LABELS[status.status] || "Sin estado verificado";
+const banlistLabel = (status) => t(BANLIST_LABELS[status.status] || "Sin estado verificado");
 
 
 // Tabs of the info panel. (Demo cards draw only "Info": they cannot go to a list.)
-const CARD_TABS =
-    '<div class="cd-tabs" role="tablist"><button role="tab" aria-selected="true" data-cd-tab="info">ⓘ Info</button><button role="tab" aria-selected="false" data-cd-tab="wants">♥ Deseados</button></div>';
+const cardTabs = () =>
+    `<div class="cd-tabs" role="tablist"><button role="tab" aria-selected="true" data-cd-tab="info">ⓘ ${t(
+        "Info"
+    )}</button><button role="tab" aria-selected="false" data-cd-tab="wants">♥ ${t("Deseados")}</button></div>`;
 
 // Prices beside the chart, from Cardmática's own sales.
 export function pricesHtml(summary) {
-    if (summary === undefined) return factRow("Última venta", "Cargando…");
+    if (summary === undefined) return factRow("Última venta", t("Cargando…"));
     if (!summary) return "";
     const value = (euros) => (euros === null ? "—" : h(window.formatPrice(euros)));
     return `${factRow(
@@ -63,8 +66,8 @@ export function assetUrl(value) {
 
 // Artwork shown only by the private preview has no commercial licence: mark it
 // so nobody mistakes it for an image that can ship.
-const PROVISIONAL =
-    "Imagen provisional: ilustración sin licencia comercial, visible solo en la vista de prueba privada. No publicar.";
+const PROVISIONAL = () =>
+    t("Imagen provisional: ilustración sin licencia comercial, visible solo en la vista de prueba privada. No publicar.");
 
 function provisional(image) {
     return image?.usage_scope === "local_preview_only";
@@ -73,8 +76,8 @@ function provisional(image) {
 function withWarning(html, image) {
     if (!provisional(image)) return html;
     return `<span class="img-wrap">${html}<span class="img-warn" tabindex="0" role="img" aria-label="${h(
-        PROVISIONAL
-    )}" data-tip="${h(PROVISIONAL)}">!</span></span>`;
+        PROVISIONAL()
+    )}" data-tip="${h(PROVISIONAL())}">!</span></span>`;
 }
 
 function imageHtml(image, name, large = false) {
@@ -82,11 +85,9 @@ function imageHtml(image, name, large = false) {
     if (!url)
         return `<div class="catalog-image-fallback ${
             large ? "large" : ""
-        }" role="img" aria-label="Sin imagen verificada">${
-            large
-                ? "Imagen de esta impresión no disponible con asociación y derechos verificados"
-                : "Sin imagen"
-        }</div>`;
+        }" role="img" aria-label="${t("Sin imagen verificada")}">${t(
+            large ? "Imagen de esta impresión no disponible con asociación y derechos verificados" : "Sin imagen"
+        )}</div>`;
     return withWarning(
         `<img class="catalog-image ${large ? "large" : ""}" src="${h(url)}" alt="${h(
             name
@@ -99,15 +100,16 @@ function imageHtml(image, name, large = false) {
 
 export function pager(data, kind = "catalog") {
     const last = Math.max(1, Math.ceil(data.total / data.page_size));
-    return `<div class="catalog-pager" aria-label="Paginación"><button class="ghost" data-${kind}-page="${
+    return `<div class="catalog-pager" aria-label="${t("Paginación")}"><button class="ghost" data-${kind}-page="${
         data.page - 1
-    }" ${data.page <= 1 ? "disabled" : ""}>Anterior</button><span>Página ${
-        data.page
-    } de ${last}<span class="pager-total"> · ${data.total} ${
-        kind === "printing" ? "impresiones" : "cartas"
-    }</span></span><button class="ghost" data-${kind}-page="${data.page + 1}" ${
+    }" ${data.page <= 1 ? "disabled" : ""}>${t("Anterior")}</button><span>${t("Página {page} de {pages}", {
+        page: data.page,
+        pages: last
+    })}<span class="pager-total"> · ${t(kind === "printing" ? "{count} impresiones" : "{count} cartas", {
+        count: data.total
+    })}</span></span><button class="ghost" data-${kind}-page="${data.page + 1}" ${
         data.page >= last ? "disabled" : ""
-    }>Siguiente</button></div>`;
+    }>${t("Siguiente")}</button></div>`;
 }
 
 // Type, subtypes and attribute matter less than price to a buyer who knows the
@@ -115,7 +117,7 @@ export function pager(data, kind = "catalog") {
 const cardMeta = typeLine;
 
 function saleCell(sale) {
-    if (!sale) return '<td class="num"><span class="muted">Sin ventas</span></td>';
+    if (!sale) return `<td class="num"><span class="muted">${t("Sin ventas")}</span></td>`;
     return `<td class="num"><b class="price">${h(money(sale.price, sale.currency))}</b><small>${h(
         formatDate(sale.observed_at)
     )}</small></td>`;
@@ -123,22 +125,20 @@ function saleCell(sale) {
 
 export function catalogRows(data) {
     if (!data.items.length)
-        return '<tr><td colspan="3" class="empty">No hay cartas almacenadas que coincidan con estos filtros.</td></tr>';
+        return `<tr><td colspan="3" class="empty">${t("No hay cartas almacenadas que coincidan con estos filtros.")}</td></tr>`;
     return data.items
         .map((card) => {
             const meta = cardMeta(card);
             const source = card.name_is_official
                 ? ""
-                : ` · Fuente: ${card.name_source || "comunitaria"}`;
+                : ` · ${t("Fuente: {source}", { source: card.name_source || t("comunitaria") })}`;
             return `<tr class="catalog-row" tabindex="0" data-catalog-card="${h(
                 card.id
             )}" aria-label="${h(`${card.name}, ${meta}`)}"><td><div class="nm">${imageHtml(
                 card.image,
-                `${card.name} — ${
-                    card.image?.association === "card_artwork"
-                        ? "ilustración general"
-                        : "imagen de impresión"
-                }`
+                `${card.name} — ${t(
+                    card.image?.association === "card_artwork" ? "ilustración general" : "imagen de impresión"
+                )}`
             )}<div class="nm-text"><b data-preview="${h(card.id)}">${badgeHtml(
                 card.market_banlist
             )}${h(card.name)}</b><small class="meta" title="${h(
@@ -157,13 +157,15 @@ function gridImage(card) {
               `<img class="catalog-image grid" src="${h(url)}" alt="${h(card.name)}" loading="lazy" decoding="async" width="168" height="245">`,
               card.image
           )
-        : '<div class="catalog-image-fallback grid" role="img" aria-label="Sin imagen verificada">Sin imagen</div>';
+        : `<div class="catalog-image-fallback grid" role="img" aria-label="${t("Sin imagen verificada")}">${t(
+              "Sin imagen"
+          )}</div>`;
 }
 
 // Image-first tiles for collectors; same data and click target as the table rows.
 export function catalogGrid(data) {
     if (!data.items.length)
-        return '<p class="empty">No hay cartas almacenadas que coincidan con estos filtros.</p>';
+        return `<p class="empty">${t("No hay cartas almacenadas que coincidan con estos filtros.")}</p>`;
     return data.items
         .map(
             (card) =>
@@ -176,7 +178,7 @@ export function catalogGrid(data) {
                         ? `<b class="price">${h(money(card.last_sale.price, card.last_sale.currency))}</b><small>${h(
                               formatDate(card.last_sale.observed_at)
                           )}</small>`
-                        : '<span class="muted">Sin ventas</span>'
+                        : `<span class="muted">${t("Sin ventas")}</span>`
                 }</span></span></button>`
         )
         .join("");
@@ -206,23 +208,25 @@ export function previewHtml(card) {
     return `${
         image
             ? `<img src="${h(image)}" alt="${h(card.name)}" width="200" height="292">`
-            : '<div class="catalog-image-fallback preview-fallback">Sin imagen verificada</div>'
+            : `<div class="catalog-image-fallback preview-fallback">${t("Sin imagen verificada")}</div>`
     }<div class="preview-body"><b>${badgeHtml(card.market_banlist)}${h(card.name)}</b>${
         image && provisional(card.image)
-            ? '<small class="warn-text"><span class="img-warn inline" aria-hidden="true">!</span> Imagen provisional, sin licencia</small>'
+            ? `<small class="warn-text"><span class="img-warn inline" aria-hidden="true">!</span> ${t(
+                  "Imagen provisional, sin licencia"
+              )}</small>`
             : ""
     }<small>${h(
         cardMeta(card)
-    )}</small><small>${card.printing_count} ${
-        card.printing_count === 1 ? "impresión" : "impresiones"
-    }</small>${
+    )}</small><small>${t(card.printing_count === 1 ? "{count} impresión" : "{count} impresiones", {
+        count: card.printing_count
+    })}</small>${
         card.last_sale
-            ? `<div class="preview-price"><small>Última venta</small><b>${h(
+            ? `<div class="preview-price"><small>${t("Última venta")}</small><b>${h(
                   money(card.last_sale.price, card.last_sale.currency)
               )}</b><small>${h(formatDate(card.last_sale.observed_at))} · ${h(
                   card.last_sale.code
               )}</small></div>`
-            : '<small class="muted">Sin ventas registradas</small>'
+            : `<small class="muted">${t("Sin ventas registradas")}</small>`
     }</div>`;
 }
 
@@ -235,16 +239,23 @@ export function tileHtml(card, line) {
 
 export function homeHtml(data, { signedIn = false } = {}) {
     // The page's one <h1> and its calls to action, visible without scrolling.
-    return `<section class="hero2 gl"><h1>Cartas de <b>Yu-Gi-Oh!</b> para el Mercosur</h1><p>Busca cualquier carta TCG u OCG, compara sus impresiones y rarezas, revisa la banlist y arma tus listas de deseados con avisos de precio.</p><p class="hero-actions"><button class="btn" data-go="Todas">Explorar cartas</button>${
+    return `<section class="hero2 gl"><h1>${t("Cartas de <b>Yu-Gi-Oh!</b> para el Mercosur")}</h1><p>${t(
+        "Busca cualquier carta TCG u OCG, compara sus impresiones y rarezas, revisa la banlist y arma tus listas de deseados con avisos de precio."
+    )}</p><p class="hero-actions"><button class="btn" data-go="Todas">${t("Explorar cartas")}</button>${
         signedIn
-            ? '<button class="ghost" data-go="Deseados">Mi lista de deseados</button>'
-            : '<button class="ghost" data-go="Acceso" data-auth-mode="register">Crear cuenta gratis</button>'
-    }</p></section><div id="home-trending"></div><h2 class="sec-title">Cartas del catálogo</h2>${
+            ? `<button class="ghost" data-go="Deseados">${t("Mi lista de deseados")}</button>`
+            : `<button class="ghost" data-go="Acceso" data-auth-mode="register">${t("Crear cuenta gratis")}</button>`
+    }</p></section><div id="home-trending"></div><h2 class="sec-title">${t("Cartas del catálogo")}</h2>${
         data.items.length
             ? `<div class="grid">${data.items
-                  .map((card) => tileHtml(card, `${card.printing_count} impresiones · ${card.markets.join(" / ")}`))
+                  .map((card) =>
+                      tileHtml(
+                          card,
+                          `${t("{count} impresiones", { count: card.printing_count })} · ${card.markets.join(" / ")}`
+                      )
+                  )
                   .join("")}</div>`
-            : '<div class="empty gl">Todavía no hay cartas importadas para este mercado.</div>'
+            : `<div class="empty gl">${t("Todavía no hay cartas importadas para este mercado.")}</div>`
     }`;
 }
 
@@ -253,9 +264,10 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
     const image =
         printing?.images.find((item) => item.url) || card.artworks?.find((item) => item.url);
     const texts = card.texts.filter((text) => text.is_current);
+    // The visitor's language if the card has it, else the printing's.
     const text =
+        texts.find((item) => item.language === lang) ||
         texts.find((item) => item.language === printing?.language) ||
-        texts.find((item) => item.language === "es") ||
         texts[0];
     const groups = (items, relation, kind) =>
         items
@@ -277,7 +289,7 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
             return `<li><a href="${h(url.href)}" target="_blank" rel="noopener noreferrer">${h(
                 source.source
             )}</a> · ${h(source.validation_status)} · ${h(
-                new Date(source.fetched_at).toLocaleDateString("es")
+                new Date(source.fetched_at).toLocaleDateString(locale)
             )}</li>`;
         })
         .join("");
@@ -288,13 +300,13 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
                     entry.effective_date ? ` · ${h(entry.effective_date)}` : ""
                 }</b><small>${h(entry.classification)}</small><p>${h(entry.explanation)}</p>${
                     entry.old_text
-                        ? `<details><summary>Texto anterior documentado</summary><p class="card-text">${h(
+                        ? `<details><summary>${t("Texto anterior documentado")}</summary><p class="card-text">${h(
                               entry.old_text.text
                           )}</p></details>`
                         : ""
                 }${
                     entry.new_text
-                        ? `<details><summary>Texto posterior documentado</summary><p class="card-text">${h(
+                        ? `<details><summary>${t("Texto posterior documentado")}</summary><p class="card-text">${h(
                               entry.new_text.text
                           )}</p></details>`
                         : ""
@@ -305,11 +317,9 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
         .filter((entry) => !entry.is_current)
         .map(
             (entry) =>
-                `<details><summary>${h(entry.language)} · ${
-                    entry.is_official
-                        ? "Versión oficial anterior"
-                        : "Versión documentada por la comunidad"
-                }${
+                `<details><summary>${h(entry.language)} · ${t(
+                    entry.is_official ? "Versión oficial anterior" : "Versión documentada por la comunidad"
+                )}${
                     entry.valid_from ? ` · ${h(entry.valid_from)}` : ""
                 }</summary><p class="card-text">${h(entry.text)}</p></details>`
         )
@@ -318,18 +328,18 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
             ? section(
                   `${
                       text.is_official
-                          ? "Texto oficial vigente"
-                          : "Texto de catálogo · " + (text.source_slug || "fuente comunitaria")
+                          ? t("Texto oficial vigente")
+                          : `${t("Texto de catálogo")} · ${text.source_slug || t("fuente comunitaria")}`
                   } · ${text.language}`,
                   `<p class="card-text">${h(text.text)}</p>${
                       text.pendulum_text
-                          ? `<h4>Efecto Péndulo</h4><p class="card-text">${h(
+                          ? `<h4>${t("Efecto Péndulo")}</h4><p class="card-text">${h(
                                 text.pendulum_text
                             )}</p>`
                           : ""
                   }`
               )
-            : '<p class="catalog-status">Texto vigente todavía no disponible.</p>';
+            : `<p class="catalog-status">${t("Texto vigente todavía no disponible.")}</p>`;
     const ids = [
         card.ygoprodeck_id ? `YGOPRODeck ${card.ygoprodeck_id}` : "",
         card.konami_id ? `CID ${card.konami_id}` : ""
@@ -339,19 +349,19 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
     const credit = image
         ? `<figcaption>${
               image.association === "card_artwork"
-                  ? "Ilustración general: no verifica la rareza, edición o set seleccionado.<br>"
+                  ? `${t("Ilustración general: no verifica la rareza, edición o set seleccionado.")}<br>`
                   : ""
-          }${h(image.author || "Autor no indicado")} · ${h(
+          }${h(image.author || t("Autor no indicado"))} · ${h(
               image.usage_scope === "local_preview_only"
-                  ? "Vista local de prueba; derechos comerciales sin verificar"
-                  : image.license || "Permiso documentado"
-          )} · ${creditLink(image.source_url, "Origen")}${
-              image.license_url ? ` · ${creditLink(image.license_url, "Licencia")}` : ""
+                  ? t("Vista local de prueba; derechos comerciales sin verificar")
+                  : image.license || t("Permiso documentado")
+          )} · ${creditLink(image.source_url, t("Origen"))}${
+              image.license_url ? ` · ${creditLink(image.license_url, t("Licencia"))}` : ""
           }</figcaption>`
         : "";
     const printingChoice =
         printings.items.length > 1
-            ? `<select id="catalog-printing" aria-label="Impresión">${printingOptionsHtml(
+            ? `<select id="catalog-printing" aria-label="${t("Impresión")}">${printingOptionsHtml(
                   printings.items,
                   printing.id
               )}</select>${printings.total > printings.page_size ? pager(printings, "printing") : ""}`
@@ -368,11 +378,11 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
               "Lanzamiento",
               printing.release_date ? h(formatDate(printing.release_date)) : ""
           )}${factRow("Banlist", banlist ? `${badgeHtml(banlist)} ${h(banlistLabel(banlist))}` : "")}`
-        : '<p class="empty">No hay impresiones documentadas para este mercado.</p>';
+        : `<p class="empty">${t("No hay impresiones documentadas para este mercado.")}</p>`;
     // The type line (card-types.js), then the numbers printed on the card.
     const stats = [
         typeLine(card),
-        card.pendulum_scale != null ? `Escala ${card.pendulum_scale}` : "",
+        card.pendulum_scale != null ? t("Escala {scale}", { scale: card.pendulum_scale }) : "",
         card.atk != null
             ? `ATK ${card.atk}${card.defense != null ? ` / DEF ${card.defense}` : ""}`
             : ""
@@ -381,14 +391,20 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
         .map(h)
         .join(" · ");
     return `<div class="card-detail"><div class="cd-head"><div><h2>${badgeHtml(banlist)}${h(card.name)}</h2><p class="cd-sub">${
-        printing ? `${h(printing.set_name)} · Cartas sueltas` : "Cartas sueltas"
-    }${ids ? `<br><small>${h(ids)}</small>` : ""}</p></div><div class="top-actions"><button class="ghost" data-close="md">Cerrar</button></div></div><div class="cd-top"><figure class="cd-image gl">${imageHtml(
+        printing ? `${h(printing.set_name)} · ${t("Cartas sueltas")}` : t("Cartas sueltas")
+    }${ids ? `<br><small>${h(ids)}</small>` : ""}</p></div><div class="top-actions"><button class="ghost" data-close="md">${t(
+        "Cerrar"
+    )}</button></div></div><div class="cd-top"><figure class="cd-image gl">${imageHtml(
         image,
-        `${card.name} · ${image?.association === "card_artwork" ? "ilustración general" : printing?.code || ""}`,
+        `${card.name} · ${image?.association === "card_artwork" ? t("ilustración general") : printing?.code || ""}`,
         true
-    )}${credit}</figure><div class="cd-info gl">${CARD_TABS}<div class="cd-panel" data-cd-panel="info"><div class="cd-cols"><div><dl class="cd-facts">${facts}</dl><dl class="cd-facts" id="cd-prices"></dl></div><div class="cd-chart"><div id="price-history" class="chart" aria-live="polite"></div><button class="btn s cd-want" data-wl-open aria-controls="wl-picker">♥ Añadir a la lista de deseados</button></div></div><div class="cd-text">${
+    )}${credit}</figure><div class="cd-info gl">${cardTabs()}<div class="cd-panel" data-cd-panel="info"><div class="cd-cols"><div><dl class="cd-facts">${facts}</dl><dl class="cd-facts" id="cd-prices"></dl></div><div class="cd-chart"><div id="price-history" class="chart" aria-live="polite"></div><button class="btn s cd-want" data-wl-open aria-controls="wl-picker">♥ ${t("Añadir a la lista de deseados")}</button></div></div><div class="cd-text">${
         stats ? `<p class="cd-stats">${stats}</p>` : ""
-    }${textHtml}</div></div><div class="cd-panel" data-cd-panel="wants" hidden></div><div id="wl-picker"></div></div></div><section class="cd-offers"><div class="gl wrap"><table class="cd-table"><thead><tr><th>Vendedor</th><th>Información del producto</th><th class="num">Oferta</th></tr></thead><tbody><tr><td colspan="3" class="empty">Todavía no hay ofertas de esta impresión en Cardmática.</td></tr></tbody></table></div></section>${section(
+    }${textHtml}</div></div><div class="cd-panel" data-cd-panel="wants" hidden></div><div id="wl-picker"></div></div></div><section class="cd-offers"><div class="gl wrap"><table class="cd-table"><thead><tr><th>${t("Vendedor")}</th><th>${t("Información del producto")}</th><th class="num">${t(
+        "Oferta"
+    )}</th></tr></thead><tbody><tr><td colspan="3" class="empty">${t(
+        "Todavía no hay ofertas de esta impresión en Cardmática."
+    )}</td></tr></tbody></table></div></section>${section(
         "Arquetipos · clasificación comunitaria",
         groups(card.archetypes, "member", "archetype")
     )}${section("Series · clasificación comunitaria", groups(card.series, "member"))}${section(
@@ -407,7 +423,7 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
                 (relation) =>
                     `<p>${h(relation.relation)} · <button class="lk" data-catalog-card="${h(
                         relation.card_id
-                    )}">Ver carta relacionada</button></p>`
+                    )}">${t("Ver carta relacionada")}</button></p>`
             )
             .join("")
     )}${section("Erratas documentadas", errata)}${section(

@@ -87,17 +87,33 @@ def test_only_merged_pull_requests_that_are_news():
     assert entry.published == date(2026, 10, 24)
 
 
-def test_storing_does_not_repeat_links_nor_touch_bundled_news(factory):
+def admin_news(session):
+    return news.add(
+        session,
+        news.NewsInput(
+            section="yugioh",
+            title="Escrita por un administrador",
+            summary="Texto propio.",
+            url="https://www.yugioh-card.com/eu/es/",
+            source_name="Konami Europa",
+            published_on=date(2026, 10, 1),
+        ),
+    )
+
+
+def test_storing_does_not_repeat_links_nor_touch_administrators_news(factory):
     entries = news_feeds.parse_feed(RSS)
     with factory.begin() as session:
-        news.import_bundled(session)
-        bundled = session.scalars(select(NewsItem)).first()
-        assert news_feeds.store(session, "yugioh", "Blog", entries) == 1
-        assert news_feeds.store(session, "yugioh", "Blog", entries) == 0
-        # A feed linking an article already in the bundled news leaves it as it was.
-        same = news_feeds.Entry("Otro título", bundled.url, date.today(), "")
+        written = admin_news(session)
+        assert news_feeds.store(session, "yugioh", "Blog", entries, "pt") == 1
+        assert news_feeds.store(session, "yugioh", "Blog", entries, "pt") == 0
+        assert (
+            session.scalar(select(NewsItem.language).where(NewsItem.url == entries[0].url)) == "pt"
+        )
+        # A feed linking an article an administrator already published leaves it as it was.
+        same = news_feeds.Entry("Otro título", written.url, date.today(), "")
         assert news_feeds.store(session, "yugioh", "Blog", [same]) == 0
-        assert bundled.title != "Otro título" and not bundled.key.startswith("feed:")
+        assert written.title != "Otro título" and not written.key.startswith("feed:")
         old = news_feeds.Entry("Vieja", "https://blog.example.org/old", date(2020, 1, 1), "")
         news_feeds.store(session, "yugioh", "Blog", [old])
         session.flush()
@@ -113,7 +129,7 @@ def news_settings(tmp_path):
         user_agent="CardmaticaTests/1 (tests@example.invalid)",
         cache_directory=tmp_path / "cache",
         http_retries=1,
-        news_feeds=["Blog|https://blog.example.org/feed", "Org|https://org.example.org/atom"],
+        news_feeds=["es|Blog|https://blog.example.org/feed", "en|Org|https://org.example.org/atom"],
         news_site_repo="santapepsi/Cardmatica",
     )
 
@@ -167,9 +183,19 @@ async def test_news_sources_can_be_turned_off_and_stay_within_their_hosts(news_s
         await http.close()
 
 
-def test_old_fetched_news_are_dropped_but_not_bundled_ones(factory):
+def test_feed_settings_say_language_source_and_address():
+    assert news_feeds.feed_setting("pt|Yu-Gi-Oh! Nexus|https://x.example.org/feed") == (
+        "pt",
+        "Yu-Gi-Oh! Nexus",
+        "https://x.example.org/feed",
+    )
+    with pytest.raises(ValueError):
+        news_feeds.feed_setting("fr|Blog|https://x.example.org/feed")
+
+
+def test_old_fetched_news_are_dropped_but_not_administrators_ones(factory):
     with factory.begin() as session:
-        news.import_bundled(session)
+        admin_news(session)
         count = len(session.scalars(select(NewsItem)).all())
         news_feeds.prune(session, today=date.today() + timedelta(days=news_feeds.KEEP_DAYS * 10))
         assert len(session.scalars(select(NewsItem)).all()) == count

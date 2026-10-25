@@ -881,15 +881,21 @@ def test_latest_set_banner_and_set_page(live_server, browser_page, factory, reco
 def test_home_news_columns(live_server, browser_page, factory):
     from datetime import date
 
-    from app.services import news, news_feeds
+    from app.services import news_feeds
 
     with factory.begin() as session:
-        news.import_bundled(session)
         # Site news arrive from the repository's merged pull requests.
         entry = news_feeds.Entry(
             "Noticias al día", "https://github.com/santapepsi/Cardmatica/pull/30", date.today(), ""
         )
         news_feeds.store(session, "site", None, [entry])
+        game = [
+            news_feeds.Entry(
+                f"Noticia {day}", f"https://news.example.org/{day}", date(2026, 10, day), "Texto."
+            )
+            for day in (1, 2, 3)
+        ]
+        news_feeds.store(session, "yugioh", "Konami Europa", game, "es")
     page = browser_page
     page.goto(live_server)
     columns = page.locator(".news > div")
@@ -916,3 +922,24 @@ def test_provisional_theme_toggle(live_server, browser_page):
     expect(root).to_have_attribute("data-theme", "light")
     page.goto(f"{live_server}/terminos")
     expect(root).to_have_attribute("data-theme", "light")
+
+
+def test_the_site_in_portuguese_and_english(live_server, browser_page):
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(f"{live_server}/?lang=pt")
+    expect(page.locator("html")).to_have_attribute("lang", "pt-BR")
+    expect(page.locator('[data-g="Todas"]')).to_have_text("Todas as cartas")
+    expect(page.locator("#q")).to_have_attribute(
+        "placeholder", "Nome, código, coleção ou arquétipo"
+    )
+    expect(page.locator("#home h1")).to_contain_text("para o Mercosul")
+    # The account menu switches language, and the page stays in it.
+    page.locator("#account-button").click()
+    page.locator('[data-lang="en"]').click()
+    expect(page.locator("html")).to_have_attribute("lang", "en")
+    expect(page.locator('[data-g="Todas"]')).to_have_text("All cards")
+    page.reload()
+    expect(page.locator('[data-g="Productos"]')).to_have_text("Products (demo)")
+    assert not errors

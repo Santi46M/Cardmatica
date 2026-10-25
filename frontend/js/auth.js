@@ -1,5 +1,6 @@
 // Accounts in the browser: sign in, register, sign out, password and sessions.
 import { escapeHtml } from "./html.js";
+import { locale, t } from "./lang.js";
 import { track } from "./analytics.js";
 import { hasSession, request } from "./session-api.js";
 
@@ -58,17 +59,22 @@ export function openAccountLink(path) {
 export function renderAuth(container) {
     if (mode === "verify") return renderVerify(container);
     if (user) {
-        container.innerHTML = `<h3>Mi cuenta</h3>${
+        container.innerHTML = `<h3>${t("Mi cuenta")}</h3>${
             notice ? `<p class="gl pnl auth-notice" role="status">${h(notice)}</p>` : ""
-        }<div class="gl pnl"><p>Sesión iniciada como <b>${h(
-            user.display_name
-        )}</b> (${h(user.email)}).</p><p><button class="btn s" data-go="Perfil">Ir a mi perfil</button> <button class="ghost" data-auth-logout>Cerrar sesión</button></p></div>`;
+        }<div class="gl pnl"><p>${t("Sesión iniciada como {name} ({email}).", {
+            name: `<b>${h(user.display_name)}</b>`,
+            email: h(user.email)
+        })}</p><p><button class="btn s" data-go="Perfil">${t("Ir a mi perfil")}</button> <button class="ghost" data-auth-logout>${t(
+            "Cerrar sesión"
+        )}</button></p></div>`;
         return;
     }
     const login = mode === "login";
     const register = mode === "register";
     const form = { login: loginForm, register: registerForm, forgot: forgotForm, reset: resetForm }[mode];
-    container.innerHTML = `<div class="auth"><div class="auth-tabs" role="tablist"><button role="tab" aria-selected="${login}" data-auth-mode="login">Iniciar sesión</button><button role="tab" aria-selected="${register}" data-auth-mode="register">Crear cuenta</button></div>${
+    container.innerHTML = `<div class="auth"><div class="auth-tabs" role="tablist"><button role="tab" aria-selected="${login}" data-auth-mode="login">${t(
+        "Iniciar sesión"
+    )}</button><button role="tab" aria-selected="${register}" data-auth-mode="register">${t("Crear cuenta")}</button></div>${
         notice ? `<p class="gl pnl auth-notice" role="status">${h(notice)}</p>` : ""
     }${form()}<p class="warn" role="alert" data-auth-error hidden></p></div>`;
 }
@@ -78,10 +84,10 @@ async function renderVerify(container) {
     const token = linkToken;
     linkToken = "";
     mode = "login";
-    container.innerHTML = '<div class="auth"><p class="gl pnl" role="status">Confirmando tu correo…</p></div>';
+    container.innerHTML = `<div class="auth"><p class="gl pnl" role="status">${t("Confirmando tu correo…")}</p></div>`;
     try {
         await call("/confirm-email", { method: "POST", body: { token } });
-        notice = "Correo confirmado. ¡Gracias!";
+        notice = t("Correo confirmado. ¡Gracias!");
         // The page may have asked who is signed in before the confirmation landed.
         await loadAccount();
     } catch (error) {
@@ -91,61 +97,99 @@ async function renderVerify(container) {
 }
 
 function forgotForm() {
-    return `<form class="gl pnl fm-stack" id="auth-forgot" novalidate><b>Recuperar la contraseña</b><label>Correo de tu cuenta<input id="auth-email" type="email" autocomplete="email" required maxlength="254"></label><button class="btn" type="submit">Enviar enlace</button><small>Te enviaremos un enlace para elegir una contraseña nueva.</small></form>`;
+    return `<form class="gl pnl fm-stack" id="auth-forgot" novalidate><b>${t("Recuperar la contraseña")}</b><label>${t(
+        "Correo de tu cuenta"
+    )}<input id="auth-email" type="email" autocomplete="email" required maxlength="254"></label><button class="btn" type="submit">${t(
+        "Enviar enlace"
+    )}</button><small>${t("Te enviaremos un enlace para elegir una contraseña nueva.")}</small></form>`;
 }
 
 function resetForm() {
-    return `<form class="gl pnl fm-stack" id="auth-reset" novalidate><b>Elige una contraseña nueva</b><label>Contraseña nueva<input id="auth-password" type="password" autocomplete="new-password" required minlength="10" maxlength="200"></label><button class="btn" type="submit">Guardar contraseña</button><small>Al guardarla se cierran todas tus sesiones abiertas.</small></form>`;
+    return `<form class="gl pnl fm-stack" id="auth-reset" novalidate><b>${t("Elige una contraseña nueva")}</b><label>${t(
+        "Contraseña nueva"
+    )}<input id="auth-password" type="password" autocomplete="new-password" required minlength="10" maxlength="200"></label><button class="btn" type="submit">${t(
+        "Guardar contraseña"
+    )}</button><small>${t("Al guardarla se cierran todas tus sesiones abiertas.")}</small></form>`;
 }
 
 function loginForm() {
-    return `<form class="gl pnl fm-stack" id="auth-login" novalidate><label>Correo<input id="auth-email" type="email" autocomplete="email" required maxlength="254"></label><label>Contraseña<input id="auth-password" type="password" autocomplete="current-password" required maxlength="200"></label><label class="check"><input id="auth-remember" type="checkbox"> Mantener la sesión iniciada en este equipo</label><button class="btn" type="submit">Iniciar sesión</button><button class="lk" type="button" data-auth-mode="forgot">¿Olvidaste tu contraseña?</button></form>`;
+    return `<form class="gl pnl fm-stack" id="auth-login" novalidate><label>${t(
+        "Correo"
+    )}<input id="auth-email" type="email" autocomplete="email" required maxlength="254"></label><label>${t(
+        "Contraseña"
+    )}<input id="auth-password" type="password" autocomplete="current-password" required maxlength="200"></label><label class="check"><input id="auth-remember" type="checkbox"> ${t(
+        "Mantener la sesión iniciada en este equipo"
+    )}</label><button class="btn" type="submit">${t("Iniciar sesión")}</button><button class="lk" type="button" data-auth-mode="forgot">${t(
+        "¿Olvidaste tu contraseña?"
+    )}</button></form>`;
 }
 
 function registerForm() {
-    return `<form class="gl pnl fm-stack" id="auth-register" novalidate><label>Nombre visible<input id="auth-name" autocomplete="nickname" required minlength="2" maxlength="60"></label><label>Correo<input id="auth-email" type="email" autocomplete="email" required maxlength="254"></label><label>Contraseña<input id="auth-password" type="password" autocomplete="new-password" required minlength="10" maxlength="200" aria-describedby="auth-password-help"></label><small id="auth-password-help">Al menos 10 caracteres. Una frase de varias palabras es fácil de recordar y difícil de adivinar.</small><label class="check"><input id="auth-terms" type="checkbox" required> Acepto los términos y condiciones y la política de privacidad</label><button class="btn" type="submit">Crear cuenta</button></form>`;
+    return `<form class="gl pnl fm-stack" id="auth-register" novalidate><label>${t(
+        "Nombre visible"
+    )}<input id="auth-name" autocomplete="nickname" required minlength="2" maxlength="60"></label><label>${t(
+        "Correo"
+    )}<input id="auth-email" type="email" autocomplete="email" required maxlength="254"></label><label>${t(
+        "Contraseña"
+    )}<input id="auth-password" type="password" autocomplete="new-password" required minlength="10" maxlength="200" aria-describedby="auth-password-help"></label><small id="auth-password-help">${t(
+        "Al menos 10 caracteres. Una frase de varias palabras es fácil de recordar y difícil de adivinar."
+    )}</small><label class="check"><input id="auth-terms" type="checkbox" required> ${t(
+        "Acepto los términos y condiciones y la política de privacidad"
+    )}</label><button class="btn" type="submit">${t("Crear cuenta")}</button></form>`;
 }
 
 // ---- "Seguridad": password and open sessions ---------------------------------
 
 export async function renderSecurity(container) {
     if (!user) {
-        container.innerHTML = `<h3>Seguridad e inicio de sesión</h3><div class="gl pnl"><p>Inicia sesión para ver tus sesiones y cambiar la contraseña.</p><p><button class="btn s" data-go="Acceso" data-auth-mode="login">Iniciar sesión</button></p></div>`;
+        container.innerHTML = `<h3>${t("Seguridad e inicio de sesión")}</h3><div class="gl pnl"><p>${t(
+            "Inicia sesión para ver tus sesiones y cambiar la contraseña."
+        )}</p><p><button class="btn s" data-go="Acceso" data-auth-mode="login">${t("Iniciar sesión")}</button></p></div>`;
         return;
     }
     const unverified = user.email_verified
         ? ""
-        : `<section class="gl pnl"><b>Confirma tu correo</b><p>Te enviamos un enlace a ${h(
-              user.email
-          )}. Si no lo encuentras, revisa el correo no deseado.</p><button class="ghost" data-auth-resend>Enviar el enlace otra vez</button></section>`;
-    container.innerHTML = `<h3>Seguridad e inicio de sesión</h3>${unverified}<form class="gl pnl fm-stack" id="auth-password-form" novalidate><b>Cambiar contraseña</b><label>Contraseña actual<input id="auth-current" type="password" autocomplete="current-password" required></label><label>Contraseña nueva<input id="auth-new" type="password" autocomplete="new-password" required minlength="10"></label><button class="btn s" type="submit">Cambiar contraseña</button><small>Al cambiarla se cierran las sesiones abiertas en otros equipos.</small><p class="warn" role="alert" data-auth-error hidden></p></form><section class="gl pnl" id="auth-sessions"><b>Sesiones abiertas</b><p class="catalog-status">Cargando…</p></section>`;
+        : `<section class="gl pnl"><b>${t("Confirma tu correo")}</b><p>${h(
+              t("Te enviamos un enlace a {email}. Si no lo encuentras, revisa el correo no deseado.", { email: user.email })
+          )}</p><button class="ghost" data-auth-resend>${t("Enviar el enlace otra vez")}</button></section>`;
+    container.innerHTML = `<h3>${t("Seguridad e inicio de sesión")}</h3>${unverified}<form class="gl pnl fm-stack" id="auth-password-form" novalidate><b>${t(
+        "Cambiar contraseña"
+    )}</b><label>${t("Contraseña actual")}<input id="auth-current" type="password" autocomplete="current-password" required></label><label>${t(
+        "Contraseña nueva"
+    )}<input id="auth-new" type="password" autocomplete="new-password" required minlength="10"></label><button class="btn s" type="submit">${t(
+        "Cambiar contraseña"
+    )}</button><small>${t(
+        "Al cambiarla se cierran las sesiones abiertas en otros equipos."
+    )}</small><p class="warn" role="alert" data-auth-error hidden></p></form><section class="gl pnl" id="auth-sessions"><b>${t(
+        "Sesiones abiertas"
+    )}</b><p class="catalog-status">${t("Cargando…")}</p></section>`;
     try {
         const sessions = await call("/sessions");
         const slot = container.querySelector("#auth-sessions");
         if (!slot) return;
-        slot.innerHTML = `<b>Sesiones abiertas</b><ul class="auth-session-list">${sessions
+        slot.innerHTML = `<b>${t("Sesiones abiertas")}</b><ul class="auth-session-list">${sessions
             .map(
                 (item) =>
                     `<li><span>${h(browserName(item.user_agent))}${
-                        item.current ? " <small>(esta)</small>" : ""
-                    }</span><small>Última actividad: ${h(
-                        new Date(item.last_seen_at).toLocaleString("es")
+                        item.current ? ` <small>(${t("esta")})</small>` : ""
+                    }</span><small>${h(
+                        t("Última actividad: {date}", { date: new Date(item.last_seen_at).toLocaleString(locale) })
                     )}</small></li>`
             )
             .join("")}</ul>${
             sessions.length > 1
-                ? '<button class="ghost" data-auth-end-others>Cerrar las demás sesiones</button>'
+                ? `<button class="ghost" data-auth-end-others>${t("Cerrar las demás sesiones")}</button>`
                 : ""
         }`;
     } catch (error) {
-        container.querySelector("#auth-sessions").innerHTML = `<b>Sesiones abiertas</b><p class="warn">${h(
+        container.querySelector("#auth-sessions").innerHTML = `<b>${t("Sesiones abiertas")}</b><p class="warn">${h(
             error.message
         )}</p>`;
     }
 }
 
 function browserName(agent) {
-    if (!agent) return "Navegador desconocido";
+    if (!agent) return t("Navegador desconocido");
     const name = /Edg\//.test(agent)
         ? "Edge"
         : /Firefox\//.test(agent)
@@ -154,7 +198,7 @@ function browserName(agent) {
             ? "Chrome"
             : /Safari\//.test(agent)
               ? "Safari"
-              : "Navegador";
+              : t("Navegador");
     const system = /Android/.test(agent)
         ? "Android"
         : /iPhone|iPad/.test(agent)
@@ -166,7 +210,7 @@ function browserName(agent) {
               : /Linux/.test(agent)
                 ? "Linux"
                 : "";
-    return system ? `${name} en ${system}` : name;
+    return system ? t("{browser} en {system}", { browser: name, system }) : name;
 }
 
 // ---- Events ------------------------------------------------------------------
@@ -204,7 +248,7 @@ export function installAuth({ panel, go }) {
                         remember: document.getElementById("auth-remember").checked
                     }
                 });
-                window.toast?.(`Hola, ${user.display_name}`);
+                window.toast?.(t("Hola, {name}", { name: user.display_name }));
                 changed();
                 go("Inicio");
             } else if (form.id === "auth-forgot") {
@@ -213,7 +257,7 @@ export function installAuth({ panel, go }) {
                     body: { email: value("auth-email") }
                 });
                 mode = "login";
-                notice = answer.message;
+                notice = t(answer.message);
                 renderAuth(panel("Acceso"));
             } else if (form.id === "auth-reset") {
                 await call("/password-reset", {
@@ -224,11 +268,11 @@ export function installAuth({ panel, go }) {
                 user = null;
                 changed();
                 mode = "login";
-                notice = "Contraseña cambiada. Inicia sesión con la nueva.";
+                notice = t("Contraseña cambiada. Inicia sesión con la nueva.");
                 renderAuth(panel("Acceso"));
             } else if (form.id === "auth-register") {
                 if (!document.getElementById("auth-terms").checked)
-                    return showError("Debes aceptar los términos y condiciones.", form);
+                    return showError(t("Debes aceptar los términos y condiciones."), form);
                 user = await call("/register", {
                     method: "POST",
                     body: {
@@ -238,7 +282,7 @@ export function installAuth({ panel, go }) {
                         accept_terms: true
                     }
                 });
-                window.toast?.("Cuenta creada");
+                window.toast?.(t("Cuenta creada"));
                 track("cuenta:registro");
                 changed();
                 go("Perfil");
@@ -250,7 +294,7 @@ export function installAuth({ panel, go }) {
                         new_password: document.getElementById("auth-new").value
                     }
                 });
-                window.toast?.("Contraseña cambiada");
+                window.toast?.(t("Contraseña cambiada"));
                 renderSecurity(panel("Seguridad"));
             }
         } catch (error) {
@@ -279,17 +323,17 @@ export function installAuth({ panel, go }) {
         try {
             if (target.hasAttribute("data-auth-resend")) {
                 await call("/confirm-email/request", { method: "POST" });
-                window.toast?.(`Te enviamos el enlace a ${user.email}`);
+                window.toast?.(t("Te enviamos el enlace a {email}", { email: user.email }));
             } else if (target.hasAttribute("data-auth-logout")) {
                 await call("/logout", { method: "POST" });
                 user = null;
-                window.toast?.("Sesión cerrada");
+                window.toast?.(t("Sesión cerrada"));
                 changed();
                 go("Inicio");
             } else {
                 const result = await call("/sessions/end-others", { method: "POST" });
                 window.toast?.(
-                    result.ended === 1 ? "Se cerró 1 sesión" : `Se cerraron ${result.ended} sesiones`
+                    t(result.ended === 1 ? "Se cerró {count} sesión" : "Se cerraron {count} sesiones", { count: result.ended })
                 );
                 renderSecurity(panel("Seguridad"));
             }

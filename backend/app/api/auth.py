@@ -24,6 +24,7 @@ from app.api.dependencies import (
     same_origin,
     site_url,
 )
+from app.core import languages
 from app.core.config import get_settings
 from app.db.base import utcnow
 from app.models.accounts import UserSession
@@ -47,7 +48,7 @@ logger = logging.getLogger(__name__)
 def send_confirmation(session, user, request: Request) -> None:
     # A failing mail server must not undo the registration; the link can be resent.
     try:
-        accounts.send_confirmation(session, user, site_url(request))
+        accounts.send_confirmation(session, user, site_url(request), languages.for_request(request))
     except OSError as error:
         logger.error("No se pudo enviar el correo de confirmación: %s", type(error).__name__)
 
@@ -232,7 +233,9 @@ def confirm_email(payload: TokenInput, session: SessionDep):
 )
 def request_password_reset(payload: PasswordResetRequest, request: Request, session: SessionDep):
     try:
-        accounts.request_password_reset(session, payload.email, site_url(request))
+        accounts.request_password_reset(
+            session, payload.email, site_url(request), languages.for_request(request)
+        )
     except OSError as error:
         logger.error("No se pudo enviar el correo de recuperación: %s", type(error).__name__)
     session.commit()

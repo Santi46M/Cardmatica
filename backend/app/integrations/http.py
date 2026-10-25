@@ -97,7 +97,7 @@ class PoliteHttpClient:
             "konami": {"www.db.yugioh-card.com"},
             # Only the configured feeds and the GitHub API.
             "news": {
-                urlsplit(feed.split("|", 1)[-1].strip()).hostname for feed in settings.news_feeds
+                urlsplit(feed.rpartition("|")[2].strip()).hostname for feed in settings.news_feeds
             }
             | {"api.github.com"},
         }[source]

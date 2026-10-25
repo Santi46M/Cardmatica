@@ -1,6 +1,7 @@
 import { escapeHtml } from "./html.js";
 import { NEXT_BANLIST } from "./config.js";
 import { formatDate } from "./format.js";
+import { t } from "./lang.js";
 
 const h = escapeHtml;
 
@@ -23,7 +24,7 @@ function safeUrl(value) {
 
 function copies(status) {
     if (status.max_copies == null) return "";
-    return status.max_copies === 1 ? "1 copia" : `${status.max_copies} copias`;
+    return t(status.max_copies === 1 ? "{count} copia" : "{count} copias", { count: status.max_copies });
 }
 
 export function statusFor(card, market) {
@@ -33,9 +34,9 @@ export function statusFor(card, market) {
 export function badgeHtml(status) {
     if (!status) return "";
     const info = STATUS[status.status] || STATUS.unknown;
-    const title = `${info.label} en ${status.format}${
+    const title = `${t("{status} en {format}", { status: t(info.label), format: status.format })}${
         copies(status) ? ` (${copies(status)})` : ""
-    } · lista del ${formatDate(status.effective_date)}`;
+    } · ${t("lista del {date}", { date: formatDate(status.effective_date) })}`;
     return `<span class="bn bn-${info.tone}" role="img" aria-label="${h(title)}" title="${h(
         title
     )}">${info.mark}</span>`;
@@ -50,9 +51,9 @@ export function banlistSectionHtml(card, market) {
             const url = safeUrl(status.source_url);
             return `<div class="bl-row${status.format === market ? " current" : ""}">${badgeHtml(
                 status
-            )}<div><b>${h(status.format)} · ${h(info.label)}</b>${
+            )}<div><b>${h(status.format)} · ${h(t(info.label))}</b>${
                 copies(status) ? ` · ${h(copies(status))}` : ""
-            }<small>Vigente desde el ${h(formatDate(status.effective_date))} · ${
+            }<small>${h(t("Vigente desde el {date}", { date: formatDate(status.effective_date) }))} · ${
                 url
                     ? `<a href="${h(url)}" target="_blank" rel="noopener noreferrer">${h(
                           status.source_name
@@ -65,15 +66,15 @@ export function banlistSectionHtml(card, market) {
         .map(
             (entry) =>
                 `<li>${h(entry.format)} · ${h(formatDate(entry.effective_date))} · ${h(
-                    (STATUS[entry.status] || STATUS.unknown).label
+                    t((STATUS[entry.status] || STATUS.unknown).label)
                 )}</li>`
         )
         .join("");
     return `<section class="catalog-section"><h3>Banlist</h3>${
-        rows || '<p class="catalog-status">Todavía no hay listas importadas en el catálogo.</p>'
+        rows || `<p class="catalog-status">${t("Todavía no hay listas importadas en el catálogo.")}</p>`
     }${
         imported
-            ? `<details><summary>Estados históricos de importaciones autorizadas</summary><ul>${imported}</ul></details>`
+            ? `<details><summary>${t("Estados históricos de importaciones autorizadas")}</summary><ul>${imported}</ul></details>`
             : ""
     }</section>`;
 }
@@ -84,32 +85,36 @@ export function homeBanlistHtml(lists, market) {
         const next = NEXT_BANLIST[format];
         const url = current && safeUrl(current.source_url);
         const since = current
-            ? `<small>Lista vigente desde el ${h(formatDate(current.effective_date))}: ${
-                  current.counts.forbidden
-              } prohibidas, ${current.counts.limited} limitadas, ${
-                  current.counts.semi_limited
-              } semi-limitadas.${
+            ? `<small>${h(
+                  t("Lista vigente desde el {date}: {forbidden} prohibidas, {limited} limitadas, {semi} semi-limitadas.", {
+                      date: formatDate(current.effective_date),
+                      forbidden: current.counts.forbidden,
+                      limited: current.counts.limited,
+                      semi: current.counts.semi_limited
+                  })
+              )}${
                   url
-                      ? ` <a href="${h(url)}" target="_blank" rel="noopener noreferrer">Fuente</a>`
+                      ? ` <a href="${h(url)}" target="_blank" rel="noopener noreferrer">${t("Fuente")}</a>`
                       : ""
               }</small>`
-            : "<small>Todavía no hay una lista importada para este formato.</small>";
+            : `<small>${t("Todavía no hay una lista importada para este formato.")}</small>`;
         const body = next
             ? `<div class="cd" data-countdown="${h(next.date)}" aria-live="off"></div><small>${h(
-                  next.note
+                  t(next.note)
               )}</small>`
-            : `<p class="price">Sin fecha anunciada</p><small>Konami todavía no anunció la próxima lista ${h(
-                  format
-              )}.${
+            : `<p class="price">${t("Sin fecha anunciada")}</p><small>${h(
+                  t("Konami todavía no anunció la próxima lista {format}.", { format })
+              )}${
                   current
-                      ? ` Han pasado ${Math.max(
-                            0,
-                            Math.floor((Date.now() - Date.parse(current.effective_date)) / 864e5)
-                        )} días desde la última.`
+                      ? ` ${h(
+                            t("Han pasado {days} días desde la última.", {
+                                days: Math.max(0, Math.floor((Date.now() - Date.parse(current.effective_date)) / 864e5))
+                            })
+                        )}`
                       : ""
               }</small>`;
-        return `<div class="gl pnl${format === market ? " current" : ""}"><b>Próxima banlist ${h(
-            format
+        return `<div class="gl pnl${format === market ? " current" : ""}"><b>${h(
+            t("Próxima banlist {format}", { format })
         )}</b>${body}${since}</div>`;
     };
     return `<h3>Banlist</h3><div class="two">${panel(market)}${panel(
@@ -130,7 +135,7 @@ function tick() {
             [seconds % 60, "seg"]
         ];
         element.innerHTML = parts
-            .map(([value, label]) => `<div><b>${value}</b><small>${label}</small></div>`)
+            .map(([value, label]) => `<div><b>${value}</b><small>${t(label)}</small></div>`)
             .join("");
     }
 }

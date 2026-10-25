@@ -29,7 +29,8 @@
         button.setAttribute("aria-pressed", String(light));
         // El ícono muestra el modo al que se pasa.
         button.textContent = light ? "☾" : "☀";
-        button.title = light ? "Modo oscuro (provisional)" : "Modo claro (provisional)";
+        var t = window.t || String; // frontend/i18n.js, once loaded
+        button.title = t(light ? "Modo oscuro (provisional)" : "Modo claro (provisional)");
     }
 
     apply(stored() === "light" ? "light" : "dark");

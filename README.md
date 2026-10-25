@@ -45,6 +45,7 @@ frontend/js/config.js           Valores ajustables del frontend (paginación, ti
 frontend/pages/, assets/        Páginas legales y 404; íconos e imagen Open Graph
 frontend/demo/data.js           Datos de la tienda demo: cartas, sets y productos reales; vendedores, precios y stock inventados
 frontend/theme.js               PROVISIONAL: botón de modo claro (Frutiger Aero) y oscuro
+frontend/i18n.js, i18n/, js/lang.js  Idiomas: t(), diccionarios portugués e inglés
 frontend/demo/store.js          Tienda demo y piezas compartidas (pestañas, moneda, ventanas, carrito)
 backend/app/core/               Configuración, logging JSON, cabeceras de seguridad, caché y versiones de archivos
 backend/app/models/             Catálogo, procedencia, cuentas, wantlists y estadísticas
@@ -318,15 +319,29 @@ destacadas por rareza. Una lista sin datos no se muestra.
 
 Las noticias se actualizan solas: el servicio `news` (`cardmatica news-worker`, arranca
 con el Codespace) las trae cada `NEWS_REFRESH_HOURS` (3 h). Las de Yu-Gi-Oh! salen de
-los feeds RSS/Atom de `NEWS_FEEDS` (el blog oficial de Konami, YGOrganization y
-YGOPRODeck): título, enlace, fecha y un extracto corto, siempre con su fuente; el
-artículo se lee en su sitio. Las de Cardmática son las pull requests unidas del
-repositorio público `NEWS_SITE_REPO` (API de GitHub), sin las de mantenimiento. Se
-respeta robots.txt de cada feed, una consulta cada 5 s, y la API nunca sale a internet
-al atender una visita. Si una fuente falla quedan sus noticias anteriores. Para traerlas
-ya: `docker compose exec api cardmatica fetch-news`. También hay noticias incluidas en
-`backend/app/data/news.json` (`cardmatica import-news`) y un administrador puede
-publicar o quitar más desde su panel; un feed nunca las reemplaza.
+los feeds RSS/Atom de `NEWS_FEEDS`, cada uno con su idioma: en español Konami Europa y
+Konami Latinoamérica; en portugués Konami América Latina y Yu-Gi-Oh! Nexus; en inglés el
+blog de Konami, YGOrganization y YGOPRODeck. Cada visitante ve primero las de su idioma
+y, si faltan, las de los otros, marcadas con su idioma. Nunca se traducen: título y
+extracto quedan como los escribió la fuente, que se nombra siempre, y el artículo se lee
+en su sitio. Las de Cardmática son las pull requests unidas del repositorio público
+`NEWS_SITE_REPO` (API de GitHub), sin las de mantenimiento. Se respeta robots.txt de cada
+feed, una consulta cada 5 s, y la API nunca sale a internet al atender una visita. Si
+una fuente falla quedan sus noticias anteriores. Para traerlas ya:
+`docker compose exec api cardmatica fetch-news`. Un administrador puede publicar o
+quitar noticias desde su panel, eligiendo el idioma; un feed nunca las reemplaza.
+
+**Idiomas.** Todo el sitio está en español, portugués e inglés, en ese orden. Cada
+visitante lo ve en el idioma que eligió (selector de la cabecera, del pie y del menú de
+la cuenta; cookie `cm_lang`) o, si no eligió, en el primero de los tres que pida su
+navegador; si no pide ninguno, en español. Los textos se escriben en español en el
+código y pasan por `t()` (`frontend/i18n.js`); las traducciones están en
+`frontend/i18n/pt.js` y `en.js`, que el servidor también usa para títulos, descripciones,
+el texto fijo de las páginas y los correos de la cuenta. Las páginas legales tienen su
+versión en cada idioma (`terminos.pt.html`). Cada idioma tiene su dirección para los
+buscadores (`?lang=pt`, con enlaces hreflang). Los nombres y textos de las cartas se
+muestran en el idioma del visitante cuando la fuente los tiene. Para añadir un texto:
+escribirlo con `t("…")` y sumarlo a los dos diccionarios; una prueba avisa si falta.
 
 **Tienda de demostración.** Las cartas, impresiones (código y rareza), sets, cajas,
 sobres, mazos y accesorios de la tienda demo son reales: salen de Yugipedia y de las

@@ -1,4 +1,5 @@
 import { escapeHtml } from "./html.js";
+import { t } from "./lang.js";
 import { WANTLIST } from "./config.js";
 import { formatDate, money, toEuro } from "./format.js";
 import { track } from "./analytics.js";
@@ -61,13 +62,14 @@ function save() {
         saveTimer = setTimeout(() => {
             if (!currentUser()) return;
             request(ACCOUNT_WANTLISTS, { method: "PUT", body: state }).catch((error) => {
-                if (currentUser()) window.toast?.(`No se pudo guardar la lista de deseados: ${error.message}`);
+                if (currentUser())
+                    window.toast?.(t("No se pudo guardar la lista de deseados: {error}", { error: error.message }));
             });
         }, SAVE_DELAY_MS);
         return;
     }
     if (!writeJson(KEY, state))
-        window.toast?.("Tu navegador no permite guardar: la lista de deseados se perderá al cerrar la página");
+        window.toast?.(t("Tu navegador no permite guardar: la lista de deseados se perderá al cerrar la página"));
 }
 
 // On sign-in the account's lists replace the browser's. The first time, the
@@ -84,11 +86,11 @@ async function syncWithAccount(panel) {
             if (!saved.lists.length && local.lists.length) {
                 state = await request(ACCOUNT_WANTLISTS, { method: "PUT", body: local });
                 writeJson(KEY, EMPTY());
-                window.toast?.("Tus listas de deseados de este navegador se guardaron en tu cuenta");
+                window.toast?.(t("Tus listas de deseados de este navegador se guardaron en tu cuenta"));
             } else state = saved;
             remote = true;
         } catch {
-            if (currentUser()) window.toast?.("No se pudieron leer tus listas de deseados de la cuenta");
+            if (currentUser()) window.toast?.(t("No se pudieron leer tus listas de deseados de la cuenta"));
         }
     }
     alerts = new Map();
@@ -112,12 +114,12 @@ function createList(name) {
 
 function options(entries, selected = "", any = "") {
     return (
-        (any ? `<option value="">${h(any)}</option>` : "") +
+        (any ? `<option value="">${h(t(any))}</option>` : "") +
         entries
             .map(
                 ([value, label]) =>
                     `<option value="${h(value)}"${value === selected ? " selected" : ""}>${h(
-                        label
+                        t(label)
                     )}</option>`
             )
             .join("")
@@ -136,7 +138,9 @@ export function listCount() {
 function pickerHtml(card, printings, selectedId, market) {
     const printing = printings.items.find((item) => item.id === selectedId) || printings.items[0];
     const language = API_LANGUAGES[String(printing?.language || "").toLowerCase()] || "";
-    return `<div class="pick gl" id="wl-form" data-card-id="${h(card.id)}"><b>Añadir a una lista de deseados</b><select id="wl-list" aria-label="Lista de deseados">${state.lists
+    return `<div class="pick gl" id="wl-form" data-card-id="${h(card.id)}"><b>${t(
+        "Añadir a una lista de deseados"
+    )}</b><select id="wl-list" aria-label="${t("Lista de deseados")}">${state.lists
         .map(
             (list) =>
                 `<option value="${h(list.id)}"${
@@ -145,20 +149,24 @@ function pickerHtml(card, printings, selectedId, market) {
         )
         .join(
             ""
-        )}<option value="new"${state.lists.length ? "" : " selected"}>+ Nueva lista…</option></select><input id="wl-list-name" placeholder="Nombre de la nueva lista" maxlength="60"${
-        state.lists.length ? " hidden" : ""
-    }><select id="wl-printing" aria-label="Impresión">${printingOptionsHtml(printings.items, printing?.id, {
-        any: "Cualquier impresión",
+        )}<option value="new"${state.lists.length ? "" : " selected"}>+ ${t("Nueva lista…")}</option></select><input id="wl-list-name" placeholder="${t(
+        "Nombre de la nueva lista"
+    )}" maxlength="60"${state.lists.length ? " hidden" : ""}><select id="wl-printing" aria-label="${t(
+        "Impresión"
+    )}">${printingOptionsHtml(printings.items, printing?.id, {
+        any: t("Cualquier impresión"),
         details: false
-    })}</select><select id="wl-language" aria-label="Idioma">${options(
+    })}</select><select id="wl-language" aria-label="${t("Idioma")}">${options(
         LANGUAGES[market],
         language,
         "Cualquier idioma"
-    )}</select><select id="wl-edition" aria-label="Edición">${options(
+    )}</select><select id="wl-edition" aria-label="${t("Edición")}">${options(
         EDITIONS,
         "",
         "Cualquier edición"
-    )}</select><label class="qty">Cantidad <input id="wl-quantity" type="number" min="1" max="${WANTLIST.maxQuantity}" value="1"></label><button class="btn s" data-wl-add>Añadir</button></div>`;
+    )}</select><label class="qty">${t("Cantidad")} <input id="wl-quantity" type="number" min="1" max="${
+        WANTLIST.maxQuantity
+    }" value="1"></label><button class="btn s" data-wl-add>${t("Añadir")}</button></div>`;
 }
 
 // "Deseados" tab of a card's detail: the lists that already include it.
@@ -170,7 +178,7 @@ export function cardWantsHtml(cardId) {
         .map(
             ({ list, item }) =>
                 `<li><b>${h(list.name)}</b> · ${item.quantity} × ${h(
-                    item.code ? `${item.code} · ${item.rarity}` : "Cualquier impresión"
+                    item.code ? `${item.code} · ${item.rarity}` : t("Cualquier impresión")
                 )}${item.language ? ` · ${h(item.language)}` : ""}${
                     item.edition ? ` · ${h(item.edition)}` : ""
                 }</li>`
@@ -178,9 +186,16 @@ export function cardWantsHtml(cardId) {
         .join("");
     return `${
         rows
-            ? `<p>Esta carta está en ${entries.length === 1 ? "1 de tus listas de deseados" : `${entries.length} entradas de tus listas de deseados`}:</p><ul class="cd-wants">${rows}</ul>`
-            : '<p class="catalog-status">Esta carta todavía no está en ninguna de tus listas de deseados.</p>'
-    }<p><button class="btn s" data-wl-open aria-controls="wl-picker">♥ Añadir a la lista de deseados</button></p><small class="catalog-status">Las listas se gestionan en la pestaña «Lista de deseados».</small>`;
+            ? `<p>${t(
+                  entries.length === 1
+                      ? "Esta carta está en 1 de tus listas de deseados:"
+                      : "Esta carta está en {count} entradas de tus listas de deseados:",
+                  { count: entries.length }
+              )}</p><ul class="cd-wants">${rows}</ul>`
+            : `<p class="catalog-status">${t("Esta carta todavía no está en ninguna de tus listas de deseados.")}</p>`
+    }<p><button class="btn s" data-wl-open aria-controls="wl-picker">♥ ${t(
+        "Añadir a la lista de deseados"
+    )}</button></p><small class="catalog-status">${t("Las listas se gestionan en la pestaña «Lista de deseados».")}</small>`;
 }
 
 function addFromForm(card, printings, market) {
@@ -189,7 +204,7 @@ function addFromForm(card, printings, market) {
     if (choice === "new") {
         const name = document.getElementById("wl-list-name").value.trim();
         if (!name) {
-            window.toast?.("Ponle un nombre a la nueva lista");
+            window.toast?.(t("Ponle un nombre a la nueva lista"));
             document.getElementById("wl-list-name").focus();
             return false;
         }
@@ -225,7 +240,7 @@ function addFromForm(card, printings, market) {
     else list.items.push(entry);
     state.active = list.id;
     save();
-    window.toast?.(`${card.name} añadida a «${list.name}»`);
+    window.toast?.(t("{card} añadida a «{list}»", { card: card.name, list: list.name }));
     track("wantlist:agregar");
     return true;
 }
@@ -251,7 +266,10 @@ function rowsHtml(list) {
             (!filter.edition || !item.edition || item.edition === filter.edition) &&
             [item.name, item.code, item.setName].join(" ").toLowerCase().includes(filter.q)
     );
-    document.getElementById("wl-count").textContent = `${rows.length} de ${list.items.length} cartas`;
+    document.getElementById("wl-count").textContent = t("{shown} de {total} cartas", {
+        shown: rows.length,
+        total: list.items.length
+    });
     return rows.length
         ? rows
               .map(
@@ -260,28 +278,28 @@ function rowsHtml(list) {
                           item.name
                       )}</button><small><span class="tag ${item.market === "OCG" ? "o" : "t"}">${h(
                           item.market
-                      )}</span>${h(TYPES[item.cardType] || item.cardType || "")}${
+                      )}</span>${h(TYPES[item.cardType] ? t(TYPES[item.cardType]) : item.cardType || "")}${
                           item.subtypes.length ? ` · ${h(item.subtypes.join(" / "))}` : ""
                       }</small></td><td>${
                           item.code
                               ? `<b>${h(item.code)}</b> ${h(item.rarity || "")}<small>${h(item.setName || "")}</small>`
-                              : "Cualquier impresión"
-                      }</td><td>${h(LANGUAGE_NAMES[item.language] || "Cualquiera")}</td><td>${h(
-                          EDITION_NAMES[item.edition] || "Cualquiera"
+                              : t("Cualquier impresión")
+                      }</td><td>${h(t(LANGUAGE_NAMES[item.language] || "Cualquiera"))}</td><td>${h(
+                          EDITION_NAMES[item.edition] || t("Cualquiera")
                       )}</td><td class="num"><input class="wl-qty" type="number" min="1" max="${WANTLIST.maxQuantity}" value="${
                           item.quantity
-                      }" data-wl-qty="${h(item.id)}" aria-label="Cantidad de ${h(
-                          item.name
+                      }" data-wl-qty="${h(item.id)}" aria-label="${h(
+                          t("Cantidad de {name}", { name: item.name })
                       )}"></td><td class="num">${alertCell(item)}</td><td class="num"><button class="ghost" data-wl-remove="${h(
                           item.id
-                      )}">Quitar</button></td></tr>`
+                      )}">${t("Quitar")}</button></td></tr>`
               )
               .join("")
-        : `<tr><td colspan="7" class="empty">${
+        : `<tr><td colspan="7" class="empty">${t(
               list.items.length
                   ? "Ninguna carta de esta lista coincide con los filtros."
                   : "Esta lista está vacía. Abre una carta y usa «♥ Añadir a la lista de deseados»."
-          }</td></tr>`;
+          )}</td></tr>`;
 }
 
 // The purchase plan follows the list: a removed card or a new quantity redraws it.
@@ -296,10 +314,10 @@ function alertCell(item) {
     const hit = alerts.get(item.id);
     return `<label class="wl-alert"><input type="number" min="0" step="0.01" inputmode="decimal" value="${
         target ? h(target.amount) : ""
-    }" placeholder="Precio" data-wl-alert="${h(item.id)}" aria-label="Avisar si ${h(
-        item.name
-    )} baja de este precio en ${h(currency)}"><span>${h(currency)}</span></label>${
-        hit ? `<small class="wl-hit">Última venta ${h(money(hit.price, hit.currency))}</small>` : ""
+    }" placeholder="${t("Precio")}" data-wl-alert="${h(item.id)}" aria-label="${h(
+        t("Avisar si {name} baja de este precio en {currency}", { name: item.name, currency })
+    )}"><span>${h(currency)}</span></label>${
+        hit ? `<small class="wl-hit">${h(t("Última venta {price}", { price: money(hit.price, hit.currency) }))}</small>` : ""
     }`;
 }
 
@@ -310,23 +328,29 @@ function allItems() {
 function alertsHtml() {
     const hits = allItems().filter(({ item }) => alerts.has(item.id));
     if (!hits.length) return "";
-    return `<section class="gl pnl wl-alerts" role="status"><b>Avisos de precio</b>${hits
+    return `<section class="gl pnl wl-alerts" role="status"><b>${t("Avisos de precio")}</b>${hits
         .map(({ item, list }) => {
             const sale = alerts.get(item.id);
             return `<div class="wl-alert-row"><div><button class="lk" data-catalog-card="${h(
                 item.cardId
-            )}">${h(item.name)}</button><small>${h(list.name)} · última venta ${h(
-                money(sale.price, sale.currency)
-            )} el ${h(formatDate(sale.observed_at))} (${h(sale.code)}), por debajo de tu objetivo de ${h(
-                `${item.alert.amount} ${item.alert.currency}`
-            )}</small></div><button class="ghost" data-wl-seen="${h(item.id)}">Marcar como visto</button></div>`;
+            )}">${h(item.name)}</button><small>${h(list.name)} · ${h(
+                t("última venta {price} el {date} ({code}), por debajo de tu objetivo de {target}", {
+                    price: money(sale.price, sale.currency),
+                    date: formatDate(sale.observed_at),
+                    code: sale.code,
+                    target: `${item.alert.amount} ${item.alert.currency}`
+                })
+            )}</small></div><button class="ghost" data-wl-seen="${h(item.id)}">${t("Marcar como visto")}</button></div>`;
         })
-        .join("")}<small>Se compara con la última venta registrada que coincide con la impresión, el idioma y la edición elegidos.</small></section>`;
+        .join("")}<small>${t(
+        "Se compara con la última venta registrada que coincide con la impresión, el idioma y la edición elegidos."
+    )}</small></section>`;
 }
 
 function updateBadge() {
     const count = alerts.size;
-    window.TAB_LABELS.Deseados = count ? `Lista de deseados (${count})` : "Lista de deseados";
+    const label = t("Lista de deseados");
+    window.TAB_LABELS.Deseados = count ? `${label} (${count})` : label;
     const tab = document.querySelector('#tabs [data-g="Deseados"]');
     if (tab) tab.textContent = window.TAB_LABELS.Deseados;
 }
@@ -372,9 +396,12 @@ export async function refreshAlerts() {
     if (alerts.size && !alertsAnnounced) {
         alertsAnnounced = true;
         window.toast?.(
-            alerts.size === 1
-                ? "Una carta de tus listas de deseados bajó de tu precio objetivo"
-                : `${alerts.size} cartas de tus listas de deseados bajaron de tu precio objetivo`
+            t(
+                alerts.size === 1
+                    ? "Una carta de tus listas de deseados bajó de tu precio objetivo"
+                    : "{count} cartas de tus listas de deseados bajaron de tu precio objetivo",
+                { count: alerts.size }
+            )
         );
     }
     const container = document.getElementById("wlv");
@@ -383,38 +410,52 @@ export async function refreshAlerts() {
 
 export function renderWantlists(container) {
     const list = activeList();
-    const create = `<input id="wl-new-name" placeholder="Nueva lista" maxlength="60" aria-label="Nombre de la nueva lista"><button class="btn s" data-wl-create>Crear lista</button>`;
+    const create = `<input id="wl-new-name" placeholder="${t("Nueva lista")}" maxlength="60" aria-label="${t(
+        "Nombre de la nueva lista"
+    )}"><button class="btn s" data-wl-create>${t("Crear lista")}</button>`;
     if (!list) {
-        container.innerHTML = `<h3>Mis listas de deseados</h3><div class="gl pnl"><p class="empty">Todavía no tienes listas de deseados. Crea una aquí o abre una carta y usa «♥ Añadir a la lista de deseados».</p><div class="tools">${create}</div></div>`;
+        container.innerHTML = `<h3>${t("Mis listas de deseados")}</h3><div class="gl pnl"><p class="empty">${t(
+            "Todavía no tienes listas de deseados. Crea una aquí o abre una carta y usa «♥ Añadir a la lista de deseados»."
+        )}</p><div class="tools">${create}</div></div>`;
         return;
     }
     const sets = [...new Set(list.items.map((item) => item.setName).filter(Boolean))].sort();
-    container.innerHTML = `<h3>Mis listas de deseados</h3>${alertsHtml()}<div class="tools">${state.lists
+    container.innerHTML = `<h3>${t("Mis listas de deseados")}</h3>${alertsHtml()}<div class="tools">${state.lists
         .map(
             (item) =>
                 `<button class="pill" aria-pressed="${item.id === list.id}" data-wl-select="${h(
                     item.id
                 )}">${h(item.name)} (${item.items.length})</button>`
         )
-        .join("")}${create}</div><div class="tools"><input id="wl-q" type="search" placeholder="Buscar por carta, set o código" aria-label="Buscar en la lista"><select id="wl-type" aria-label="Tipo">${options(
+        .join("")}${create}</div><div class="tools"><input id="wl-q" type="search" placeholder="${t(
+        "Buscar por carta, set o código"
+    )}" aria-label="${t("Buscar en la lista")}"><select id="wl-type" aria-label="${t("Tipo")}">${options(
         Object.entries(TYPES),
         "",
         "Todos los tipos"
-    )}</select><select id="wl-set" aria-label="Set">${options(
+    )}</select><select id="wl-set" aria-label="${t("Set")}">${options(
         sets.map((name) => [name, name]),
         "",
         "Todos los sets"
-    )}</select><select id="wl-filter-language" aria-label="Idioma"><option value="">Todos los idiomas</option><optgroup label="TCG">${options(
-        LANGUAGES.TCG
-    )}</optgroup><optgroup label="OCG">${options(LANGUAGES.OCG)}</optgroup></select><select id="wl-filter-edition" aria-label="Edición">${options(
+    )}</select><select id="wl-filter-language" aria-label="${t("Idioma")}"><option value="">${t(
+        "Todos los idiomas"
+    )}</option><optgroup label="TCG">${options(LANGUAGES.TCG)}</optgroup><optgroup label="OCG">${options(
+        LANGUAGES.OCG
+    )}</optgroup></select><select id="wl-filter-edition" aria-label="${t("Edición")}">${options(
         EDITIONS,
         "",
         "Cualquier edición"
-    )}</select><span class="cnt" id="wl-count"></span></div><div class="pn gl wrap"><table><thead><tr><th>Carta</th><th>Impresión</th><th>Idioma</th><th>Edición</th><th class="num">Cant.</th><th class="num">Avisar si baja de</th><th></th></tr></thead><tbody id="wl-rows"></tbody></table></div><p><small>Creada el ${h(
-        formatDate(list.createdAt)
-    )}. ${currentUser() ? "Tus listas se guardan en tu cuenta." : "Tus listas se guardan en este navegador."}</small> <button class="ghost" data-wl-delete="${h(
-        list.id
-    )}">${pendingDelete === list.id ? "Confirmar: eliminar la lista" : "Eliminar esta lista"}</button></p>${wizardHtml(list)}`;
+    )}</select><span class="cnt" id="wl-count"></span></div><div class="pn gl wrap"><table><thead><tr><th>${t("Carta")}</th><th>${t(
+        "Impresión"
+    )}</th><th>${t("Idioma")}</th><th>${t("Edición")}</th><th class="num">${t("Cant.")}</th><th class="num">${t(
+        "Avisar si baja de"
+    )}</th><th></th></tr></thead><tbody id="wl-rows"></tbody></table></div><p><small>${h(
+        t("Creada el {date}.", { date: formatDate(list.createdAt) })
+    )} ${t(
+        currentUser() ? "Tus listas se guardan en tu cuenta." : "Tus listas se guardan en este navegador."
+    )}</small> <button class="ghost" data-wl-delete="${h(list.id)}">${t(
+        pendingDelete === list.id ? "Confirmar: eliminar la lista" : "Eliminar esta lista"
+    )}</button></p>${wizardHtml(list)}`;
     document.getElementById("wl-rows").innerHTML = rowsHtml(list);
 }
 
@@ -464,7 +505,7 @@ export function installWantlists({ panel, detail, api: client }) {
                 const input = document.getElementById("wl-new-name");
                 const name = input.value.trim();
                 if (!name) {
-                    window.toast?.("Escribe un nombre para la lista");
+                    window.toast?.(t("Escribe un nombre para la lista"));
                     input.focus();
                     return;
                 }
@@ -484,7 +525,7 @@ export function installWantlists({ panel, detail, api: client }) {
                     state.active = state.lists[0]?.id || null;
                     pendingDelete = null;
                     save();
-                    window.toast?.("Lista eliminada");
+                    window.toast?.(t("Lista eliminada"));
                 }
             }
             if (container) renderWantlists(container);
@@ -511,7 +552,7 @@ export function installWantlists({ panel, detail, api: client }) {
                 const amount = Number(event.target.value);
                 if (event.target.value === "" || !Number.isFinite(amount) || amount <= 0) {
                     delete item.alert;
-                    window.toast?.(`Aviso de precio quitado para ${item.name}`);
+                    window.toast?.(t("Aviso de precio quitado para {name}", { name: item.name }));
                 } else {
                     item.alert = {
                         amount: Math.round(amount * 100) / 100,
@@ -519,7 +560,10 @@ export function installWantlists({ panel, detail, api: client }) {
                     };
                     delete item.seenSaleAt;
                     window.toast?.(
-                        `Te avisaremos si ${item.name} se vende por ${item.alert.amount} ${item.alert.currency} o menos`
+                        t("Te avisaremos si {name} se vende por {price} o menos", {
+                            name: item.name,
+                            price: `${item.alert.amount} ${item.alert.currency}`
+                        })
                     );
                 }
                 save();

@@ -1,4 +1,5 @@
 import { escapeHtml } from "./html.js";
+import { t } from "./lang.js";
 // Full-page cart for the demo store (frontend/demo/store.js, whose cart,
 // LISTINGS and helpers are globals). The popup and this page share cartTotals().
 const h = escapeHtml;
@@ -15,61 +16,77 @@ function sellerHtml(group) {
             const quantity = window.cart[key];
             return `<tr><td><b>${h(line.name)}</b> ${line.tag}<small>${h(line.meta)}</small></td><td class="num hide">${window.formatPrice(
                 item.price
-            )}</td><td class="num"><div class="stepper" role="group" aria-label="Cantidad de ${h(
-                line.name
-            )}"><button class="ghost" data-cart-step="-1" data-key="${h(key)}" aria-label="Quitar una unidad"${
+            )}</td><td class="num"><div class="stepper" role="group" aria-label="${h(
+                t("Cantidad de {name}", { name: line.name })
+            )}"><button class="ghost" data-cart-step="-1" data-key="${h(key)}" aria-label="${t("Quitar una unidad")}"${
                 quantity <= 1 ? " disabled" : ""
             }>−</button><output>${quantity}</output><button class="ghost" data-cart-step="1" data-key="${h(
                 key
-            )}" aria-label="Añadir una unidad"${quantity >= item.quantity ? " disabled" : ""}>+</button></div><small>${item.quantity} ${
-                item.quantity === 1 ? "disponible" : "disponibles"
-            }</small></td><td class="num price">${window.formatPrice(
+            )}" aria-label="${t("Añadir una unidad")}"${quantity >= item.quantity ? " disabled" : ""}>+</button></div><small>${t(
+                item.quantity === 1 ? "{count} disponible" : "{count} disponibles",
+                { count: item.quantity }
+            )}</small></td><td class="num price">${window.formatPrice(
                 item.price * quantity
-            )}</td><td class="num"><button class="ghost" data-cart-remove="${h(key)}">Quitar</button></td></tr>`;
+            )}</td><td class="num"><button class="ghost" data-cart-remove="${h(key)}">${t("Quitar")}</button></td></tr>`;
         })
         .join("");
     return `<section class="gl pnl cart-seller"><div class="cart-seller-head"><div>${window.flag(
         seller.country
-    )}<button class="lk" data-v="${seller.id}">${h(seller.name)}</button><small>${h(seller.country)} · ★ ${
+    )}<button class="lk" data-v="${seller.id}">${h(seller.name)}</button><small>${h(t(seller.country))} · ★ ${
         seller.rating
-    } · ${group.units} ${group.units === 1 ? "artículo" : "artículos"}</small></div><div class="num"><small>Envío</small><b>${
-        group.ship ? window.formatPrice(group.ship) : "Gratis"
-    }</b></div></div><div class="wrap"><table><thead><tr><th>Artículo</th><th class="num hide col-price">Precio</th><th class="num col-qty">Cantidad</th><th class="num col-total">Total</th><th class="col-action"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${rows}</tbody></table></div><p class="cart-seller-foot">${
+    } · ${t(group.units === 1 ? "{count} artículo" : "{count} artículos", { count: group.units })}</small></div><div class="num"><small>${t(
+        "Envío"
+    )}</small><b>${group.ship ? window.formatPrice(group.ship) : t("Gratis")}</b></div></div><div class="wrap"><table><thead><tr><th>${t(
+        "Artículo"
+    )}</th><th class="num hide col-price">${t("Precio")}</th><th class="num col-qty">${t("Cantidad")}</th><th class="num col-total">${t(
+        "Total"
+    )}</th><th class="col-action"><span class="sr-only">${t("Acciones")}</span></th></tr></thead><tbody>${rows}</tbody></table></div><p class="cart-seller-foot">${
         missing > 0
-            ? `Te faltan ${window.formatPrice(missing)} con este vendedor para el envío gratis.`
-            : "Envío gratis con este vendedor."
+            ? h(t("Te faltan {amount} con este vendedor para el envío gratis.", { amount: window.formatPrice(missing) }))
+            : t("Envío gratis con este vendedor.")
     }<b>${window.formatPrice(group.sub + group.ship)}</b></p></section>`;
 }
 
 export function renderCart(container) {
     if (receipt) {
-        container.innerHTML = `<h3>Pedido recibido</h3><div class="gl pnl"><p>${receipt.units} ${
-            receipt.units === 1 ? "artículo" : "artículos"
-        } de ${receipt.sellers} ${receipt.sellers === 1 ? "vendedor" : "vendedores"} por ${window.formatPrice(
-            receipt.total
-        )}.</p><small>Comercio de demostración: no se cobró nada. El stock de cada vendedor se actualizó.</small><p><button class="btn" data-go="Todas">Seguir comprando</button></p></div>`;
+        container.innerHTML = `<h3>${t("Pedido recibido")}</h3><div class="gl pnl"><p>${h(
+            t("{items} de {sellers} por {total}.", {
+                items: t(receipt.units === 1 ? "{count} artículo" : "{count} artículos", { count: receipt.units }),
+                sellers: t(receipt.sellers === 1 ? "{count} vendedor" : "{count} vendedores", { count: receipt.sellers }),
+                total: window.formatPrice(receipt.total)
+            })
+        )}</p><small>${t("Comercio de demostración: no se cobró nada. El stock de cada vendedor se actualizó.")}</small><p><button class="btn" data-go="Todas">${t(
+            "Seguir comprando"
+        )}</button></p></div>`;
         receipt = null;
         return;
     }
     const totals = window.cartTotals();
     if (!totals.sellers.length) {
-        container.innerHTML = `<h3>Tu carrito</h3><div class="gl pnl"><p class="empty">Tu carrito está vacío. Abre una carta, un producto o el inventario de un vendedor y añade lo que prefieras.</p><p><button class="btn" data-go="Productos">Ver productos</button></p></div>`;
+        container.innerHTML = `<h3>${t("Tu carrito")}</h3><div class="gl pnl"><p class="empty">${t(
+            "Tu carrito está vacío. Abre una carta, un producto o el inventario de un vendedor y añade lo que prefieras."
+        )}</p><p><button class="btn" data-go="Productos">${t("Ver productos")}</button></p></div>`;
         return;
     }
     const units = totals.sellers.reduce((sum, group) => sum + group.units, 0);
-    container.innerHTML = `<div class="cart-page"><div class="cart-main"><h3>Tu carrito · ${units} ${
-        units === 1 ? "artículo" : "artículos"
-    }</h3><p class="catalog-status">Comercio de demostración: ofertas, precios y stock ilustrativos. Cada vendedor envía por separado.</p>${totals.sellers
-        .map(sellerHtml)
-        .join("")}</div><aside class="gl pnl cart-summary" aria-label="Resumen del pedido"><b>Resumen</b><div class="tot sm"><span>Artículos</span><span>${window.formatPrice(
+    container.innerHTML = `<div class="cart-page"><div class="cart-main"><h3>${t("Tu carrito")} · ${t(
+        units === 1 ? "{count} artículo" : "{count} artículos",
+        { count: units }
+    )}</h3><p class="catalog-status">${t(
+        "Comercio de demostración: ofertas, precios y stock ilustrativos. Cada vendedor envía por separado."
+    )}</p>${totals.sellers.map(sellerHtml).join("")}</div><aside class="gl pnl cart-summary" aria-label="${t(
+        "Resumen del pedido"
+    )}"><b>${t("Resumen")}</b><div class="tot sm"><span>${t("Artículos")}</span><span>${window.formatPrice(
         totals.sub
-    )}</span></div><div class="tot sm"><span>Envío (${totals.sellers.length} ${
-        totals.sellers.length === 1 ? "vendedor" : "vendedores"
-    })</span><span>${totals.ship ? window.formatPrice(totals.ship) : "Gratis"}</span></div><div class="tot"><span>Total</span><span>${window.formatPrice(
-        totals.total
-    )}</span></div><button class="btn" data-cart-buy>Finalizar compra</button><button class="ghost" data-go="Todas">Seguir comprando</button><button class="ghost" data-cart-clear>${
+    )}</span></div><div class="tot sm"><span>${t("Envío ({sellers})", {
+        sellers: t(totals.sellers.length === 1 ? "{count} vendedor" : "{count} vendedores", { count: totals.sellers.length })
+    })}</span><span>${totals.ship ? window.formatPrice(totals.ship) : t("Gratis")}</span></div><div class="tot"><span>${t(
+        "Total"
+    )}</span><span>${window.formatPrice(totals.total)}</span></div><button class="btn" data-cart-buy>${t(
+        "Finalizar compra"
+    )}</button><button class="ghost" data-go="Todas">${t("Seguir comprando")}</button><button class="ghost" data-cart-clear>${t(
         window.cartClearArmed ? "Confirmar: vaciar carrito" : "Vaciar carrito"
-    }</button></aside></div>`;
+    )}</button></aside></div>`;
 }
 
 export function installCart({ panel, open }) {

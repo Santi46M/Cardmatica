@@ -3,6 +3,7 @@
 // its family (backend/app/services/rarities.py). Rarity names are proper names
 // and stay as Cardmarket, TCGplayer and Yugipedia write them.
 import { escapeHtml } from "./html.js";
+import { t } from "./lang.js";
 
 const h = escapeHtml;
 
@@ -39,10 +40,11 @@ function tone(name, family) {
 // printing: { rarity, rarity_code, rarity_family } as the API sends it.
 export function rarityBadge(printing) {
     if (!printing?.rarity || printing.rarity === "Unknown")
-        return '<span class="rr" data-tone="other">Sin documentar</span>';
+        return `<span class="rr" data-tone="other">${t("Sin documentar")}</span>`;
     const family = printing.rarity_family;
     const title = [printing.rarity_code, NOTES[printing.rarity], FAMILY_LABELS[family]]
         .filter(Boolean)
+        .map((part) => t(part))
         .join(" · ");
     return `<span class="rr" data-tone="${tone(printing.rarity, family)}" title="${h(title)}">${h(
         printing.rarity
@@ -58,13 +60,13 @@ const FAMILY_VALUE = "familia:";
 export function rarityOptionsHtml(groups) {
     const option = (value, label) => `<option value="${h(value)}">${h(label)}</option>`;
     return (
-        option("", "Todas las rarezas") +
+        option("", t("Todas las rarezas")) +
         groups
             .map(({ family, names }) => {
-                const label = FAMILY_LABELS[family] || FAMILY_LABELS.other;
+                const label = t(FAMILY_LABELS[family] || FAMILY_LABELS.other);
                 const whole =
                     family !== "basic" && names.length > 1
-                        ? option(`${FAMILY_VALUE}${family}`, `${label}: todas`)
+                        ? option(`${FAMILY_VALUE}${family}`, t("{family}: todas", { family: label }))
                         : "";
                 return `<optgroup label="${h(label)}">${whole}${names
                     .map((name) => option(name, name))

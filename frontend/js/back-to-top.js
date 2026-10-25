@@ -8,8 +8,8 @@ export function installBackToTop({ focus }) {
     button.className = "btn to-top";
     button.type = "button";
     button.hidden = true;
-    button.textContent = "↑ Arriba";
-    button.setAttribute("aria-label", "Volver arriba");
+    button.textContent = `↑ ${window.t("Arriba")}`;
+    button.setAttribute("aria-label", window.t("Volver arriba"));
     document.body.append(button);
     button.addEventListener("click", () => {
         const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;

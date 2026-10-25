@@ -131,20 +131,30 @@ importan precios de terceros ni de guías de precios.
 
 ## Noticias
 
-Consultado el 24 de octubre de 2026. Las noticias de Yu-Gi-Oh! del inicio salen de
-feeds RSS/Atom públicos, hechos para que otros programas los lean:
+Consultado el 24 y 25 de octubre de 2026. Las noticias de Yu-Gi-Oh! del inicio salen de
+feeds RSS/Atom públicos, hechos para que otros programas los lean, cada uno en su idioma:
 
-- Blog oficial de Konami (`https://yugiohblog.konami.com/feed/`): coberturas de
-  eventos y anuncios de la TCG.
-- YGOrganization (`https://ygorganization.com/feed/`): traducciones y novedades de la
-  OCG y la TCG.
-- YGOPRODeck (`https://ygoprodeck.com/feed_rss.xml`): artículos y novedades de sets.
+- Español: Konami Europa (`https://www.yugioh-card.com/eu/es/feed/`) y Konami
+  Latinoamérica (`https://www.yugioh-card.com/lat-am/feed/`), los sitios oficiales en
+  español.
+- Portugués: Konami América Latina en portugués
+  (`https://www.yugioh-card.com/lat-am/pt/feed/`) y Yu-Gi-Oh! Nexus
+  (`https://www.yugiohnexus.com.br/feeds/posts/default`), blog brasileño de listas y
+  spoilers de sets.
+- Inglés: el blog oficial de Konami (`https://yugiohblog.konami.com/feed/`),
+  YGOrganization (`https://ygorganization.com/feed/`) y YGOPRODeck
+  (`https://ygoprodeck.com/feed_rss.xml`).
 
-Solo se guardan título, enlace, fecha y un extracto de hasta 220 caracteres sin HTML,
-con el nombre de la fuente; el artículo completo se lee en su sitio. No se copian
-imágenes ni textos enteros. Se pide robots.txt antes de cada feed y se espera
-`NEWS_REQUEST_INTERVAL` (5 s) entre consultas; un feed con DOCTYPE no se procesa. Las
-novedades del sitio son las pull requests unidas del repositorio público
-`NEWS_SITE_REPO`, por la API REST de GitHub sin token (60 consultas por hora; se usa
-una cada 3 h). Esa API es para programas: su robots.txt habla del sitio web, por eso
-es la única consulta sin él. `NEWS_ENABLED=false` corta todas.
+Los sitios de Konami son WordPress y Yu-Gi-Oh! Nexus es Blogger; las direcciones son las
+de feed de cada plataforma. Desde el entorno de desarrollo no se pudieron abrir: si una
+falla, el registro del servicio `news` lo dice y las demás siguen.
+
+Nada se traduce: se guardan título, enlace, fecha y un extracto de hasta 220 caracteres
+sin HTML, tal como los escribió la fuente, con su nombre y su idioma; el artículo
+completo se lee en su sitio. No se copian imágenes ni textos enteros. Se pide robots.txt
+antes de cada feed y se espera `NEWS_REQUEST_INTERVAL` (5 s) entre consultas; un feed con
+DOCTYPE no se procesa. Las novedades del sitio son las pull requests unidas del
+repositorio público `NEWS_SITE_REPO`, por la API REST de GitHub sin token (60 consultas
+por hora; se usa una cada 3 h), y están en español. Esa API es para programas: su
+robots.txt habla del sitio web, por eso es la única consulta sin él.
+`NEWS_ENABLED=false` corta todas.

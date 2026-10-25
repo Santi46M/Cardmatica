@@ -1,7 +1,8 @@
-// How a printing reads in a list: code, rarity, language and edition in
-// Spanish, grouped by the set it was printed in (newest set first, the order
+// How a printing reads in a list: code, rarity, language and edition in the
+// visitor's language, grouped by the set it was printed in (newest set first, the order
 // the API sends), as Cardmarket lists a card's versions by expansion.
 import { escapeHtml } from "./html.js";
+import { t } from "./lang.js";
 
 const h = escapeHtml;
 
@@ -19,7 +20,10 @@ const LANGUAGE_NAMES = {
 };
 const EDITION_NAMES = { "1st": "1st Edition", limited: "Limited Edition", unlimited: "Unlimited" };
 
-export const languageName = (code) => LANGUAGE_NAMES[String(code || "").toLowerCase()] || code || "";
+export const languageName = (code) => {
+    const name = LANGUAGE_NAMES[String(code || "").toLowerCase()];
+    return name ? t(name) : code || "";
+};
 export const editionName = (value) => EDITION_NAMES[String(value || "").toLowerCase()] || "";
 
 // "LOB-EN001 · Ultra Rare · Inglés · 1st Edition"; without the last two when

@@ -35,6 +35,7 @@ import {
 } from "./collections.js";
 import { CATALOG } from "./config.js";
 import { escapeHtml } from "./html.js";
+import { t } from "./lang.js";
 import { installBackToTop } from "./back-to-top.js";
 import { installCardPreview } from "./card-preview.js";
 import { installHeaderScroll } from "./header-scroll.js";
@@ -105,7 +106,7 @@ const SORTS = [
     ["newest", "Lanzamiento: más reciente"],
     ["oldest", "Lanzamiento: más antiguo"]
 ]
-    .map(([value, label]) => `<option value="${value}">${label}</option>`)
+    .map(([value, label]) => `<option value="${value}">${t(label)}</option>`)
     .join("");
 
 // Layout pieces around the existing table: view toggle, top pager and the grid.
@@ -124,7 +125,7 @@ grid.after(pagination);
 const viewToggle = document.createElement("div");
 viewToggle.className = "seg m view-toggle";
 viewToggle.setAttribute("role", "group");
-viewToggle.setAttribute("aria-label", "Vista");
+viewToggle.setAttribute("aria-label", t("Vista"));
 element("cnt").before(viewToggle);
 
 // The banner of the latest set, above every catalogue view, and the header
@@ -160,7 +161,7 @@ function hideEmptyFilters() {
 function updateFiltersToggle() {
     const ids = ["rar", "stp", ...TYPE_FILTERS.map((filter) => filter.id)];
     const used = ids.filter((id) => element(id)?.value).length;
-    filtersToggle.textContent = used ? `Filtros (${used})` : "Filtros";
+    filtersToggle.textContent = used ? t("Filtros ({count})", { count: used }) : t("Filtros");
 }
 
 // On phones the tabs scroll sideways; the current one is brought into view.
@@ -179,7 +180,7 @@ function renderViewToggle() {
     ]
         .map(
             ([value, label]) =>
-                `<button data-view="${value}" aria-pressed="${value === view}">${label}</button>`
+                `<button data-view="${value}" aria-pressed="${value === view}">${t(label)}</button>`
         )
         .join("");
 }
@@ -337,7 +338,7 @@ function fillFacets(data) {
     fillSelect(element("rar"), rarityOptionsHtml(facets.rarity_groups));
     fillSelect(
         element("stp"),
-        `<option value="">Cualquier producto</option>${facets.product_types
+        `<option value="">${t("Cualquier producto")}</option>${facets.product_types
             .map((value) => `<option value="${h(value)}">${h(value)}</option>`)
             .join("")}`
     );
@@ -501,8 +502,8 @@ async function showHomeBanlist(request) {
         slot.innerHTML = homeBanlistHtml(await request, window.market);
         startCountdowns();
     } catch (error) {
-        slot.innerHTML = `<p class="catalog-status" role="alert">No se pudo cargar la banlist: ${h(
-            error.message
+        slot.innerHTML = `<p class="catalog-status" role="alert">${h(
+            t("No se pudo cargar la banlist: {error}", { error: error.message })
         )}</p>`;
     }
 }
@@ -553,7 +554,7 @@ async function loadCards(reset = false) {
     controller = new AbortController();
     const current = ++generation;
     const home = window.tab === "Inicio";
-    status("Consultando catálogo…", { quiet: true });
+    status(t("Consultando catálogo…"), { quiet: true });
     element(home ? "home" : "cat").setAttribute("aria-busy", "true");
     // Cached answers arrive at once; only slower ones show placeholders.
     const skeleton = setTimeout(
@@ -562,8 +563,8 @@ async function loadCards(reset = false) {
     );
     // The home page's banlist and trending cards are asked for with its cards.
     const banlist = home ? api.get("banlists") : null;
-    const trending = home ? api.get("trending", { market: window.market, language: "es" }) : null;
-    const news = home ? api.get("news", { limit: CATALOG.newsSize }) : null;
+    const trending = home ? api.get("trending", { market: window.market, language: window.I18N.lang }) : null;
+    const news = home ? api.get("news", { limit: CATALOG.newsSize, lang: window.I18N.lang }) : null;
     for (const request of [banlist, trending, news]) request?.catch(() => {});
     try {
         if (!home) {
@@ -588,7 +589,7 @@ async function loadCards(reset = false) {
                 ...(home ? {} : rarityParams(element("rar").value)),
                 product_type: home ? undefined : element("stp").value,
                 sort: home ? "updated" : element("srt").value,
-                language: "es"
+                language: window.I18N.lang
             },
             { signal: controller.signal }
         );
@@ -612,16 +613,12 @@ async function loadCards(reset = false) {
             lastData = data;
             renderResults(data);
         }
-        status(
-            data.total
-                ? ""
-                : "El catálogo no contiene resultados para este mercado y estos filtros."
-        );
+        status(data.total ? "" : t("El catálogo no contiene resultados para este mercado y estos filtros."));
     } catch (error) {
         if (error.name === "AbortError" || current !== generation) return;
         const message = `${h(
             error.message
-        )} <button class="ghost" data-catalog-retry>Reintentar</button>`;
+        )} <button class="ghost" data-catalog-retry>${t("Reintentar")}</button>`;
         if (home) element("home").innerHTML = `<div class="empty gl" role="alert">${message}</div>`;
         else {
             showViewContainers();
@@ -632,7 +629,7 @@ async function loadCards(reset = false) {
             pagination.innerHTML = "";
             topPagination.innerHTML = "";
         }
-        status("No se pudo cargar el catálogo.");
+        status(t("No se pudo cargar el catálogo."));
     } finally {
         clearTimeout(skeleton);
         if (current === generation) element(home ? "home" : "cat").removeAttribute("aria-busy");
@@ -672,7 +669,7 @@ window.showTab = function () {
     element("tabs").innerHTML = window.TABS.map(
         (tab) =>
             `<button aria-pressed="${tab === window.tab}" data-g="${h(tab)}">${h(
-                window.TAB_LABELS[tab]
+                t(window.TAB_LABELS[tab])
             )}</button>`
     ).join("");
     showCurrentTab();
@@ -896,7 +893,7 @@ document.addEventListener(
             fallback.className = `catalog-image-fallback${
                 event.target.classList.contains("grid") ? " grid" : ""
             }`;
-            fallback.textContent = "Imagen no disponible";
+            fallback.textContent = t("Imagen no disponible");
             // A broken image takes its provisional warning with it.
             (event.target.closest(".img-wrap") || event.target).replaceWith(fallback);
         }
@@ -911,7 +908,7 @@ for (const name of ["openDemoCard", "openSeller", "openProduct", "showCart"]) {
         const container = element(name === "showCart" ? "cbx" : "mb");
         const notice = document.createElement("p");
         notice.className = "catalog-status";
-        notice.textContent = "Comercio de demostración: ofertas, precios y stock ilustrativos.";
+        notice.textContent = t("Comercio de demostración: ofertas, precios y stock ilustrativos.");
         container.prepend(notice);
         return result;
     };
