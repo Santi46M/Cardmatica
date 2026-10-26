@@ -28,18 +28,43 @@ procedencia histórica y parsers de importaciones autorizadas, sin consultas aut
 ## Organización
 
 ```text
-index.html, styles.css, script.js  Interfaz y comercio original
-frontend/js/                    Cliente API, vistas y adaptador del catálogo
-backend/app/core/               Configuración y logging JSON
-backend/app/models/             Catálogo, procedencia y mantenimiento
+index.html, styles.css          Página y estilos
+frontend/js/catalog.js          Punto de entrada: pestañas, lista, ficha, dirección de la página
+frontend/js/catalog-view.js     HTML de la lista, la cuadrícula y la ficha de carta
+frontend/js/card-types.js       Tipos de carta por niveles, en español, y sus filtros
+frontend/js/search-suggest.js   Sugerencias con miniatura mientras se escribe en la búsqueda
+frontend/js/rarities.js         Rarezas: familias en español, filtro agrupado y etiqueta de color
+frontend/js/printings.js        Impresiones legibles y agrupadas por set
+frontend/js/collections.js      Página de cada set y arquetipo, y banner del último set
+frontend/js/trending.js, news.js  Inicio: cartas en tendencia y noticias
+frontend/js/shopping-wizard.js  Asistente de compra de la lista de deseados
+frontend/js/header-scroll.js    En el teléfono, la cabecera se esconde al bajar y vuelve al subir
+frontend/js/auth.js, account-menu.js, profile.js, wantlists.js   Cuenta y sus datos
+frontend/js/admin.js            Panel de administración
+frontend/js/config.js           Valores ajustables del frontend (paginación, tiempos, cachés)
+frontend/pages/, assets/        Páginas legales y 404; íconos e imagen Open Graph
+frontend/demo/data.js           Datos de la tienda demo: cartas, sets y productos reales; vendedores, precios y stock inventados
+frontend/theme.js               PROVISIONAL: botón de modo claro (Frutiger Aero) y oscuro
+frontend/i18n.js, i18n/, js/lang.js  Idiomas: t(), diccionarios portugués e inglés
+frontend/demo/store.js          Tienda demo y piezas compartidas (pestañas, moneda, ventanas, carrito)
+backend/app/core/               Configuración, logging JSON, cabeceras de seguridad, caché y versiones de archivos
+backend/app/models/             Catálogo, procedencia, cuentas, wantlists y estadísticas
 backend/app/repositories/       SQL paginado y upserts
-backend/app/services/           Reconciliación, precedencia, consultas e imágenes
+backend/app/services/           Reconciliación, tipos de carta, rarezas, cuentas, correo, precios e imágenes
 backend/app/integrations/       HTTP respetuoso, YGOPRODeck y Yugipedia
 backend/app/ingestion/          Normalización, checkpoints y worker
-backend/app/api/                API pública y administración autenticada
+backend/app/api/                Catálogo, cuentas, administración, estadísticas y páginas HTML
 backend/alembic/                Migraciones versionadas
 backend/tests/                  Dominio, HTTP simulado, API y navegador
 ```
+
+**Cómo se escribe el HTML del frontend.** Cada plantilla va con `html` delante
+(`frontend/js/html.js`; en la tienda demo, `markup`) y se escribe como HTML con
+sangría, un elemento por línea. Al usarse se quitan los saltos de línea y la sangría,
+así que la página queda igual que si estuviera en una sola línea. Por eso un salto no
+puede caer dentro de una etiqueta ni entre dos palabras: lo comprueba
+`backend/tests/test_templates.py`. Todo valor que viene de afuera pasa por `h()`
+(`escapeHtml`).
 
 Las decisiones de integración están en [architecture.md](docs/architecture.md).
 El resultado de las pruebas y los pendientes de producción están en
@@ -53,6 +78,48 @@ El resultado de las pruebas y los pendientes de producción están en
   con `python -m playwright install chromium`.
 - El rol de migraciones debe poder crear tablas e instalar `pg_trgm`. En un servicio
   administrado, solicitar al administrador que instale esa extensión previamente.
+
+## Probar en el navegador con GitHub Codespaces
+
+No requiere instalar nada. En GitHub: **Code → Codespaces → Create codespace** sobre la rama
+deseada. El entorno (`.devcontainer/`) crea `.env`, levanta PostgreSQL y la API con Docker e
+importa las banlists. Cuando el puerto 8000 aparece en la pestaña **Ports**, abrir su dirección.
+El catálogo empieza vacío. Para cargar unas 1000 cartas, cada una con dos impresiones de
+rarezas distintas (la original y la más reciente en otra rareza), en la terminal del Codespace:
+
+```bash
+docker compose exec api cardmatica sync ygoprodeck initial --max-cards 1000 --max-printings 2
+```
+
+Tarda unos minutos y termina con `"status": "paused"`: es lo esperado, se detuvo al llegar al
+límite. Sin `--max-printings` se importan todas las impresiones de cada carta.
+
+Para ver ilustraciones (vista provisional, sin licencia comercial), tras cargar cartas.
+Respeta un ritmo de una petición por segundo (dos por carta), así que 1000 cartas tardan
+alrededor de media hora; se puede cortar y retomar, solo baja las que faltan:
+
+```bash
+docker compose exec api cardmatica preview-images --max-cards 1000
+```
+
+Las fotos de los productos de la demo (boosters, cajas, fundas, deckboxes, binders, playmats,
+dados) salen de la página oficial de cada uno, listada en `backend/app/data/product_pages.json`
+(Konami, Dragon Shield, Ultra Pro, Ultimate Guard, Chessex y Yugipedia para los sets antiguos).
+Con la misma vista provisional activada, bajan con (unos 3 minutos; una página cada 5 segundos):
+
+```bash
+docker compose exec api cardmatica product-images
+```
+
+Las que ya bajó no las vuelve a pedir (`--refresh` las renueva). Si una página falla, el comando
+dice cuál y ese producto sigue con su ícono; para cambiar de foto, cambiar su dirección en el JSON.
+
+El Codespace activa esa vista al crearse (`backend/scripts/enable_preview_images.py`, que
+acepta el dominio privado `.app.github.dev`). En un Codespace creado antes, ejecutar ese script
+y luego `docker compose up -d api`. Cada imagen así mostrada lleva un aviso rojo «!» que explica
+que es provisional. **Mantener el puerto 8000 privado** (valor por defecto): si se hace público,
+cualquiera vería ilustraciones sin licencia. Los Codespaces consumen la cuota mensual de la
+cuenta de GitHub; detenerlos al terminar.
 
 ## Windows 11 — PowerShell
 
@@ -94,7 +161,7 @@ python -m uvicorn app.main:app --reload
 Tras crear `.env`:
 
 ```bash
-docker compose up --build -d db api
+docker compose up --build -d db api news
 docker compose --profile maintenance up --build -d worker
 docker compose logs -f api worker
 ```
@@ -227,21 +294,162 @@ autor y licencia cuando se conocen. No se inventa autor ni licencia ausentes.
 La vista local de ilustraciones solo acepta hosts localhost/127.0.0.1/::1; Docker
 publica el puerto únicamente en loopback. Deshabilitarla al desplegar públicamente.
 
+## Banlist, historial de precios, listas de deseados y perfil
+
+**Banlist.** Las listas Forbidden & Limited vigentes viajan con la aplicación en
+`backend/app/data/banlists/`: TCG del 19 de octubre de 2026 (base oficial de Konami)
+y OCG del 1 de octubre de 2026 (transcripción de Yugipedia). Cada archivo guarda solo
+nombres y estados, con su URL de origen y la fecha de consulta. El contenedor de la API
+las importa al arrancar; fuera de Docker:
+
+```powershell
+.\.venv\Scripts\cardmatica.exe import-banlist
+```
+
+Las entradas se guardan por nombre en inglés, así que una carta sincronizada después
+también obtiene su estado sin repetir la importación. En una lista marcada como completa,
+una carta que no figura queda como permitida; en una incompleta, como «sin estado
+verificado». Para una lista nueva: copiar un JSON existente, actualizar fecha, fuente y
+nombres, y volver a ejecutar el comando. La importación es idempotente.
+
+**Historial de precios.** Se construye solo con ventas completadas en Cardmática
+(tabla `price_observations`); nunca con guías de precios externas. Mientras no exista el
+backend de pedidos, un administrador puede registrar una venta:
+
+```powershell
+$headers = @{ Authorization = "Bearer $env:ADMIN_TOKEN" }
+$body = @{ printing_id = "UUID_DE_LA_IMPRESION"; price = "450.00"; currency = "UYU"; observed_at = "2026-10-20T15:00:00-03:00"; condition = "NM" } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/v1/admin/price-observations -Headers $headers -ContentType "application/json" -Body $body
+```
+
+La ficha muestra la última venta con su fecha aunque nadie tenga la carta a la venta
+o no haya ventas en el periodo elegido.
+
+**Listas de deseados y perfil.** Sin cuenta se guardan en el navegador (localStorage);
+con cuenta, en el servidor (ver «Cuentas» más abajo). Un perfil de vendedor todavía no
+publica una tienda. Las listas referencian el UUID y la impresión del catálogo, nunca
+índices del comercio de demostración. En el código y la API conservan el nombre técnico
+`wantlists`.
+
+**En tendencia y noticias del inicio.** «En tendencia» junta listas que salen solo
+de datos del catálogo (`backend/app/services/trending.py`): bajan de precio (ventas
+completadas), vuelven al juego (una banlist nueva las libera), más deseadas (en las
+listas de varias personas, solo el recuento), vuelven con reimpresión e impresiones
+destacadas por rareza. Una lista sin datos no se muestra.
+
+Las noticias se actualizan solas: el servicio `news` (`cardmatica news-worker`, arranca
+con el Codespace) las trae cada `NEWS_REFRESH_HOURS` (3 h). Las de Yu-Gi-Oh! salen de
+los feeds RSS/Atom de `NEWS_FEEDS`, cada uno con su idioma: en portugués Yu-Gi-Oh! Nexus;
+en inglés YGOrganization y YGOPRODeck. Konami no publica feeds y falta una fuente en
+español (ver [source-policies.md](docs/source-policies.md)). Cada visitante ve primero las de su idioma
+y, si faltan, las de los otros, marcadas con su idioma. Nunca se traducen: título y
+extracto quedan como los escribió la fuente, que se nombra siempre, y el artículo se lee
+en su sitio. Las de Cardmática son las pull requests unidas del repositorio público
+`NEWS_SITE_REPO` (API de GitHub), sin las de mantenimiento. Se respeta robots.txt de cada
+feed, una consulta cada 5 s, y la API nunca sale a internet al atender una visita. Si
+una fuente falla quedan sus noticias anteriores. Para traerlas ya:
+`docker compose exec api cardmatica fetch-news`. Un administrador puede publicar o
+quitar noticias desde su panel, eligiendo el idioma; un feed nunca las reemplaza.
+
+**Legal y privacidad.** Términos, privacidad, cookies, devoluciones y arrepentimiento,
+normas y aviso legal, en los tres idiomas; son borradores y lo marca un lápiz ✎. El pie
+común (`frontend/pages/footer.html`) lleva esos enlaces, el botón de arrepentimiento y el
+aviso de cookies. Cada persona puede descargar sus datos o borrar su cuenta desde
+«Seguridad e inicio de sesión». Los datos del responsable se configuran con `BUSINESS_*`.
+El estado de cada punto está en [compliance.md](docs/compliance.md).
+
+**Idiomas.** Todo el sitio está en español, portugués e inglés, en ese orden. Cada
+visitante lo ve en el idioma que eligió (selector de la cabecera, del pie y del menú de
+la cuenta; cookie `cm_lang`) o, si no eligió, en el primero de los tres que pida su
+navegador; si no pide ninguno, en español. Los textos se escriben en español en el
+código y pasan por `t()` (`frontend/i18n.js`); las traducciones están en
+`frontend/i18n/pt.js` y `en.js`, que el servidor también usa para títulos, descripciones,
+el texto fijo de las páginas y los correos de la cuenta. Las páginas legales tienen su
+versión en cada idioma (`terminos.pt.html`). Cada idioma tiene su dirección para los
+buscadores (`?lang=pt`, con enlaces hreflang). Los nombres y textos de las cartas se
+muestran en el idioma del visitante cuando la fuente los tiene. Para añadir un texto:
+escribirlo con `t("…")` y sumarlo a los dos diccionarios; una prueba avisa si falta.
+
+**Tienda de demostración.** Las cartas, impresiones (código y rareza), sets, cajas,
+sobres, mazos y accesorios de la tienda demo son reales: salen de Yugipedia y de las
+páginas de Konami, Dragon Shield, Ultra Pro, Ultimate Guard y Chessex (octubre de
+2026). Vendedores, precios, stock e historial siguen siendo inventados y la página lo
+avisa. Para cambiarla basta con editar las tablas de `frontend/demo/data.js`.
+
+**Modo claro (provisional).** El botón ☀/☾ de la cabecera cambia entre el modo oscuro
+de siempre y uno claro estilo Frutiger Aero; la elección queda en el navegador. Todos
+los colores salen de las variables de `styles.css` (`:root` y
+`:root[data-theme="light"]`); para quitarlo, borrar `frontend/theme.js`, sus `<script>`,
+el botón `#theme` y los bloques marcados PROVISIONAL.
+
+**Asistente de compra.** Como el Shopping Wizard de Cardmarket: arma la compra de una
+lista entre los vendedores, con «Menos envíos» o «Menor precio» (contando el envío de
+cada vendedor y el envío gratis), estado mínimo, país y valoración; calcula las dos
+opciones para compararlas, explica qué cartas no encontró y pasa todo o un vendedor al
+carrito (`frontend/js/shopping-wizard.js`). Hoy usa las ofertas de la tienda de
+demostración; con publicaciones reales solo cambia de dónde salen las ofertas.
+
 ## API y seguridad
 
 Endpoints principales:
 
 - `GET /api/v1/cards`: q, market, card_type, subtype, rarity, set_id,
-  archetype_id, product_type, language, sort, page, page_size.
-- `GET /api/v1/cards/{uuid}`; `/printings`; `/errata`.
+  archetype_id, product_type, language, sort, page, page_size, y los niveles de
+  tipo: frame (Normal, Effect, Ritual, Fusion, Synchro, Xyz, Link o Pendulum),
+  ability (Tuner, Flip, Gemini, Spirit, Toon, Union), race, attribute, level
+  (nivel, rango o link) y property (tipo de magia o trampa). Ver
+  `backend/app/services/card_types.py`.
+- `GET /api/v1/facets`: rarezas, orígenes y la taxonomía de tipos ordenada.
+- `GET /api/v1/cards/{uuid}`; `/printings`; `/errata`; `/price-history`
+  (market, printing_id, days). La ficha incluye `banlist_status` por formato.
+- `GET /api/v1/banlists`: lista vigente por formato, recuentos y fuente.
 - `GET /api/v1/printings/{uuid}`, `/archetypes`, `/archetypes/{uuid}/cards`, `/sets`.
 - `GET /api/v1/images/{uuid}?thumbnail=true`.
 - `GET /api/v1/artworks/{uuid}?thumbnail=true`: ilustración general y control de uso.
 - `POST /api/v1/admin/sync-jobs`, `GET /api/v1/admin/sync-jobs/{uuid}`,
   `POST /api/v1/admin/sync-jobs/{uuid}/resume`, `/errors` y `/admin/conflicts`.
+- `POST /api/v1/admin/price-observations`: registra una venta completada.
 - `GET /health/live` y `/health/ready`.
 
-Administración exige `Authorization: Bearer ADMIN_TOKEN` de al menos 32 caracteres.
+Cuentas (`/api/v1/auth`): `POST /register`, `/login`, `/logout`, `/password`,
+`/sessions/end-others`; `GET /me` y `/sessions`. La sesión viaja en la cookie
+`cm_session` (HttpOnly, SameSite=Lax, Secure en HTTPS) y la base guarda solo el
+hash del token. Los cambios exigen la cabecera `X-CSRF-Token` con el valor de la
+cookie `cm_csrf` y se rechazan si llegan de otro sitio. Contraseñas con scrypt;
+bloqueo temporal tras `LOGIN_MAX_FAILURES` intentos y límite por IP
+(`AUTH_ATTEMPTS_PER_MINUTE`, en memoria: válido para un solo proceso). Detrás de un
+proxy público, `FORWARDED_ALLOW_IPS` debe indicar su dirección para que el límite
+se aplique a cada visitante y no al proxy. `cardmatica cleanup` borra sesiones
+vencidas y enlaces de correo usados (conviene programarlo una vez al día). Al registrarse
+se envía un enlace para confirmar el correo (`/verificar`) y desde el inicio de
+sesión se puede pedir uno para restablecer la contraseña (`/restablecer`); los
+enlaces son de un solo uso y vencen (`EMAIL_CONFIRMATION_HOURS`,
+`PASSWORD_RESET_MINUTES`). Con `EMAIL_BACKEND=console` (valor por defecto) los
+correos no salen del equipo: aparecen en `docker compose logs api`, con su enlace.
+En producción, `EMAIL_BACKEND=smtp` y los datos del servidor de correo.
+
+Datos de la cuenta (`/api/v1/account`): `GET` perfil y preferencias; `PUT /profile`,
+`/preferences` (moneda, mercado, vista); `GET`/`PUT /wantlists`. Las wantlists se
+envían como un documento con la forma que usa la página y se guardan como filas
+(`wantlists`, `wantlist_items`); al leerlas, el nombre, código y rareza salen del
+catálogo. Al iniciar sesión por primera vez, lo que el navegador tenía guardado
+pasa a la cuenta.
+
+Todas las respuestas llevan Content-Security-Policy estricta (solo recursos del
+propio sitio), `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` y,
+en producción bajo HTTPS, HSTS (`backend/app/core/security.py`). En producción,
+definir `ALLOWED_HOSTS` con el dominio real.
+
+Administración (`/api/v1/admin`): acepta la sesión de una cuenta con rol `admin`
+(con CSRF, como el resto de cambios) o el token para scripts. El panel está en el
+menú de cuenta de los administradores: resumen, cuentas con su rol y últimas
+sincronizaciones. El primer administrador se nombra desde la terminal:
+
+```bash
+docker compose exec api cardmatica set-role tu@correo.com admin
+```
+
+Para scripts, administración también acepta `Authorization: Bearer ADMIN_TOKEN` de al menos 32 caracteres.
 Sin token configurado, queda deshabilitada. La API solo encola; no ejecuta scraping
 en background de una petición. Mantener el token fuera del frontend y del navegador
 de clientes. El despliegue público debe usar HTTPS y rotación del token operativo.
@@ -251,7 +459,26 @@ subcadenas, orden estable y límite máximo de 100 elementos por página. Las of
 y precios no se deducen del catálogo externo; por ello el catálogo ordena por nombre
 o actualización, mientras el comercio original conserva su orden por precio.
 
+## Lanzamiento: buscadores, enlaces e íconos
+
+- Cada página sale con su título, descripción, enlace canónico y etiquetas
+  Open Graph (imagen `frontend/assets/og-image.png`, 1200×630), con direcciones
+  absolutas basadas en `PUBLIC_BASE_URL` o en el sitio de la petición. Al moverse
+  por pestañas o abrir una carta, la página actualiza título y descripción.
+- `/robots.txt` y `/sitemap.xml` (inicio, páginas legales y cada carta, con su
+  fecha de actualización).
+- Íconos: `favicon.ico`, `favicon.svg`, `apple-touch-icon` y manifiesto con
+  íconos de 192 y 512 px (`frontend/assets/`).
+- Estadísticas anónimas propias (`/api/v1/analytics/event`): visitas por
+  pestaña y unas pocas acciones, sumadas por día, sin cookies ni datos
+  personales; respetan Do Not Track y Global Privacy Control. Se ven en el panel
+  de administración. `ANALYTICS_ENABLED=false` las apaga.
+
 ## Pruebas
+
+GitHub Actions (`.github/workflows/tests.yml`) corre en cada pull request y en
+cada cambio a main: ruff, todas las pruebas con navegador sobre SQLite, y las
+migraciones más las pruebas contra PostgreSQL 17.
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest backend/tests -q

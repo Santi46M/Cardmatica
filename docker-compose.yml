@@ -23,15 +23,24 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cardmatica}
       CACHE_DIRECTORY: /data/cache
       IMAGE_DIRECTORY: /data/images
+      # Proxies whose X-Forwarded-For uvicorn trusts for the visitor's address
+      # (used by the attempt limits). Behind a public proxy, set its address.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1}
     ports:
       - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     volumes:
       - .:/workspace:ro
       - catalog_data:/data
     depends_on:
       db:
         condition: service_healthy
-    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    command: ["sh", "-c", "alembic upgrade head && cardmatica import-banlist && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers"]
   worker:
     build: ./backend
     profiles: ["maintenance"]
@@ -46,6 +55,20 @@ services:
       db:
         condition: service_healthy
     command: ["cardmatica", "worker", "--poll-seconds", "5"]
+  # Noticias del inicio desde sus fuentes (RSS y GitHub), cada NEWS_REFRESH_HOURS.
+  news:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cardmatica}
+      CACHE_DIRECTORY: /data/cache
+    volumes:
+      - catalog_data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+    command: ["cardmatica", "news-worker"]
 volumes:
   postgres_data:
   catalog_data:

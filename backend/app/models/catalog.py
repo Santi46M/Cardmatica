@@ -23,6 +23,10 @@ class Card(Entity, Base):
     __table_args__ = (
         CheckConstraint("konami_id IS NULL OR konami_id > 0", name="positive_konami_id"),
         Index("ix_cards_type_name", "card_type", "display_name"),
+        Index("ix_cards_frame", "card_type", "monster_frame"),
+        Index("ix_cards_property", "card_type", "card_property"),
+        Index("ix_cards_race", "monster_race"),
+        Index("ix_cards_attribute", "attribute"),
     )
     konami_id: Mapped[int | None] = mapped_column(Integer, unique=True)
     ygoprodeck_id: Mapped[int | None] = mapped_column(Integer, unique=True)
@@ -38,6 +42,13 @@ class Card(Entity, Base):
     atk: Mapped[str | None] = mapped_column(String(20))
     defense: Mapped[str | None] = mapped_column(String(20))
     pendulum_scale: Mapped[int | None] = mapped_column(Integer)
+    # Type levels derived from card_type + subtypes (app/services/card_types.py),
+    # stored so the catalogue can filter and sort by them with an index.
+    monster_frame: Mapped[str | None] = mapped_column(String(20))
+    is_pendulum: Mapped[bool] = mapped_column(Boolean, default=False)
+    monster_abilities: Mapped[list | None] = mapped_column(JSON, default=list)
+    monster_race: Mapped[str | None] = mapped_column(String(40))
+    card_property: Mapped[str | None] = mapped_column(String(20))
     names: Mapped[list["CardName"]] = relationship(
         back_populates="card", cascade="all, delete-orphan"
     )
@@ -210,6 +221,48 @@ class BanlistEntry(Entity, Base):
     format: Mapped[str] = mapped_column(String(60), index=True)
     effective_date: Mapped[date] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(20))
+
+
+class BanlistList(Entity, Base):
+    """A dated Forbidden & Limited List as published, with its provenance.
+
+    Entries are kept by English card name so cards synchronised after the import
+    resolve their status without re-importing. A complete list means every card
+    not named on it is unlimited for that format and date.
+    """
+
+    __tablename__ = "banlist_lists"
+    __table_args__ = (
+        UniqueConstraint("format", "effective_date"),
+        CheckConstraint("format IN ('TCG', 'OCG')", name="valid_format"),
+    )
+    format: Mapped[str] = mapped_column(String(8))
+    effective_date: Mapped[date] = mapped_column(Date)
+    complete: Mapped[bool] = mapped_column(Boolean, default=False)
+    source_name: Mapped[str] = mapped_column(String(200))
+    source_url: Mapped[str] = mapped_column(Text)
+    retrieved_on: Mapped[date] = mapped_column(Date)
+    scope_note: Mapped[str | None] = mapped_column(Text)
+    entries: Mapped[list["BanlistListEntry"]] = relationship(
+        back_populates="banlist", cascade="all, delete-orphan"
+    )
+
+
+class BanlistListEntry(Entity, Base):
+    __tablename__ = "banlist_list_entries"
+    __table_args__ = (
+        UniqueConstraint("banlist_id", "normalized_name"),
+        CheckConstraint(
+            "status IN ('forbidden','limited','semi_limited')", name="valid_list_status"
+        ),
+    )
+    banlist_id: Mapped[UUID] = mapped_column(
+        ForeignKey("banlist_lists.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(300))
+    normalized_name: Mapped[str] = mapped_column(String(300), index=True)
+    status: Mapped[str] = mapped_column(String(20))
+    banlist: Mapped[BanlistList] = relationship(back_populates="entries")
 
 
 # Substring searches use PostgreSQL trigram indexes; SQLite is only a test adapter.

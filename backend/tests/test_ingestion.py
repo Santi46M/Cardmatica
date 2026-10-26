@@ -1,6 +1,9 @@
 from datetime import datetime, timezone
 
 import pytest
+from pydantic import ValidationError
+from sqlalchemy import func, select
+
 from app.ingestion.normalizers import normalized_name, rarity_name
 from app.models import (
     Archetype,
@@ -27,8 +30,6 @@ from app.schemas.ingestion import (
 )
 from app.services.ingestion import IngestionService
 from app.services.reconciliation import IdentityConflict
-from pydantic import ValidationError
-from sqlalchemy import func, select
 
 
 def count(session, model):

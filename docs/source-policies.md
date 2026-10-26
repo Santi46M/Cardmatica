@@ -95,3 +95,77 @@ No se hace hotlink de imágenes no aprobadas. El fallback nunca usa otra impresi
 Galerías ambiguas, edición/arte desconocidos o metadatos insuficientes se registran
 para revisión. Se descargaron ilustraciones generales de YGOPRODeck para la
 prueba local; no se descargaron ni aprobaron escaneos de Yugipedia.
+
+## Vista provisional de imágenes en desarrollo
+
+`LOCAL_PREVIEW_HOST_SUFFIXES` permite tratar un dominio privado de desarrollo (por ejemplo
+`.app.github.dev` de un Codespace con el puerto privado) igual que localhost para la vista local
+de prueba. Solo funciona con DEPLOYMENT_MODE=local y ALLOW_LOCAL_IMAGE_PREVIEW=true, no concede
+derechos y la interfaz marca cada ilustración así servida con un aviso de imagen provisional.
+`cardmatica preview-images` descarga las ilustraciones generales de las cartas del catálogo con
+el mismo límite de una solicitud por segundo. No habilitarlo en un despliegue público.
+
+`cardmatica product-images` hace lo mismo con las fotos de los productos de la demo: lee la foto
+principal que declara cada página oficial de `backend/app/data/product_pages.json` (etiqueta
+`og:image`, o la imagen del cuadro de Yugipedia), respeta robots.txt, pide una página cada 5
+segundos (`PRODUCT_REQUEST_INTERVAL`) y solo acepta fotos del mismo sitio o de un CDN listado.
+Guarda una copia WebP de 480 px como máximo. Las fotos son de Konami y de cada marca y no tienen
+licencia: la API solo las sirve en la vista local (`/api/v1/product-images`, sin caché) y la
+tienda las marca con el aviso rojo. Para publicarlas hace falta permiso de cada titular o
+material de prensa con licencia de uso.
+
+## Banlists
+
+Revisado: 2026-10-23. Las listas incluidas contienen únicamente nombres de cartas y su
+estado (prohibida, limitada, semi-limitada), con fecha de vigencia, URL de origen y fecha
+de consulta. No incluyen textos, imágenes ni otros materiales de las cartas.
+
+- TCG, vigente desde el 19 de octubre de 2026: leída una vez, de forma manual, en
+  https://www.db.yugioh-card.com/yugiohdb/forbidden_limited.action?request_locale=en
+  ("Status Updated 10/19/2026": 156 prohibidas, 92 limitadas, 7 semi-limitadas).
+- OCG, vigente desde el 1 de octubre de 2026: transcripción comunitaria de la regulación
+  oficial en https://yugipedia.com/wiki/October_2026_Lists_(OCG). Aplica a japonés,
+  Asian-English y chino simplificado; Corea publica una lista propia.
+
+No es una extracción sistemática ni un conector automático: no se agregó ningún cliente que
+consulte esas páginas. Queda pendiente que el operador confirme si la reproducción de estos
+estados requiere la misma referencia de autorización que las importaciones oficiales
+descritas arriba, y ajuste o retire los archivos según esa revisión.
+
+## Precios
+
+Los precios del historial provienen solo de ventas completadas en Cardmática. No se
+importan precios de terceros ni de guías de precios.
+
+
+## Noticias
+
+Consultado el 24 y 25 de octubre de 2026. Las noticias de Yu-Gi-Oh! del inicio salen de
+feeds RSS/Atom públicos, hechos para que otros programas los lean, cada uno en su idioma:
+
+- Portugués: Yu-Gi-Oh! Nexus
+  (`https://www.yugiohnexus.com.br/feeds/posts/default?redirect=false`), blog brasileño de
+  listas y spoilers de sets. `redirect=false` pide el feed propio de Blogger en lugar de
+  mandar a FeedBurner.
+- Inglés: YGOrganization (`https://ygorganization.com/feed/`) y YGOPRODeck
+  (`https://ygoprodeck.com/feed_rss.xml`).
+- Español: ninguna por ahora (ver abajo).
+
+Revisado el 25 de octubre de 2026 desde un Codespace: Konami no publica feeds. Responden
+404 tanto los generales (`/eu/es/feed/`, `/lat-am/feed/`, `/lat-am/pt/feed/`) como los de
+categoría (`/eu/es/category/noticias/feed/`, `/eu/category/news/feed/`), y el blog
+`yugiohblog.konami.com` ya no responde. Falta una fuente en español con feed; no se
+traducen artículos de otras fuentes. El feed de YGOPRODeck trae XML inválido en algún
+artículo: si el XML no se puede leer ni reparado, cada artículo se lee por separado y se
+descarta solo el roto. Si una fuente falla, `cardmatica fetch-news` dice el motivo y las
+demás siguen.
+
+Nada se traduce: se guardan título, enlace, fecha y un extracto de hasta 220 caracteres
+sin HTML, tal como los escribió la fuente, con su nombre y su idioma; el artículo
+completo se lee en su sitio. No se copian imágenes ni textos enteros. Se pide robots.txt
+antes de cada feed y se espera `NEWS_REQUEST_INTERVAL` (5 s) entre consultas; un feed con
+DOCTYPE no se procesa. Las novedades del sitio son las pull requests unidas del
+repositorio público `NEWS_SITE_REPO`, por la API REST de GitHub sin token (60 consultas
+por hora; se usa una cada 3 h), y están en español. Esa API es para programas: su
+robots.txt habla del sitio web, por eso es la única consulta sin él.
+`NEWS_ENABLED=false` corta todas.

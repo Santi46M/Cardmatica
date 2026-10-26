@@ -2,16 +2,17 @@ import os
 from datetime import datetime, timezone
 from uuid import uuid4
 
-import app.models  # noqa: F401
 import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, event, schema
+from sqlalchemy.orm import sessionmaker
+
+import app.models  # noqa: F401
 from app.core.config import get_settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
 from app.schemas.ingestion import CardRecord, NameInput, PrintingInput, TextInput
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event, schema
-from sqlalchemy.orm import sessionmaker
 
 
 @pytest.fixture

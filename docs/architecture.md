@@ -11,6 +11,13 @@ TCG/OCG filtra cartas duplicadas de ejemplo; las monedas se guardan en localStor
 Las fichas, precios e historiales originales son ilustrativos. Hay declaraciones
 duplicadas de init, inv, add y showCart y una extensión final de list/init.
 
+Actualización (23 de octubre de 2026): script.js se reescribió como
+frontend/demo/data.js (datos de la demo en tablas con nombre) y
+frontend/demo/store.js (lógica legible, sin duplicados ni código
+inalcanzable). Los nombres globales pasaron a ser descriptivos: LISTINGS,
+SELLERS, PRODUCTS, market, currency, formatPrice, showTab y refreshList. Con
+la misma semilla la demo genera exactamente los mismos datos que antes.
+
 Se conservan los controles, diseño de vidrio, modal, navegación, carrito y flujos
 comerciales anteriores. Un adaptador explícito conecta las vistas del catálogo
 con la API; los UUID del catálogo jamás se interpretan como índices de ITEMS.
@@ -21,6 +28,25 @@ PostgreSQL + SQLAlchemy 2 + Alembic evita una migración posterior desde almacen
 local y permite integridad, búsquedas e historial con concurrencia. FastAPI sirve
 la API y archivos frontend permitidos desde el mismo origen. El mantenimiento es
 un CLI/worker independiente; las rutas públicas solo consultan PostgreSQL.
+
+Rarezas (24 de octubre de 2026): cada fuente escribe la misma rareza de varias
+formas ("ScR", "SE", "Secret", "Collectors Rare"; la OCG llama "Normal" a la
+Common). backend/app/services/rarities.py las une bajo el nombre que usan
+Cardmarket, TCGplayer y Yugipedia, con su abreviatura de Yugipedia, y las agrupa
+en familias como TCGplayer: básicas (Common a Secret Rare; Short Print y Super
+Short Print son Commons menos frecuentes), alta gama, Secret especiales, Gold y
+Platinum, Parallel y texturas, ediciones especiales y otras. Un nombre
+desconocido se conserva tal cual en "otras". El filtro muestra solo las rarezas
+presentes en el mercado elegido; la migración 011 unió las grafías ya guardadas.
+
+Velocidad de carga sin paso de compilación (24 de octubre de 2026): cada página
+enlaza sus scripts y estilos como `archivo?v=<hash de su contenido>`
+(backend/app/core/assets.py) y el navegador los guarda un año sin volver a
+preguntar; un archivo modificado cambia de dirección. Los módulos se importan
+entre sí por ruta relativa, así que la página incluye un import map que agrega la
+versión, permitido en la Content-Security-Policy por su SHA-256. En una conexión
+3G lenta la portada pasó de 1,0 s a 0,37 s en visitas repetidas y de 2,0 s a 1,4 s
+en la primera.
 
 El modelo separa identidad, nombres, impresiones, imágenes, textos, erratas,
 arquetipos/series, relaciones, banlists, observaciones por campo y trabajos.

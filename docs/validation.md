@@ -1,5 +1,11 @@
 # Validación de la implementación
 
+**Actualización 2026-10-23.** Desde ahora la validación corre sola en GitHub
+Actions con cada pull request y cada cambio a main (`.github/workflows/tests.yml`):
+ruff, 132 pruebas con Chromium sobre SQLite, y las 10 migraciones aplicadas en
+PostgreSQL 17 seguidas de `alembic check` y las pruebas contra PostgreSQL. Lo que
+sigue es el registro de la validación manual del 21 de octubre.
+
 Fecha: 2026-10-21. Sustitución del conector activo por YGOPRODeck, sobre la misma
 base PostgreSQL y arquitectura FastAPI/SQLAlchemy existentes.
 

@@ -2,13 +2,14 @@ import io
 
 import httpx
 import pytest
+from PIL import Image
+from sqlalchemy import select
+
 from app.integrations.http import AccessDenied
 from app.models import CardImage
 from app.schemas.ingestion import ImageInput
 from app.services.images import ImageService
 from app.services.ingestion import IngestionService
-from PIL import Image
-from sqlalchemy import select
 
 
 class ImageSource:

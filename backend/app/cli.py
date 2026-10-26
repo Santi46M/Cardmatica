@@ -6,13 +6,18 @@ from datetime import date, datetime
 from pathlib import Path
 from uuid import UUID
 
+from sqlalchemy import select
+
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.db.session import session_factory
 from app.ingestion.sync import SyncRunner, worker
-from app.models import CardArtwork, CardImage, SyncError, SyncJob
+from app.models import Card, CardArtwork, CardImage, SyncError, SyncJob, User
+from app.models.accounts import ROLES
 from app.schemas.catalog import JobRequest
 from app.schemas.ingestion import CardRecord
+from app.services.accounts import normalize_email, remove_expired
+from app.services.banlists import bundled_files, import_banlist, load_file
 from app.services.ingestion import IngestionService
 
 
@@ -66,11 +71,88 @@ def import_records(path: Path, authorization: str):
     return 1 if failures else 0
 
 
-def main():
-    configure_logging()
+def import_banlists(paths: list[Path]):
+    """Load dated lists from JSON files; without paths, the lists bundled with the app."""
+    files = paths or bundled_files()
+    if not files:
+        raise ValueError("No hay archivos de banlist para importar")
+    factory = session_factory()
+    results = []
+    for path in files:
+        data = load_file(path)
+        with factory.begin() as session:
+            results.append({"file": path.name, **import_banlist(session, data)})
+    print(json.dumps(results, ensure_ascii=False))
+    return 0
+
+
+async def refresh_news(*, forever=False):
+    """Bring the news up to date now, or every NEWS_REFRESH_HOURS when forever."""
+    from app.integrations.http import PoliteHttpClient
+    from app.services import news_feeds
+
+    settings = get_settings()
+    while True:
+        client = PoliteHttpClient("news", settings)
+        try:
+            with session_factory().begin() as session:
+                print(
+                    json.dumps(
+                        await news_feeds.refresh(session, client, settings),
+                        ensure_ascii=False,
+                        indent=2,
+                    ),
+                    flush=True,
+                )
+        finally:
+            await client.close()
+        if not forever:
+            return 0
+        await asyncio.sleep(settings.news_refresh_hours * 3600)
+
+
+def preview_images(max_cards: int, runner=None):
+    """Download the general artwork of every catalogue card for the local preview.
+
+    Only for private development environments: the artwork stays unverified and
+    is never served in production (see docs/source-policies.md).
+    """
+    from sqlalchemy import exists
+
+    settings = get_settings()
+    if not settings.local_image_preview:
+        raise ValueError(
+            "Activar DEPLOYMENT_MODE=local y ALLOW_LOCAL_IMAGE_PREVIEW=true antes de descargar"
+        )
+    runner = runner or SyncRunner()
+    downloaded = exists().where(CardArtwork.card_id == Card.id, CardArtwork.local_path.is_not(None))
+    with runner.factory() as session:
+        identifiers = list(
+            session.scalars(
+                select(Card.ygoprodeck_id)
+                .where(Card.ygoprodeck_id.is_not(None), ~downloaded)
+                .order_by(Card.display_name)
+                .limit(max_cards)
+            )
+        )
+    failed = 0
+    for identifier in identifiers:
+        job_id = runner.enqueue(
+            JobRequest(source="ygoprodeck", mode="images", identifier=str(identifier))
+        )
+        asyncio.run(runner.run(job_id))
+        with runner.factory() as session:
+            if session.get(SyncJob, job_id).status in {"failed", "completed_with_errors"}:
+                failed += 1
+    print(json.dumps({"cards": len(identifiers), "failed": failed}))
+    return 1 if failed else 0
+
+
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cardmatica")
     commands = parser.add_subparsers(dest="command", required=True)
-    sync = commands.add_parser("sync")
+
+    sync = commands.add_parser("sync", help="Importar o actualizar cartas desde una fuente")
     sync.add_argument("source", choices=["ygoprodeck", "yugipedia"])
     sync.add_argument(
         "mode", choices=["initial", "incremental", "card", "images", "errata", "retry", "banlist"]
@@ -80,43 +162,127 @@ def main():
     sync.add_argument("--since", type=datetime.fromisoformat)
     sync.add_argument("--retry-job", type=UUID)
     sync.add_argument("--max-cards", type=int, default=3)
+    sync.add_argument(
+        "--max-printings",
+        type=int,
+        help="Importar como máximo N impresiones por carta, cada una de una rareza distinta",
+    )
     sync.add_argument("--banlist-format", choices=["TCG", "OCG"])
     sync.add_argument("--effective-date", type=date.fromisoformat)
     sync.add_argument("--enqueue-only", action="store_true")
-    resume = commands.add_parser("resume")
+
+    resume = commands.add_parser("resume", help="Seguir un trabajo pausado o fallido")
     resume.add_argument("job_id", type=UUID)
     resume.add_argument("--max-cards", type=int, default=3)
-    work = commands.add_parser("worker")
+
+    work = commands.add_parser("worker", help="Procesar los trabajos en cola")
     work.add_argument("--once", action="store_true")
     work.add_argument("--poll-seconds", type=float, default=5)
-    importing = commands.add_parser("import-jsonl")
+
+    importing = commands.add_parser("import-jsonl", help="Importar una exportación autorizada")
     importing.add_argument("path", type=Path)
     importing.add_argument("--authorization-reference", required=True)
-    approval = commands.add_parser("image-rights")
+
+    banlist = commands.add_parser(
+        "import-banlist", help="Importar listas Forbidden & Limited fechadas con su procedencia"
+    )
+    banlist.add_argument("paths", nargs="*", type=Path)
+
+    commands.add_parser("fetch-news", help="Actualizar ahora las noticias desde sus fuentes")
+    commands.add_parser(
+        "news-worker", help="Actualizar las noticias cada NEWS_REFRESH_HOURS, sin parar"
+    )
+
+    images = commands.add_parser(
+        "preview-images",
+        help="Descargar ilustraciones de las cartas del catálogo para la vista local de prueba",
+    )
+    images.add_argument("--max-cards", type=int, default=100)
+
+    photos = commands.add_parser(
+        "product-images",
+        help="Descargar las fotos provisionales de los productos de la demo (solo vista local)",
+    )
+    photos.add_argument("--refresh", action="store_true", help="Volver a descargar todas")
+
+    commands.add_parser(
+        "cleanup", help="Borrar sesiones vencidas y enlaces de correo usados o vencidos"
+    )
+
+    role = commands.add_parser(
+        "set-role", help="Dar o quitar un rol a una cuenta (p. ej. el primer administrador)"
+    )
+    role.add_argument("email")
+    role.add_argument("role", choices=list(ROLES))
+
+    approval = commands.add_parser(
+        "image-rights", help="Registrar la revisión de derechos de una imagen"
+    )
     approval.add_argument("image_id", type=UUID)
     approval.add_argument("status", choices=["approved", "denied", "unverified"])
     approval.add_argument("--authorization-reference")
     approval.add_argument(
         "--artwork", action="store_true", help="Ilustración general, no escaneo de impresión"
     )
-    args = parser.parse_args()
-    if args.command == "import-jsonl":
-        return import_records(args.path, args.authorization_reference)
-    if args.command == "worker":
-        if args.poll_seconds < 1:
-            parser.error("poll-seconds debe ser al menos 1")
-        asyncio.run(worker(once=args.once, poll_seconds=args.poll_seconds))
-        return 0
-    if args.command == "image-rights":
-        if args.status == "approved" and not args.authorization_reference:
-            parser.error("La aprobación requiere evidencia de permiso comercial")
-        with session_factory().begin() as session:
-            row = session.get(CardArtwork if args.artwork else CardImage, args.image_id)
-            if not row:
-                parser.error("Imagen inexistente")
-            row.rights_status = args.status
-            row.authorization_reference = args.authorization_reference
-        return 0
+    return parser
+
+
+# ---- One function per command: (args, parser) → exit code -------------------
+
+
+def run_preview_images(args, parser):
+    if not 1 <= args.max_cards <= 5000:
+        parser.error("max-cards debe estar entre 1 y 5000")
+    return preview_images(args.max_cards)
+
+
+def run_product_images(args, parser):
+    from app.services.product_images import download_all
+
+    result = asyncio.run(download_all(get_settings(), refresh=args.refresh))
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    # It failed only if nothing at all could be saved or kept.
+    return 1 if result["failed"] and not result["saved"] and not result["kept"] else 0
+
+
+def run_cleanup(args, parser):
+    with session_factory().begin() as session:
+        print(json.dumps(remove_expired(session)))
+    return 0
+
+
+def run_set_role(args, parser):
+    email = normalize_email(args.email)
+    with session_factory().begin() as session:
+        user = session.scalar(select(User).where(User.email == email))
+        if not user:
+            parser.error("No existe una cuenta con ese correo")
+        user.role = args.role
+    print(json.dumps({"email": email, "role": args.role}))
+    return 0
+
+
+def run_worker(args, parser):
+    if args.poll_seconds < 1:
+        parser.error("poll-seconds debe ser al menos 1")
+    asyncio.run(worker(once=args.once, poll_seconds=args.poll_seconds))
+    return 0
+
+
+def run_image_rights(args, parser):
+    if args.status == "approved" and not args.authorization_reference:
+        parser.error("La aprobación requiere evidencia de permiso comercial")
+    with session_factory().begin() as session:
+        row = session.get(CardArtwork if args.artwork else CardImage, args.image_id)
+        if not row:
+            parser.error("Imagen inexistente")
+        row.rights_status = args.status
+        row.authorization_reference = args.authorization_reference
+    return 0
+
+
+def run_sync(args, parser):
+    """`sync` queues a new job and `resume` reopens a stopped one; both then run it here."""
     runner = SyncRunner()
     if args.command == "resume":
         if not 1 <= args.max_cards <= 100000:
@@ -137,6 +303,7 @@ def main():
             since=args.since,
             retry_job_id=args.retry_job,
             max_cards=args.max_cards,
+            max_printings=args.max_printings,
             banlist_format=args.banlist_format,
             effective_date=args.effective_date,
         )
@@ -158,6 +325,29 @@ def main():
             )
         )
         return 1 if job.status in {"failed", "completed_with_errors"} else 0
+
+
+COMMANDS = {
+    "sync": run_sync,
+    "resume": run_sync,
+    "worker": run_worker,
+    "import-jsonl": lambda args, parser: import_records(args.path, args.authorization_reference),
+    "import-banlist": lambda args, parser: import_banlists(args.paths),
+    "fetch-news": lambda args, parser: asyncio.run(refresh_news()),
+    "news-worker": lambda args, parser: asyncio.run(refresh_news(forever=True)),
+    "preview-images": run_preview_images,
+    "product-images": run_product_images,
+    "cleanup": run_cleanup,
+    "set-role": run_set_role,
+    "image-rights": run_image_rights,
+}
+
+
+def main():
+    configure_logging()
+    parser = build_parser()
+    args = parser.parse_args()
+    return COMMANDS[args.command](args, parser)
 
 
 if __name__ == "__main__":

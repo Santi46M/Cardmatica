@@ -17,6 +17,7 @@ from app.models import (
 from app.schemas.catalog import (
     CardDetail,
     CardSummary,
+    CardTypesView,
     ErratumView,
     FieldView,
     GroupView,
@@ -26,6 +27,9 @@ from app.schemas.catalog import (
     SourceView,
     TextView,
 )
+from app.services import rarities
+from app.services.banlists import card_statuses
+from app.services.card_types import normalize_kind
 
 
 def image_view(image):
@@ -74,13 +78,16 @@ def artwork_view(image):
 
 
 def printing_view(printing):
+    rarity = rarities.info(printing.rarity.name)
     return PrintingView(
         id=printing.id,
         card_id=printing.card_id,
         code=printing.code,
         set_id=printing.set_id,
         set_name=printing.card_set.name,
-        rarity=printing.rarity.name,
+        rarity=rarity.name,
+        rarity_code=rarity.code,
+        rarity_family=rarity.family,
         language=printing.language,
         market=printing.market,
         edition=printing.edition,
@@ -125,6 +132,18 @@ def card_summary(card, language="es", market=None):
         card_type=card.card_type,
         subtypes=card.subtypes,
         attribute=card.attribute,
+        types=CardTypesView(
+            kind=normalize_kind(card.card_type),
+            frame=card.monster_frame,
+            pendulum=bool(card.is_pendulum),
+            abilities=card.monster_abilities or [],
+            race=card.monster_race,
+            property=card.card_property,
+            attribute=card.attribute,
+            level=card.level,
+            rank=card.rank,
+            link_rating=card.link_rating,
+        ),
         markets=sorted(
             set(card.available_markets) | {printing.market for printing in card.printings}
         ),
@@ -245,6 +264,7 @@ def card_detail(session, card, language="es"):
                 .order_by(BanlistEntry.effective_date.desc())
             )
         ],
+        banlist_status=card_statuses(session, card),
         relations=[
             {"card_id": row.related_card_id, "relation": row.relation}
             for row in session.scalars(select(CardRelation).where(CardRelation.card_id == card.id))

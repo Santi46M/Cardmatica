@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
 
+from sqlalchemy import func, select
+
 from app.integrations.yugipedia.parser import parse_errata
 from app.models import Archetype, CardArchetype, FieldObservation
 from app.schemas.ingestion import GroupInput
 from app.services.ingestion import IngestionService
-from sqlalchemy import func, select
 
 
 def test_complete_snapshot_retires_membership_and_keeps_observations(session, wiki_record):
