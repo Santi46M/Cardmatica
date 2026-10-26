@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     news_site_repo: str = "santapepsi/Cardmatica"
     # Pull requests whose title starts like this are maintenance, not news.
     news_site_skip_prefixes: list[str] = ["CI:", "Limpieza", "Bump", "Prueba"]
+    # Feed services a news feed may redirect to (besides its own domain).
+    news_redirect_hosts: list[str] = ["feeds.feedburner.com", "www.blogger.com"]
     news_refresh_hours: float = Field(default=3, ge=0.5, le=48)
     news_request_interval: float = Field(default=5, ge=1)
     image_directory: Path = ROOT / "data/images"

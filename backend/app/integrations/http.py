@@ -80,6 +80,11 @@ class HttpStore:
         await asyncio.sleep(await asyncio.to_thread(reserve))
 
 
+def same_domain(first: str, second: str) -> bool:
+    """Both names end in the same two labels (www.example.com, feeds.example.com)."""
+    return bool(first and second) and first.split(".")[-2:] == second.split(".")[-2:]
+
+
 class PoliteHttpClient:
     def __init__(self, source, settings, *, transport=None):
         self.source = source
@@ -142,7 +147,22 @@ class PoliteHttpClient:
             or parsed.password
             or parsed.port not in (None, 443)
         ):
-            raise AccessDenied("URL externa fuera de los orígenes permitidos")
+            raise AccessDenied(f"URL externa fuera de los orígenes permitidos: {parsed.hostname}")
+
+    def follow(self, current, location):
+        """Where a redirect leads, if it may be followed.
+
+        A feed may move within its own domain (blog.example.com → www.example.com)
+        or to a known feed service (NEWS_REDIRECT_HOSTS); any other site is refused.
+        """
+        target = urljoin(current, location)
+        host = urlsplit(target).hostname or ""
+        if self.source == "news" and host not in self.allowed_hosts:
+            here = urlsplit(current).hostname or ""
+            if same_domain(host, here) or host in self.settings.news_redirect_hosts:
+                self.allowed_hosts.add(host)
+        self.validate_url(target)
+        return target
 
     async def close(self):
         await self.client.aclose()
@@ -162,7 +182,15 @@ class PoliteHttpClient:
         robots_response = await self._fetch(
             robots_url, ttl=86400, refresh=False, allow_missing=True
         )
-        if robots_response.status_code in (404, 410):
+        # RFC 9309: follow at least five redirects; more counts as no robots.txt.
+        for _ in range(5):
+            if not robots_response.is_redirect:
+                break
+            robots_url = self.follow(robots_url, robots_response.headers["location"])
+            robots_response = await self._fetch(
+                robots_url, ttl=86400, refresh=False, allow_missing=True
+            )
+        if robots_response.status_code in (404, 410) or robots_response.is_redirect:
             pass
         elif robots_response.status_code != 200 or robots_response.text.lstrip().startswith("<"):
             raise AccessDenied("No fue posible validar robots.txt; acceso suspendido")
@@ -179,7 +207,7 @@ class PoliteHttpClient:
             if redirects >= 5:
                 raise ExternalError("Demasiadas redirecciones")
             return await self.get(
-                urljoin(request_url, response.headers["location"]),
+                self.follow(request_url, response.headers["location"]),
                 ttl=ttl,
                 refresh=refresh,
                 redirects=redirects + 1,

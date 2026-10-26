@@ -199,3 +199,34 @@ def test_old_fetched_news_are_dropped_but_not_administrators_ones(factory):
         count = len(session.scalars(select(NewsItem)).all())
         news_feeds.prune(session, today=date.today() + timedelta(days=news_feeds.KEEP_DAYS * 10))
         assert len(session.scalars(select(NewsItem)).all()) == count
+
+
+async def test_redirects_of_robots_and_feeds_are_followed_only_where_allowed(
+    news_settings, monkeypatch
+):
+    def handler(request):
+        url = str(request.url)
+        if url == "https://blog.example.org/robots.txt":
+            return httpx.Response(302, headers={"location": "/es/robots.txt"})
+        if url == "https://blog.example.org/es/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nAllow: /")
+        if url == "https://blog.example.org/feed":
+            return httpx.Response(302, headers={"location": "https://www.example.org/feed"})
+        if request.url.host == "www.example.org" and request.url.path == "/robots.txt":
+            return httpx.Response(404)
+        if url == "https://www.example.org/feed":
+            return httpx.Response(200, content=RSS)
+        if url == "https://org.example.org/atom":
+            return httpx.Response(301, headers={"location": "https://tracker.test/atom"})
+        return httpx.Response(404)
+
+    http = PoliteHttpClient("news", news_settings, transport=httpx.MockTransport(handler))
+    monkeypatch.setattr(http.store, "wait", no_wait)
+    try:
+        # robots.txt moved within the site, and the feed moved within its domain.
+        assert (await http.get("https://blog.example.org/feed")).content == RSS
+        # A feed that leaves for an unrelated site is refused, naming that site.
+        with pytest.raises(AccessDenied, match="tracker.test"):
+            await http.get("https://org.example.org/atom")
+    finally:
+        await http.close()
