@@ -104,7 +104,13 @@ def parse_feed(content: bytes) -> list[Entry]:
     try:
         root = ElementTree.fromstring(content)
     except ElementTree.ParseError:
-        root = ElementTree.fromstring(repaired(content))
+        try:
+            root = ElementTree.fromstring(repaired(content))
+        except ElementTree.ParseError:
+            # Only a feed is read item by item; a web page stays an error.
+            if not re.search(rb"<(rss|feed)\b", content[:4096]):
+                raise
+            return _valid(_loose_entries(content))
     entries = []
     for item in root.iter("item"):
         entries.append(
@@ -129,6 +135,58 @@ def parse_feed(content: bytes) -> list[Entry]:
                 item.findtext(f"{ATOM}summary") or item.findtext(f"{ATOM}content"),
             )
         )
+    return _valid(entries)
+
+
+def _loose_entries(content: bytes) -> list[tuple]:
+    """Items read one by one, for a feed whose XML is broken somewhere.
+
+    A single bad character (a stray "<" in one article, invalid bytes) makes an
+    XML parser drop the whole feed; reading each item on its own keeps the rest.
+    """
+    text = content.decode("utf-8", errors="replace")
+
+    def field(block, name):
+        match = re.search(rf"<{name}\b[^>]*>(.*?)</{name}>", block, re.S)
+        if not match:
+            return None
+        value = match.group(1).strip()
+        cdata = re.fullmatch(r"<!\[CDATA\[(.*)\]\]>", value, re.S)
+        return cdata.group(1) if cdata else html.unescape(value)
+
+    entries = []
+    for block in re.findall(r"<item\b[^>]*>(.*?)</item>", text, re.S):
+        entries.append(
+            (
+                field(block, "title"),
+                field(block, "link"),
+                field(block, "pubDate"),
+                field(block, "description"),
+            )
+        )
+    for block in re.findall(r"<entry\b[^>]*>(.*?)</entry>", text, re.S):
+        link = next(
+            (
+                html.unescape(href.group(1))
+                for tag in re.findall(r"<link\b[^>]*>", block)
+                if not re.search(r'rel="(?!alternate")', tag)
+                and (href := re.search(r'href="([^"]+)"', tag))
+            ),
+            None,
+        )
+        entries.append(
+            (
+                field(block, "title"),
+                link,
+                field(block, "published") or field(block, "updated"),
+                field(block, "summary") or field(block, "content"),
+            )
+        )
+    return entries
+
+
+def _valid(entries) -> list[Entry]:
+    """Entries with a title, a date and an https link, as shown on the home page."""
     found = []
     for title, link, published, summary in entries:
         link, when = (link or "").strip(), _date(published)

@@ -143,19 +143,22 @@ importan precios de terceros ni de guías de precios.
 Consultado el 24 y 25 de octubre de 2026. Las noticias de Yu-Gi-Oh! del inicio salen de
 feeds RSS/Atom públicos, hechos para que otros programas los lean, cada uno en su idioma:
 
-- Español: la categoría «Noticias» de Konami Europa
-  (`https://www.yugioh-card.com/eu/es/category/noticias/feed/`).
-- Portugués: Yu-Gi-Oh! Nexus (`https://www.yugiohnexus.com.br/feeds/posts/default`), blog
-  brasileño de listas y spoilers de sets; su feed redirige a FeedBurner.
-- Inglés: la categoría «News» de Konami Europa
-  (`https://www.yugioh-card.com/eu/category/news/feed/`), YGOrganization
-  (`https://ygorganization.com/feed/`) y YGOPRODeck (`https://ygoprodeck.com/feed_rss.xml`).
+- Portugués: Yu-Gi-Oh! Nexus
+  (`https://www.yugiohnexus.com.br/feeds/posts/default?redirect=false`), blog brasileño de
+  listas y spoilers de sets. `redirect=false` pide el feed propio de Blogger en lugar de
+  mandar a FeedBurner.
+- Inglés: YGOrganization (`https://ygorganization.com/feed/`) y YGOPRODeck
+  (`https://ygoprodeck.com/feed_rss.xml`).
+- Español: ninguna por ahora (ver abajo).
 
-Revisado el 25 de octubre de 2026 desde un Codespace: los feeds generales de Konami
-(`/eu/es/feed/`, `/lat-am/feed/`, `/lat-am/pt/feed/`) responden 404 y el blog
-`yugiohblog.konami.com` ya no responde, así que se quitaron. Konami Europa es WordPress
-con un feed por categoría. Konami Latinoamérica no publica feed, y no se traducen artículos
-de otras fuentes. Si una falla, `cardmatica fetch-news` dice el motivo y las demás siguen.
+Revisado el 25 de octubre de 2026 desde un Codespace: Konami no publica feeds. Responden
+404 tanto los generales (`/eu/es/feed/`, `/lat-am/feed/`, `/lat-am/pt/feed/`) como los de
+categoría (`/eu/es/category/noticias/feed/`, `/eu/category/news/feed/`), y el blog
+`yugiohblog.konami.com` ya no responde. Falta una fuente en español con feed; no se
+traducen artículos de otras fuentes. El feed de YGOPRODeck trae XML inválido en algún
+artículo: si el XML no se puede leer ni reparado, cada artículo se lee por separado y se
+descarta solo el roto. Si una fuente falla, `cardmatica fetch-news` dice el motivo y las
+demás siguen.
 
 Nada se traduce: se guardan título, enlace, fecha y un extracto de hasta 220 caracteres
 sin HTML, tal como los escribió la fuente, con su nombre y su idioma; el artículo

@@ -331,9 +331,9 @@ destacadas por rareza. Una lista sin datos no se muestra.
 
 Las noticias se actualizan solas: el servicio `news` (`cardmatica news-worker`, arranca
 con el Codespace) las trae cada `NEWS_REFRESH_HOURS` (3 h). Las de Yu-Gi-Oh! salen de
-los feeds RSS/Atom de `NEWS_FEEDS`, cada uno con su idioma: en español las noticias de
-Konami Europa; en portugués Yu-Gi-Oh! Nexus; en inglés las de Konami Europe, YGOrganization
-y YGOPRODeck. Cada visitante ve primero las de su idioma
+los feeds RSS/Atom de `NEWS_FEEDS`, cada uno con su idioma: en portugués Yu-Gi-Oh! Nexus;
+en inglés YGOrganization y YGOPRODeck. Konami no publica feeds y falta una fuente en
+español (ver [source-policies.md](docs/source-policies.md)). Cada visitante ve primero las de su idioma
 y, si faltan, las de los otros, marcadas con su idioma. Nunca se traducen: título y
 extracto quedan como los escribió la fuente, que se nombra siempre, y el artículo se lee
 en su sitio. Las de Cardmática son las pull requests unidas del repositorio público

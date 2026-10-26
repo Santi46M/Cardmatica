@@ -258,3 +258,11 @@ async def test_a_redirect_to_plain_http_is_asked_over_https(news_settings, monke
         await http.close()
     assert "https://feeds.feedburner.com/Blog" in asked
     assert not any(url.startswith("http://") for url in asked)
+
+
+def test_one_broken_item_does_not_lose_the_whole_feed():
+    broken = RSS.replace(b"Coverage &lt;b&gt;live", b"Coverage <3 live \xff")
+    entries = news_feeds.parse_feed(broken)
+    assert [entry.url for entry in entries] == ["https://blog.example.org/ycs"]
+    atom = ATOM.replace(b"A new booster", b"A < new booster")
+    assert news_feeds.parse_feed(atom)[0].url == "https://org.example.org/set"

@@ -193,10 +193,19 @@ class PoliteHttpClient:
             robots_response = await self._fetch(
                 robots_url, ttl=86400, refresh=False, allow_missing=True
             )
-        if robots_response.status_code in (404, 410) or robots_response.is_redirect:
+        status = robots_response.status_code
+        # RFC 9309: a missing file, too many redirects or a web page instead of
+        # rules mean there are no rules. Anything else unclear stops the source.
+        if (
+            status in (404, 410)
+            or robots_response.is_redirect
+            or (status == 200 and robots_response.text.lstrip().startswith("<"))
+        ):
             pass
-        elif robots_response.status_code != 200 or robots_response.text.lstrip().startswith("<"):
-            raise AccessDenied("No fue posible validar robots.txt; acceso suspendido")
+        elif status != 200:
+            raise AccessDenied(
+                f"No fue posible validar {robots_url} (HTTP {status}); acceso suspendido"
+            )
         else:
             robots = RobotFileParser()
             robots.parse(robots_response.text.splitlines())
