@@ -249,6 +249,8 @@ class SetView(NamedView):
     product_type: str | None
     # Cards of the catalogue printed in this set.
     card_count: int | None = None
+    # The prefix of its printing codes ("BETB" in BETB-EN001), when one is common.
+    code: str | None = None
 
 
 class ArchetypeView(NamedView):

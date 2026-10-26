@@ -7,13 +7,11 @@
 import { escapeHtml, html } from "./html.js";
 import { formatDate } from "./format.js";
 import { t } from "./lang.js";
-import { readJson, writeJson } from "./storage.js";
 
 const h = escapeHtml;
 const PATH = /^\/(set|arquetipo)\/([0-9a-f-]{36})(?:\/|$)/i;
 const KINDS = { set: "set", arquetipo: "archetype" };
 const PATHS = { set: "set", archetype: "arquetipo" };
-const DISMISSED_KEY = "cm_promo_closed";
 
 export function scopeFromPath(pathname) {
     const match = pathname.match(PATH);
@@ -105,26 +103,46 @@ export function scopeHeadHtml(scope, info) {
 
 // ---- Banner of the latest set ------------------------------------------------
 
+// Its photo comes from the set's official page, only in the private test view
+// with images on (frontend/demo/store.js loads PRODUCT_PHOTOS); elsewhere the
+// banner shows the same text over the site's colours.
+const PHOTO_WARNING = () =>
+    t("Foto provisional de la página oficial, sin licencia: visible solo en la vista de prueba privada. No publicar.");
+
+function setPhoto(set) {
+    return set.code ? window.PRODUCT_PHOTOS?.[set.code.toLowerCase()] : null;
+}
+
 export function promoHtml(set) {
     if (!set) return "";
-    if (readJson(DISMISSED_KEY, []).includes(set.id)) return "";
+    const photo = setPhoto(set);
     const released = set.release_date ? ` · ${h(formatDate(set.release_date))}` : "";
     const contents = t(
         set.card_count === 1 ? "Cajas, sobres y {count} carta suelta" : "Cajas, sobres y {count} cartas sueltas",
         { count: set.card_count }
     );
+    const warning = h(PHOTO_WARNING());
+    // The same picture twice: faint and blurred behind, clear on the right.
+    const background = photo ? `<img class="promo-bg" src="${h(photo)}" alt="" aria-hidden="true">` : "";
+    const art = photo
+        ? html`
+            <span class="img-wrap promo-art">
+                <img src="${h(photo)}" alt="${h(set.name)}" width="300" height="300" decoding="async">
+                <span class="img-warn" tabindex="0" role="img" aria-label="${warning}" data-tip="${warning}">!</span>
+            </span>`
+        : "";
     return html`
-        <aside class="promo" aria-label="${t("Último set lanzado")}">
-            <a href="${scopePath({ kind: "set", id: set.id })}" data-scope="set" data-scope-id="${h(set.id)}">
+        <section class="promo${photo ? " with-photo" : ""}" aria-label="${t("Último set lanzado")}">
+            ${background}
+            <div class="promo-body">
                 <small>${h(t("Último set {market}", { market: set.market }))}${released}</small>
-                <b>${h(set.name)}</b>
-                <span>${h(contents)} →</span>
-            </a>
-            <button class="promo-close" data-promo-close="${h(set.id)}" aria-label="${t("Ocultar este aviso")}">×</button>
-        </aside>`;
-}
-
-export function dismissPromo(id) {
-    const closed = readJson(DISMISSED_KEY, []);
-    writeJson(DISMISSED_KEY, [...new Set([...closed, id])].slice(-20));
+                <h2>${h(set.name)}</h2>
+                <p>${h(contents)}</p>
+                <p class="promo-actions">
+                    <a class="btn" href="${scopePath({ kind: "set", id: set.id })}" data-scope="set" data-scope-id="${h(set.id)}">${t("Ver el set")}</a>
+                    <button class="ghost" data-go="Productos">${t("Cajas y accesorios")}</button>
+                </p>
+            </div>
+            ${art}
+        </section>`;
 }

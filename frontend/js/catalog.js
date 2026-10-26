@@ -25,7 +25,6 @@ import {
 } from "./catalog-view.js";
 import { TYPE_FILTERS, typeFiltersHtml, typeParams } from "./card-types.js";
 import {
-    dismissPromo,
     promoHtml,
     scopeFromPath,
     scopeHeadHtml,
@@ -434,6 +433,9 @@ function openScope(next) {
     window.scrollTo(0, 0);
 }
 
+// The set's photo may arrive after the banner is drawn.
+document.addEventListener("cm:product-photos", () => renderPromo());
+
 function renderPromo() {
     if (promoMarket !== window.market) {
         const market = (promoMarket = window.market);
@@ -459,12 +461,6 @@ document.addEventListener(
     (event) => {
         // Moving to a tab leaves the set or archetype page.
         if (event.target.closest("[data-g], [data-go]")) scope = null;
-        const close = event.target.closest("[data-promo-close]");
-        if (close) {
-            dismissPromo(close.dataset.promoClose);
-            renderPromo();
-            return;
-        }
         if (event.target.closest("[data-scope-clear]")) {
             event.preventDefault();
             scope = null;

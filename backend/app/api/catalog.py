@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import date
 from typing import Annotated, Literal
 from uuid import UUID
@@ -309,8 +310,17 @@ def set_card_counts(session, set_ids):
     )
 
 
-def set_view(row, card_count):
-    return SetView.model_validate(row).model_copy(update={"card_count": card_count})
+def set_view(row, card_count, code=None):
+    return SetView.model_validate(row).model_copy(update={"card_count": card_count, "code": code})
+
+
+def set_code(session, set_id) -> str | None:
+    """The most common prefix of the set's printing codes ("BETB-EN001" → "BETB")."""
+    codes = session.scalars(
+        select(CardPrinting.code).where(CardPrinting.set_id == set_id).limit(200)
+    ).all()
+    prefixes = Counter(code.split("-")[0].upper() for code in codes if "-" in code)
+    return prefixes.most_common(1)[0][0] if prefixes else None
 
 
 @router.get("/sets", response_model=Page[SetView])
@@ -366,7 +376,8 @@ def latest_set(session: SessionDep, market: Market = "TCG"):
     row = row or session.execute(query).first()
     if not row:
         raise HTTPException(404, "Ningún set con fecha de lanzamiento")
-    return set_view(*row)
+    card_set, count = row
+    return set_view(card_set, count, set_code(session, card_set.id))
 
 
 @router.get("/sets/{set_id}", response_model=SetView)
@@ -374,7 +385,9 @@ def card_set(set_id: UUID, session: SessionDep):
     row = session.get(CardSet, set_id)
     if not row:
         raise HTTPException(404, "Set inexistente")
-    return set_view(row, set_card_counts(session, [set_id]).get(set_id, 0))
+    return set_view(
+        row, set_card_counts(session, [set_id]).get(set_id, 0), set_code(session, set_id)
+    )
 
 
 def present(session, column):

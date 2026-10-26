@@ -396,7 +396,7 @@ def test_latest_set_set_and_archetype_pages(factory, client, record):
         )
         seed(factory, copy)
     latest = client.get("/api/v1/sets/latest", params={"market": "TCG"}).json()
-    assert (latest["name"], latest["card_count"]) == ("New Set", 5)
+    assert (latest["name"], latest["card_count"], latest["code"]) == ("New Set", 5, "NEW")
     assert client.get("/api/v1/sets/latest", params={"market": "OCG"}).status_code == 404
     assert client.get(f"/api/v1/sets/{latest['id']}").json()["card_count"] == 5
     assert client.get("/api/v1/cards", params={"set_id": latest["id"]}).json()["total"] == 5

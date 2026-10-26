@@ -941,7 +941,10 @@ fetch("/api/v1/product-images")
     .then((response) => (response.ok ? response.json() : {}))
     .then((data) => {
         PRODUCT_PHOTOS = data.images || {};
-        if (Object.keys(PRODUCT_PHOTOS).length && tab === "Productos") renderProducts();
+        if (!Object.keys(PRODUCT_PHOTOS).length) return;
+        if (tab === "Productos") renderProducts();
+        // The latest-set banner (frontend/js/collections.js) uses them too.
+        document.dispatchEvent(new CustomEvent("cm:product-photos"));
     })
     .catch(() => {});
 

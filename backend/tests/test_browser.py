@@ -864,9 +864,9 @@ def test_latest_set_banner_and_set_page(live_server, browser_page, factory, reco
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     page.goto(live_server)
-    banner = page.locator(".promo a")
-    expect(banner).to_contain_text("Beyond the Brave")
-    banner.click()
+    expect(page.locator(".promo h2")).to_have_text("Beyond the Brave")
+    expect(page.locator(".promo [data-promo-close]")).to_have_count(0)
+    page.locator(".promo a").click()
     expect(page).to_have_url(re.compile(r"/set/[0-9a-f-]{36}$"))
     expect(page.locator(".scope-head h2")).to_have_text("Beyond the Brave")
     expect(page.locator(".scope-products")).to_contain_text("Caja de sobres Beyond the Brave")
@@ -877,13 +877,12 @@ def test_latest_set_banner_and_set_page(live_server, browser_page, factory, reco
     page.locator('.card-detail [data-scope="set"]').click()
     expect(page.locator("#md")).not_to_have_class(re.compile("on"))
     expect(page.locator(".scope-head h2")).to_have_text("Beyond the Brave")
-    # A tab leaves the set page; the banner can be closed for good.
+    # A tab leaves the set page, and the banner is back for good.
     page.locator('[data-g="Inicio"]').click()
     expect(page).to_have_url(re.compile(r"/$"))
-    page.locator("[data-promo-close]").click()
     page.reload()
     expect(page.locator("#home h1")).to_be_visible()
-    expect(page.locator(".promo")).to_have_count(0)
+    expect(page.locator(".promo h2")).to_have_text("Beyond the Brave")
     assert not errors
 
 
