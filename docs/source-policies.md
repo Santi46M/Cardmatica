@@ -143,20 +143,19 @@ importan precios de terceros ni de guías de precios.
 Consultado el 24 y 25 de octubre de 2026. Las noticias de Yu-Gi-Oh! del inicio salen de
 feeds RSS/Atom públicos, hechos para que otros programas los lean, cada uno en su idioma:
 
-- Español: Konami Europa (`https://www.yugioh-card.com/eu/es/feed/`) y Konami
-  Latinoamérica (`https://www.yugioh-card.com/lat-am/feed/`), los sitios oficiales en
-  español.
-- Portugués: Konami América Latina en portugués
-  (`https://www.yugioh-card.com/lat-am/pt/feed/`) y Yu-Gi-Oh! Nexus
-  (`https://www.yugiohnexus.com.br/feeds/posts/default`), blog brasileño de listas y
-  spoilers de sets.
-- Inglés: el blog oficial de Konami (`https://yugiohblog.konami.com/feed/`),
-  YGOrganization (`https://ygorganization.com/feed/`) y YGOPRODeck
-  (`https://ygoprodeck.com/feed_rss.xml`).
+- Español: la categoría «Noticias» de Konami Europa
+  (`https://www.yugioh-card.com/eu/es/category/noticias/feed/`).
+- Portugués: Yu-Gi-Oh! Nexus (`https://www.yugiohnexus.com.br/feeds/posts/default`), blog
+  brasileño de listas y spoilers de sets; su feed redirige a FeedBurner.
+- Inglés: la categoría «News» de Konami Europa
+  (`https://www.yugioh-card.com/eu/category/news/feed/`), YGOrganization
+  (`https://ygorganization.com/feed/`) y YGOPRODeck (`https://ygoprodeck.com/feed_rss.xml`).
 
-Los sitios de Konami son WordPress y Yu-Gi-Oh! Nexus es Blogger; las direcciones son las
-de feed de cada plataforma. Desde el entorno de desarrollo no se pudieron abrir: si una
-falla, el registro del servicio `news` lo dice y las demás siguen.
+Revisado el 25 de octubre de 2026 desde un Codespace: los feeds generales de Konami
+(`/eu/es/feed/`, `/lat-am/feed/`, `/lat-am/pt/feed/`) responden 404 y el blog
+`yugiohblog.konami.com` ya no responde, así que se quitaron. Konami Europa es WordPress
+con un feed por categoría. Konami Latinoamérica no publica feed, y no se traducen artículos
+de otras fuentes. Si una falla, `cardmatica fetch-news` dice el motivo y las demás siguen.
 
 Nada se traduce: se guardan título, enlace, fecha y un extracto de hasta 220 caracteres
 sin HTML, tal como los escribió la fuente, con su nombre y su idioma; el artículo

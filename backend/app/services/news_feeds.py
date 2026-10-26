@@ -73,12 +73,38 @@ def _date(value: str | None) -> date | None:
         return None
 
 
+# A bare "&", an HTML-only entity such as &nbsp; and control characters are the
+# usual slips of hand-made feeds; XML parsers refuse the whole feed for any of them.
+_BARE_AMPERSAND = re.compile(rb"&(?!#\d+;|#x[0-9a-fA-F]+;|[A-Za-z][A-Za-z0-9]*;)")
+_HTML_ENTITY = re.compile(rb"&([A-Za-z][A-Za-z0-9]*);")
+_CONTROL = re.compile(rb"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+_XML_ENTITIES = {b"amp", b"lt", b"gt", b"quot", b"apos"}
+
+
+def repaired(content: bytes) -> bytes:
+    """The feed with those slips fixed, for a second try."""
+
+    def entity(match):
+        name = match.group(1)
+        if name in _XML_ENTITIES:
+            return match.group(0)
+        character = html.unescape(f"&{name.decode()};")
+        return f"&#{ord(character)};".encode() if len(character) == 1 else b"&amp;" + name + b";"
+
+    content = _CONTROL.sub(b"", content)
+    content = _BARE_AMPERSAND.sub(b"&amp;", content)
+    return _HTML_ENTITY.sub(entity, content)
+
+
 def parse_feed(content: bytes) -> list[Entry]:
     """Items of an RSS 2.0 or Atom feed with an https link and a date."""
     # A feed has no reason to declare entities; refusing them avoids expansion attacks.
     if b"<!DOCTYPE" in content[:4096].upper():
         raise ValueError("Feed con DOCTYPE: no se procesa")
-    root = ElementTree.fromstring(content)
+    try:
+        root = ElementTree.fromstring(content)
+    except ElementTree.ParseError:
+        root = ElementTree.fromstring(repaired(content))
     entries = []
     for item in root.iter("item"):
         entries.append(

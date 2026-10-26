@@ -46,11 +46,10 @@ class Settings(BaseSettings):
     # "language|source|feed": language of the articles (es, pt or en), the name shown
     # next to each news item and its RSS or Atom feed.
     news_feeds: list[str] = [
-        "es|Konami Europa|https://www.yugioh-card.com/eu/es/feed/",
-        "es|Konami Latinoamérica|https://www.yugioh-card.com/lat-am/feed/",
-        "pt|Konami América Latina|https://www.yugioh-card.com/lat-am/pt/feed/",
+        # Konami's sites have no general feed; Europe's news categories do.
+        "es|Konami Europa|https://www.yugioh-card.com/eu/es/category/noticias/feed/",
         "pt|Yu-Gi-Oh! Nexus|https://www.yugiohnexus.com.br/feeds/posts/default",
-        "en|Konami|https://yugiohblog.konami.com/feed/",
+        "en|Konami Europe|https://www.yugioh-card.com/eu/category/news/feed/",
         "en|YGOrganization|https://ygorganization.com/feed/",
         "en|YGOPRODeck|https://ygoprodeck.com/feed_rss.xml",
     ]

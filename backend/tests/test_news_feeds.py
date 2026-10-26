@@ -230,3 +230,31 @@ async def test_redirects_of_robots_and_feeds_are_followed_only_where_allowed(
             await http.get("https://org.example.org/atom")
     finally:
         await http.close()
+
+
+def test_a_feed_with_common_slips_is_repaired_rather_than_lost():
+    broken = RSS.replace(b"Regional &amp; YCS", b"Regional & YCS \x0b&nbsp;live")
+    entries = news_feeds.parse_feed(broken)
+    assert any(entry.title.startswith("Regional & YCS") for entry in entries)
+
+
+async def test_a_redirect_to_plain_http_is_asked_over_https(news_settings, monkeypatch):
+    news_settings.news_redirect_hosts = ["feeds.feedburner.com"]
+    asked = []
+
+    def handler(request):
+        asked.append(str(request.url))
+        if request.url.path == "/robots.txt":
+            return httpx.Response(404)
+        if request.url.host == "blog.example.org":
+            return httpx.Response(302, headers={"location": "http://feeds.feedburner.com/Blog"})
+        return httpx.Response(200, content=RSS)
+
+    http = PoliteHttpClient("news", news_settings, transport=httpx.MockTransport(handler))
+    monkeypatch.setattr(http.store, "wait", no_wait)
+    try:
+        assert (await http.get("https://blog.example.org/feed")).content == RSS
+    finally:
+        await http.close()
+    assert "https://feeds.feedburner.com/Blog" in asked
+    assert not any(url.startswith("http://") for url in asked)

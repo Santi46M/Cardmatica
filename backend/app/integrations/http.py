@@ -156,6 +156,9 @@ class PoliteHttpClient:
         or to a known feed service (NEWS_REDIRECT_HOSTS); any other site is refused.
         """
         target = urljoin(current, location)
+        # Old feed services still answer with http:// addresses; ask the same over https.
+        if target.startswith("http://"):
+            target = "https://" + target[len("http://") :]
         host = urlsplit(target).hostname or ""
         if self.source == "news" and host not in self.allowed_hosts:
             here = urlsplit(current).hostname or ""
