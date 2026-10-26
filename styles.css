@@ -178,6 +178,8 @@ header {
 }
 
 .logo {
+    color: inherit;
+    text-decoration: none;
     font-size: 23px;
     font-weight: 300;
     letter-spacing: .3px;
@@ -784,10 +786,6 @@ small {
 }
 
 /* Catálogo persistido e impresiones verificadas */
-.logo {
-    color: inherit;
-    text-decoration: none;
-}
 
 .catalog-status {
     color: var(--mu);
@@ -2843,6 +2841,7 @@ button.acc-avatar:hover,
 
 /* Botón PROVISIONAL de modo claro / oscuro (frontend/theme.js). */
 .theme-toggle {
+    position: relative;
     flex: none;
     width: 40px;
     height: 40px;
@@ -2886,6 +2885,10 @@ button.acc-avatar:hover,
 
 /* Marca de lo provisional: un lápiz pequeño junto a borradores (páginas legales,
    datos pendientes, modo claro). Lo nombra su aria-label o su title. */
+:root {
+    --pencil: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.2V21h3.8L18 9.8 14.2 6 3 17.2Zm17.7-10.1a1 1 0 0 0 0-1.4l-2.4-2.4a1 1 0 0 0-1.4 0l-1.9 1.9 3.8 3.8 1.9-1.9Z'/%3E%3C/svg%3E");
+}
+
 .prov {
     display: inline-block;
     width: .85em;
@@ -2893,12 +2896,8 @@ button.acc-avatar:hover,
     margin-left: .3em;
     vertical-align: -.05em;
     background: var(--gold);
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.2V21h3.8L18 9.8 14.2 6 3 17.2Zm17.7-10.1a1 1 0 0 0 0-1.4l-2.4-2.4a1 1 0 0 0-1.4 0l-1.9 1.9 3.8 3.8 1.9-1.9Z'/%3E%3C/svg%3E") center / contain no-repeat;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.2V21h3.8L18 9.8 14.2 6 3 17.2Zm17.7-10.1a1 1 0 0 0 0-1.4l-2.4-2.4a1 1 0 0 0-1.4 0l-1.9 1.9 3.8 3.8 1.9-1.9Z'/%3E%3C/svg%3E") center / contain no-repeat;
-}
-
-.theme-toggle {
-    position: relative;
+    -webkit-mask: var(--pencil) center / contain no-repeat;
+    mask: var(--pencil) center / contain no-repeat;
 }
 
 .theme-toggle::after {
@@ -2910,8 +2909,8 @@ button.acc-avatar:hover,
     height: 13px;
     border-radius: 50%;
     background: var(--gold);
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.2V21h3.8L18 9.8 14.2 6 3 17.2Zm17.7-10.1a1 1 0 0 0 0-1.4l-2.4-2.4a1 1 0 0 0-1.4 0l-1.9 1.9 3.8 3.8 1.9-1.9Z'/%3E%3C/svg%3E") center / contain no-repeat;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.2V21h3.8L18 9.8 14.2 6 3 17.2Zm17.7-10.1a1 1 0 0 0 0-1.4l-2.4-2.4a1 1 0 0 0-1.4 0l-1.9 1.9 3.8 3.8 1.9-1.9Z'/%3E%3C/svg%3E") center / contain no-repeat;
+    -webkit-mask: var(--pencil) center / contain no-repeat;
+    mask: var(--pencil) center / contain no-repeat;
 }
 
 /* Aviso de cookies: informa y se cierra; no tapa el contenido ni pide nada. */

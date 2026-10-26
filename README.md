@@ -58,6 +58,14 @@ backend/alembic/                Migraciones versionadas
 backend/tests/                  Dominio, HTTP simulado, API y navegador
 ```
 
+**Cómo se escribe el HTML del frontend.** Cada plantilla va con `html` delante
+(`frontend/js/html.js`; en la tienda demo, `markup`) y se escribe como HTML con
+sangría, un elemento por línea. Al usarse se quitan los saltos de línea y la sangría,
+así que la página queda igual que si estuviera en una sola línea. Por eso un salto no
+puede caer dentro de una etiqueta ni entre dos palabras: lo comprueba
+`backend/tests/test_templates.py`. Todo valor que viene de afuera pasa por `h()`
+(`escapeHtml`).
+
 Las decisiones de integración están en [architecture.md](docs/architecture.md).
 El resultado de las pruebas y los pendientes de producción están en
 [validation.md](docs/validation.md).

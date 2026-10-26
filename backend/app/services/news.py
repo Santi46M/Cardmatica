@@ -7,7 +7,6 @@ from typing import Literal
 from pydantic import BaseModel, Field, HttpUrl, model_validator
 from sqlalchemy import select
 
-from app.core.languages import LANGUAGES
 from app.models import NewsItem
 
 
@@ -51,17 +50,14 @@ def add(session, data: NewsInput) -> NewsItem:
 
 
 def latest(session, section: str, limit: int, language: str = "es") -> list[NewsItem]:
-    """The newest in the visitor's language; if there are not enough, the rest
-    come in the other languages, in the site's order (Spanish, Portuguese, English)."""
-    order = [language, *(code for code in LANGUAGES if code != language)]
-    found = []
-    for code in order:
-        found += session.scalars(
-            select(NewsItem)
-            .where(NewsItem.section == section, NewsItem.language == code)
-            .order_by(NewsItem.published_on.desc(), NewsItem.created_at.desc())
-            .limit(limit - len(found))
-        ).all()
-        if len(found) == limit:
-            break
-    return found
+    """The newest news in the visitor's language only, newest first.
+
+    Other languages are never mixed in: a section with no news in this language
+    stays empty and the home page leaves it out.
+    """
+    return session.scalars(
+        select(NewsItem)
+        .where(NewsItem.section == section, NewsItem.language == language)
+        .order_by(NewsItem.published_on.desc(), NewsItem.created_at.desc())
+        .limit(limit)
+    ).all()

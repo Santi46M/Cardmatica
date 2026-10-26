@@ -42,9 +42,7 @@ export function printingOptionsHtml(items, selectedId, { any = "", details = tru
         sets.get(item.set_name).push(item);
     }
     const option = (item) =>
-        `<option value="${h(item.id)}"${item.id === selectedId ? " selected" : ""}>${h(
-            printingLabel(item, { details })
-        )}</option>`;
+        `<option value="${h(item.id)}"${item.id === selectedId ? " selected" : ""}>${h(printingLabel(item, { details }))}</option>`;
     return (
         (any ? `<option value="">${h(any)}</option>` : "") +
         [...sets]

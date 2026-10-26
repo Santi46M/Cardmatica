@@ -1,4 +1,6 @@
-import { escapeHtml } from "./html.js";
+// "Mi perfil" and "Personalización": the person's details and preferences, in
+// the account when signed in and in this browser otherwise.
+import { escapeHtml, html } from "./html.js";
 import { lang, t } from "./lang.js";
 import { countItems, listCount } from "./wantlists.js";
 import { currentUser } from "./auth.js";
@@ -41,23 +43,22 @@ function preferencesHtml() {
     const option = (value, label, current) =>
         `<option value="${value}"${value === current ? " selected" : ""}>${label}</option>`;
     const languages = window.I18N.languages.map(([code, name]) => option(code, name, lang)).join("");
-    return `<section class="gl pnl" id="pf-prefs"><b>${t("Personalización")}</b><div class="fm"><label>${t(
-        "Idioma"
-    )}<select class="lang-select" id="pf-pref-language">${languages}</select></label><label>${t(
-        "Moneda"
-    )}<select id="pf-pref-currency">${currencies}</select></label><label>${t("Mercado")}<select id="pf-pref-market">${option(
-        "TCG",
-        t("TCG (cartas occidentales)"),
-        window.market
-    )}${option("OCG", t("OCG (cartas asiáticas)"), window.market)}</select></label><label>${t(
-        "Vista del catálogo"
-    )}<select id="pf-pref-view">${option("list", t("Lista"), view)}${option(
-        "grid",
-        t("Cuadrícula"),
-        view
-    )}</select></label></div><small>${t(
-        currentUser() ? "Se aplican al instante y se guardan en tu cuenta." : "Se aplican al instante y se guardan en este navegador."
-    )}</small></section>`;
+    const markets = option("TCG", t("TCG (cartas occidentales)"), window.market) + option("OCG", t("OCG (cartas asiáticas)"), window.market);
+    const views = option("list", t("Lista"), view) + option("grid", t("Cuadrícula"), view);
+    const where = currentUser()
+        ? "Se aplican al instante y se guardan en tu cuenta."
+        : "Se aplican al instante y se guardan en este navegador.";
+    return html`
+        <section class="gl pnl" id="pf-prefs">
+            <b>${t("Personalización")}</b>
+            <div class="fm">
+                <label>${t("Idioma")}<select class="lang-select" id="pf-pref-language">${languages}</select></label>
+                <label>${t("Moneda")}<select id="pf-pref-currency">${currencies}</select></label>
+                <label>${t("Mercado")}<select id="pf-pref-market">${markets}</select></label>
+                <label>${t("Vista del catálogo")}<select id="pf-pref-view">${views}</select></label>
+            </div>
+            <small>${t(where)}</small>
+        </section>`;
 }
 
 const sells = (role) => role === "seller" || role === "both";
@@ -65,57 +66,66 @@ const sells = (role) => role === "seller" || role === "both";
 function summaryHtml() {
     if (!profile) return "";
     const role = t(ROLES.find(([value]) => value === profile.role)?.[1] || "");
-    return `<div class="gl pnl profile-card"><div>${window.flag ? window.flag(profile.country) : ""}<b>${h(
-        profile.name
-    )}</b> · ${h(role)}${
-        profile.store ? ` · ${t("Tienda")} <b>${h(profile.store)}</b>` : ""
-    }</div><small>${h([profile.address, t(profile.country), profile.phone].filter(Boolean).join(" · "))}</small>${
-        profile.payments?.length
-            ? `<small>${h(
-                  t("Pagos aceptados: {methods}", { methods: profile.payments.map((method) => t(method)).join(", ") })
-              )}</small>`
-            : ""
-    }</div>`;
+    const store = profile.store ? ` · ${t("Tienda")} <b>${h(profile.store)}</b>` : "";
+    const contact = [profile.address, t(profile.country), profile.phone].filter(Boolean).join(" · ");
+    const methods = profile.payments?.map((method) => t(method)).join(", ");
+    const payments = methods ? `<small>${h(t("Pagos aceptados: {methods}", { methods }))}</small>` : "";
+    return html`
+        <div class="gl pnl profile-card">
+            <div>${window.flag ? window.flag(profile.country) : ""}<b>${h(profile.name)}</b> · ${h(role)}${store}</div>
+            <small>${h(contact)}</small>
+            ${payments}
+        </div>`;
 }
+
+const selected = (yes) => (yes ? " selected" : "");
 
 export function renderProfile(container) {
     const value = profile || { role: "buyer", country: "Uruguay", payments: [] };
-    container.innerHTML = `<h3>${t("Mi perfil")}</h3>${summaryHtml()}<form class="gl pnl" id="pf-form" novalidate><div class="fm"><label>${t(
-        "Quiero registrarme como"
-    )}<select id="pf-role">${ROLES.map(
-        ([key, label]) => `<option value="${key}"${value.role === key ? " selected" : ""}>${t(label)}</option>`
-    ).join("")}</select></label><label>${t("Nombre completo")}<input id="pf-name" autocomplete="name" maxlength="120" value="${h(
-        value.name
-    )}"></label><label id="pf-store-field"${sells(value.role) ? "" : " hidden"}>${t("Nombre de la tienda")}<input id="pf-store" autocomplete="organization" maxlength="80" value="${h(
-        value.store
-    )}"></label><label>${t("País")}<select id="pf-country" autocomplete="country-name">${COUNTRIES.map(
-        (country) =>
-            `<option value="${country}"${value.country === country ? " selected" : ""}>${t(country)}</option>`
-    ).join("")}</select></label><label class="full">${t("Dirección (opcional, para envíos)")}<input id="pf-address" autocomplete="street-address" maxlength="200" value="${h(
-        value.address
-    )}"></label><label>${t("Teléfono (opcional)")}<input id="pf-phone" type="tel" autocomplete="tel" maxlength="30" value="${h(
-        value.phone
-    )}"></label><fieldset class="full" id="pf-payments"${sells(value.role) ? "" : " hidden"}><legend>${t(
-        "Métodos de pago que aceptas"
-    )}</legend><div class="chk">${PAYMENTS.map(
+    const roles = ROLES.map(([key, label]) => `<option value="${key}"${selected(value.role === key)}>${t(label)}</option>`).join("");
+    const countries = COUNTRIES.map(
+        (country) => `<option value="${country}"${selected(value.country === country)}>${t(country)}</option>`
+    ).join("");
+    const payments = PAYMENTS.map(
         (method) =>
-            `<label><input type="checkbox" name="pf-payment" value="${h(method)}"${
-                value.payments.includes(method) ? " checked" : ""
-            }> ${h(t(method))}</label>`
-    ).join("")}</div></fieldset></div><p id="pf-error" class="warn" role="alert" hidden></p><p><button class="btn" type="submit">${t(
-        "Guardar perfil"
-    )}</button></p><small>${t(
+            `<label><input type="checkbox" name="pf-payment" value="${h(method)}"${value.payments.includes(method) ? " checked" : ""}> ${h(t(method))}</label>`
+    ).join("");
+    const sellerOnly = sells(value.role) ? "" : " hidden";
+    const minimal = t(
         "Solo pedimos lo necesario: la dirección y el teléfono se usarán para envíos cuando existan, y los métodos de pago solo si vendes."
-    )}</small> <small>${t(
+    );
+    const where = t(
         currentUser()
             ? "El perfil se guarda en tu cuenta. Un perfil de vendedor todavía no publica una tienda."
             : "Sin sesión iniciada, el perfil se guarda solo en este navegador. Inicia sesión para guardarlo en tu cuenta."
-    )}</small></form><div class="gl pnl" style="margin-top:12px"><b>${t("Listas de deseados")}</b><small>${t(
-        listCount() === 1 ? "{count} lista" : "{count} listas",
-        { count: listCount() }
-    )} · ${t("{count} cartas", { count: countItems() })}</small><p><button class="btn s" data-go="Deseados">${t(
-        "Ver mis listas"
-    )}</button></p></div>${preferencesHtml()}`;
+    );
+    const lists = t(listCount() === 1 ? "{count} lista" : "{count} listas", { count: listCount() });
+    container.innerHTML = html`
+        <h3>${t("Mi perfil")}</h3>
+        ${summaryHtml()}
+        <form class="gl pnl" id="pf-form" novalidate>
+            <div class="fm">
+                <label>${t("Quiero registrarme como")}<select id="pf-role">${roles}</select></label>
+                <label>${t("Nombre completo")}<input id="pf-name" autocomplete="name" maxlength="120" value="${h(value.name)}"></label>
+                <label id="pf-store-field"${sellerOnly}>${t("Nombre de la tienda")}<input id="pf-store" autocomplete="organization" maxlength="80" value="${h(value.store)}"></label>
+                <label>${t("País")}<select id="pf-country" autocomplete="country-name">${countries}</select></label>
+                <label class="full">${t("Dirección (opcional, para envíos)")}<input id="pf-address" autocomplete="street-address" maxlength="200" value="${h(value.address)}"></label>
+                <label>${t("Teléfono (opcional)")}<input id="pf-phone" type="tel" autocomplete="tel" maxlength="30" value="${h(value.phone)}"></label>
+                <fieldset class="full" id="pf-payments"${sellerOnly}>
+                    <legend>${t("Métodos de pago que aceptas")}</legend>
+                    <div class="chk">${payments}</div>
+                </fieldset>
+            </div>
+            <p id="pf-error" class="warn" role="alert" hidden></p>
+            <p><button class="btn" type="submit">${t("Guardar perfil")}</button></p>
+            <small>${minimal}</small> <small>${where}</small>
+        </form>
+        <div class="gl pnl" style="margin-top:12px">
+            <b>${t("Listas de deseados")}</b>
+            <small>${lists} · ${t("{count} cartas", { count: countItems() })}</small>
+            <p><button class="btn s" data-go="Deseados">${t("Ver mis listas")}</button></p>
+        </div>
+        ${preferencesHtml()}`;
 }
 
 function read() {

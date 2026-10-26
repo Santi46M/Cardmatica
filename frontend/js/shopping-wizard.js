@@ -7,7 +7,7 @@
 //
 // Las ofertas son hoy las de la tienda de demostración (frontend/demo/store.js);
 // cuando haya publicaciones reales solo cambia demoCandidates.
-import { escapeHtml } from "./html.js";
+import { escapeHtml, html } from "./html.js";
 import { locale, t } from "./lang.js";
 import { readJson, writeJson } from "./storage.js";
 
@@ -226,126 +226,139 @@ const condition = (index) => window.DEMO?.conditions[index]?.code || "";
 const languageName = (code) => (window.DEMO?.languages[code] ? t(window.DEMO.languages[code].name) : code);
 
 function optionsHtml() {
-    const select = (id, label, entries, current) =>
-        `<label>${t(label)}<select id="${id}">${entries
-            .map(
-                ([value, text]) =>
-                    `<option value="${h(value)}"${String(value) === String(current) ? " selected" : ""}>${h(t(text))}</option>`
-            )
-            .join("")}</select></label>`;
-    const conditions = [[6, "Cualquier estado"], ...(window.DEMO?.conditions || [])
-        .slice(0, -1)
-        .map((item, index) => [
-            index,
-            `${t(item.name)} (${item.code})${index ? ` ${t("o mejor")}` : ""}`
-        ])];
+    const select = (id, label, entries, current) => {
+        const choices = entries
+            .map(([value, text]) => `<option value="${h(value)}"${String(value) === String(current) ? " selected" : ""}>${h(t(text))}</option>`)
+            .join("");
+        return `<label>${t(label)}<select id="${id}">${choices}</select></label>`;
+    };
+    const conditions = [
+        [6, "Cualquier estado"],
+        ...(window.DEMO?.conditions || [])
+            .slice(0, -1)
+            .map((item, index) => [index, `${t(item.name)} (${item.code})${index ? ` ${t("o mejor")}` : ""}`])
+    ];
     const countries = [...new Set((window.SELLERS || []).map((seller) => seller.country))].sort((a, b) =>
         t(a).localeCompare(t(b), locale)
     );
-    return `<div class="wz-options"><div class="seg" role="radiogroup" aria-label="${t("Prioridad")}">${Object.entries(
-        PRIORITIES
-    )
+    const ratings = [
+        [0, "Cualquiera"],
+        [4.5, "4,5 ★ o más"],
+        [4.8, "4,8 ★ o más"]
+    ];
+    const priorities = Object.entries(PRIORITIES)
         .map(
             ([value, label]) =>
                 `<button type="button" role="radio" aria-checked="${options.priority === value}" data-wz-priority="${value}">${t(label)}</button>`
         )
-        .join("")}</div>${select("wz-condition", "Estado mínimo", conditions, options.condition)}${select(
-        "wz-country",
-        "País del vendedor",
-        [["", "Todo el Mercosur"], ...countries.map((name) => [name, name])],
-        options.country
-    )}${select(
-        "wz-rating",
-        "Valoración mínima (ficticia)",
-        [
-            [0, "Cualquiera"],
-            [4.5, "4,5 ★ o más"],
-            [4.8, "4,8 ★ o más"]
-        ],
-        options.rating
-    )}<button class="btn" type="button" data-wz-run>${t("Armar compra")}</button></div>`;
+        .join("");
+    return html`
+        <div class="wz-options">
+            <div class="seg" role="radiogroup" aria-label="${t("Prioridad")}">${priorities}</div>
+            ${select("wz-condition", "Estado mínimo", conditions, options.condition)}
+            ${select("wz-country", "País del vendedor", [["", "Todo el Mercosur"], ...countries.map((name) => [name, name])], options.country)}
+            ${select("wz-rating", "Valoración mínima (ficticia)", ratings, options.rating)}
+            <button class="btn" type="button" data-wz-run>${t("Armar compra")}</button>
+        </div>`;
 }
 
 function lineHtml(line) {
     const offer = line.offer;
-    return `<tr><td><b>${h(line.want.name)}</b><small>${h(
-        [offer.printing.code, offer.printing.rarity, condition(offer.condition), languageName(offer.language)].join(" · ")
-    )}</small></td><td class="num">${line.units} × ${h(price(offer.price))}</td></tr>`;
+    const detail = [offer.printing.code, offer.printing.rarity, condition(offer.condition), languageName(offer.language)].join(" · ");
+    return html`
+        <tr>
+            <td><b>${h(line.want.name)}</b><small>${h(detail)}</small></td>
+            <td class="num">${line.units} × ${h(price(offer.price))}</td>
+        </tr>`;
 }
 
 function sellerHtml(group) {
     const seller = window.SELLERS[group.seller];
-    return `<article class="wz-seller"><header><span>${window.flag?.(seller.country) || ""} <b>${h(
-        seller.name
-    )}</b> <small>★ ${h(seller.rating)} · ${h(t(seller.country))}</small></span><button class="ghost" type="button" data-wz-cart="${
-        group.seller
-    }">${t("Añadir al carrito")}</button></header><table>${group.lines.map(lineHtml).join("")}</table><footer><span>${h(
-        t("Cartas {price}", { price: price(group.subtotal) })
-    )}</span><span>${h(
-        group.shipping ? t("Envío {price}", { price: price(group.shipping) }) : t("Envío gratis")
-    )}</span><b>${h(
-        price(group.subtotal + group.shipping)
-    )}</b></footer></article>`;
+    const shipping = group.shipping ? t("Envío {price}", { price: price(group.shipping) }) : t("Envío gratis");
+    return html`
+        <article class="wz-seller">
+            <header>
+                <span>${window.flag?.(seller.country) || ""} <b>${h(seller.name)}</b> <small>★ ${h(seller.rating)} · ${h(t(seller.country))}</small></span>
+                <button class="ghost" type="button" data-wz-cart="${group.seller}">${t("Añadir al carrito")}</button>
+            </header>
+            <table>${group.lines.map(lineHtml).join("")}</table>
+            <footer>
+                <span>${h(t("Cartas {price}", { price: price(group.subtotal) }))}</span>
+                <span>${h(shipping)}</span>
+                <b>${h(price(group.subtotal + group.shipping))}</b>
+            </footer>
+        </article>`;
+}
+
+const shipmentsText = (count) => t(count === 1 ? "{count} envío" : "{count} envíos", { count });
+
+// How the other priority would have turned out, when it differs.
+function comparisonHtml(plan, other) {
+    if (Math.abs(other.total - plan.total) <= EPSILON && other.sellers.length === plan.sellers.length) return "";
+    const summary = t("Con «{priority}»: {shipments} · {total}", {
+        priority: t(PRIORITIES[other.priority]),
+        shipments: shipmentsText(other.sellers.length),
+        total: price(other.total)
+    });
+    const found = other.found !== plan.found ? ` · ${h(t("{count} cartas", { count: other.found }))}` : "";
+    return `<small>${h(summary)}${found}.</small>`;
 }
 
 function resultHtml() {
     if (!plans) return "";
     const plan = plans[options.priority];
     const other = plans[options.priority === "price" ? "shipments" : "price"];
-    const shipments = (count) => t(count === 1 ? "{count} envío" : "{count} envíos", { count });
     if (!plan.found)
         return `<p class="empty">${t("No se encontró ninguna carta de esta lista con estos filtros.")}</p>${missingHtml(plan)}`;
-    const compare =
-        Math.abs(other.total - plan.total) > EPSILON || other.sellers.length !== plan.sellers.length
-            ? `<small>${h(
-                  t("Con «{priority}»: {shipments} · {total}", {
-                      priority: t(PRIORITIES[other.priority]),
-                      shipments: shipments(other.sellers.length),
-                      total: price(other.total)
-                  })
-              )}${other.found !== plan.found ? ` · ${h(t("{count} cartas", { count: other.found }))}` : ""}.</small>`
-            : "";
-    return `<div class="wz-summary" role="status"><div><b>${h(
-        t("{found} de {wanted} cartas", { found: plan.found, wanted: plan.wanted })
-    )}</b> ${h(
-        t("en {shipments} · cartas {cards} · envío {shipping}", {
-            shipments: shipments(plan.sellers.length),
-            cards: price(plan.cards),
-            shipping: price(plan.shipping)
-        })
-    )} · <b>${h(t("total {total}", { total: price(plan.total) }))}</b>${
-        compare ? `<br>${compare}` : ""
-    }</div><button class="btn" type="button" data-wz-cart="all">${t("Añadir todo al carrito")}</button></div>${plan.sellers
-        .map(sellerHtml)
-        .join("")}${missingHtml(plan)}<small class="catalog-status">${h(
-        t(
-            "Ofertas de la tienda de demostración: vendedores, precios y stock son ilustrativos. Envío por vendedor de {shipping}, gratis desde {free}. La demo no distingue ediciones.",
-            { shipping: price(window.SHIPPING.perSeller), free: price(window.SHIPPING.freeFrom) }
-        )
-    )}</small>`;
+    const compare = comparisonHtml(plan, other);
+    const found = t("{found} de {wanted} cartas", { found: plan.found, wanted: plan.wanted });
+    const totals = t("en {shipments} · cartas {cards} · envío {shipping}", {
+        shipments: shipmentsText(plan.sellers.length),
+        cards: price(plan.cards),
+        shipping: price(plan.shipping)
+    });
+    const demo = t(
+        "Ofertas de la tienda de demostración: vendedores, precios y stock son ilustrativos. Envío por vendedor de {shipping}, gratis desde {free}. La demo no distingue ediciones.",
+        { shipping: price(window.SHIPPING.perSeller), free: price(window.SHIPPING.freeFrom) }
+    );
+    return html`
+        <div class="wz-summary" role="status">
+            <div>
+                <b>${h(found)}</b> ${h(totals)} · <b>${h(t("total {total}", { total: price(plan.total) }))}</b>${compare ? `<br>${compare}` : ""}
+            </div>
+            <button class="btn" type="button" data-wz-cart="all">${t("Añadir todo al carrito")}</button>
+        </div>
+        ${plan.sellers.map(sellerHtml).join("")}
+        ${missingHtml(plan)}
+        <small class="catalog-status">${h(demo)}</small>`;
 }
 
 function missingHtml(plan) {
     if (!plan.missing.length) return "";
-    return `<details class="wz-missing"${plan.found ? "" : " open"}><summary>${t("No encontradas ({count})", {
-        count: plan.missing.length
-    })}</summary><ul>${plan.missing
-        .map(
-            ({ want, units: left, reason }) =>
-                `<li><b>${h(want.name)}</b>${want.code ? ` · ${h(want.code)}` : ""} · ${h(
-                    t("faltan {count}", { count: left })
-                )}<small>${h(t(reason))}</small></li>`
-        )
-        .join("")}</ul></details>`;
+    const items = plan.missing
+        .map(({ want, units: left, reason }) => {
+            const code = want.code ? ` · ${h(want.code)}` : "";
+            return `<li><b>${h(want.name)}</b>${code} · ${h(t("faltan {count}", { count: left }))}<small>${h(t(reason))}</small></li>`;
+        })
+        .join("");
+    const title = t("No encontradas ({count})", { count: plan.missing.length });
+    return `<details class="wz-missing"${plan.found ? "" : " open"}><summary>${title}</summary><ul>${items}</ul></details>`;
 }
 
 // The section inside the list of deseados; empty lists have nothing to buy.
 export function wizardHtml(list) {
     if (!list?.items.length) return "";
     if (signature(list) !== plannedFor) plans = null;
-    return `<section class="gl pnl wz" id="wl-wizard"><div class="wz-head"><b>${t("Asistente de compra")}</b><small>${h(
-        t("Arma la compra de «{list}» entre los vendedores: con menos envíos o al menor precio.", { list: list.name })
-    )}</small></div>${optionsHtml()}<div id="wz-result">${resultHtml()}</div></section>`;
+    const intro = t("Arma la compra de «{list}» entre los vendedores: con menos envíos o al menor precio.", { list: list.name });
+    return html`
+        <section class="gl pnl wz" id="wl-wizard">
+            <div class="wz-head">
+                <b>${t("Asistente de compra")}</b>
+                <small>${h(intro)}</small>
+            </div>
+            ${optionsHtml()}
+            <div id="wz-result">${resultHtml()}</div>
+        </section>`;
 }
 
 function readOptions() {

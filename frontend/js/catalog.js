@@ -34,7 +34,7 @@ import {
     scopePath
 } from "./collections.js";
 import { CATALOG } from "./config.js";
-import { escapeHtml } from "./html.js";
+import { escapeHtml, html } from "./html.js";
 import { t } from "./lang.js";
 import { installBackToTop } from "./back-to-top.js";
 import { installCardPreview } from "./card-preview.js";
@@ -502,9 +502,8 @@ async function showHomeBanlist(request) {
         slot.innerHTML = homeBanlistHtml(await request, window.market);
         startCountdowns();
     } catch (error) {
-        slot.innerHTML = `<p class="catalog-status" role="alert">${h(
-            t("No se pudo cargar la banlist: {error}", { error: error.message })
-        )}</p>`;
+        const message = t("No se pudo cargar la banlist: {error}", { error: error.message });
+        slot.innerHTML = `<p class="catalog-status" role="alert">${h(message)}</p>`;
     }
 }
 
@@ -516,9 +515,7 @@ function showViewContainers() {
 function showSkeleton(home) {
     if (home) {
         if (!element("home").innerHTML.trim())
-            element("home").innerHTML = `<div class="sk-hero gl" aria-hidden="true"></div><div class="grid">${skeletonTiles(
-                4
-            )}</div>`;
+            element("home").innerHTML = `<div class="sk-hero gl" aria-hidden="true"></div><div class="grid">${skeletonTiles(4)}</div>`;
         return;
     }
     showViewContainers();
@@ -616,15 +613,11 @@ async function loadCards(reset = false) {
         status(data.total ? "" : t("El catálogo no contiene resultados para este mercado y estos filtros."));
     } catch (error) {
         if (error.name === "AbortError" || current !== generation) return;
-        const message = `${h(
-            error.message
-        )} <button class="ghost" data-catalog-retry>${t("Reintentar")}</button>`;
+        const message = `${h(error.message)} <button class="ghost" data-catalog-retry>${t("Reintentar")}</button>`;
         if (home) element("home").innerHTML = `<div class="empty gl" role="alert">${message}</div>`;
         else {
             showViewContainers();
-            element(
-                "list"
-            ).innerHTML = `<tr><td colspan="3" class="empty" role="alert">${message}</td></tr>`;
+            element("list").innerHTML = `<tr><td colspan="3" class="empty" role="alert">${message}</td></tr>`;
             grid.innerHTML = `<p class="empty" role="alert">${message}</p>`;
             pagination.innerHTML = "";
             topPagination.innerHTML = "";
@@ -667,10 +660,7 @@ window.showTab = function () {
         return;
     }
     element("tabs").innerHTML = window.TABS.map(
-        (tab) =>
-            `<button aria-pressed="${tab === window.tab}" data-g="${h(tab)}">${h(
-                t(window.TAB_LABELS[tab])
-            )}</button>`
+        (tab) => `<button aria-pressed="${tab === window.tab}" data-g="${h(tab)}">${h(t(window.TAB_LABELS[tab]))}</button>`
     ).join("");
     showCurrentTab();
     renderPromo();
@@ -744,11 +734,12 @@ async function openCard(id, { push = true } = {}) {
         });
     } catch (error) {
         if (current !== detailGeneration || element("md").dataset.mode !== "catalog") return;
-        element(
-            "mb"
-        ).innerHTML = `<div class="top"><h2>No se pudo cargar la ficha</h2><button class="ghost" data-close="md">Cerrar</button></div><p role="alert">${h(
-            error.message
-        )}</p>`;
+        element("mb").innerHTML = html`
+            <div class="top">
+                <h2>No se pudo cargar la ficha</h2>
+                <button class="ghost" data-close="md">Cerrar</button>
+            </div>
+            <p role="alert">${h(error.message)}</p>`;
     }
 }
 
@@ -890,9 +881,7 @@ document.addEventListener(
     (event) => {
         if (event.target.matches?.("img.catalog-image")) {
             const fallback = document.createElement("span");
-            fallback.className = `catalog-image-fallback${
-                event.target.classList.contains("grid") ? " grid" : ""
-            }`;
+            fallback.className = `catalog-image-fallback${event.target.classList.contains("grid") ? " grid" : ""}`;
             fallback.textContent = t("Imagen no disponible");
             // A broken image takes its provisional warning with it.
             (event.target.closest(".img-wrap") || event.target).replaceWith(fallback);

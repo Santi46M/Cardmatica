@@ -4,7 +4,7 @@
 // A set or archetype page is the catalogue list limited to it, with a header
 // on top. A set page also shows the boxes and packs of that set the demo
 // store sells, when there are any (frontend/demo).
-import { escapeHtml } from "./html.js";
+import { escapeHtml, html } from "./html.js";
 import { formatDate } from "./format.js";
 import { t } from "./lang.js";
 import { readJson, writeJson } from "./storage.js";
@@ -32,15 +32,13 @@ export const scopeInfoPath = (scope) => `${scope.kind === "set" ? "sets" : "arch
 
 // An anchor that opens a set or archetype page (catalog.js handles the click).
 export function scopeLink(kind, id, label) {
-    return `<a class="lk" href="/${PATHS[kind]}/${h(id)}" data-scope="${kind}" data-scope-id="${h(id)}">${h(
-        label
-    )}</a>`;
+    return `<a class="lk" href="/${PATHS[kind]}/${h(id)}" data-scope="${kind}" data-scope-id="${h(id)}">${h(label)}</a>`;
 }
 
 const comparable = (name) =>
     String(name)
         .normalize("NFKD")
-        .replace(/[̀-ͯ]/g, "")
+        .replace(/[\u0300-\u036f]/g, "") // accents
         .toLowerCase()
         .replace(/[^a-z0-9]/g, "");
 
@@ -57,18 +55,20 @@ function demoProducts(set) {
 
 function productsHtml(set) {
     const products = demoProducts(set);
-    if (!products.length)
-        return `<p class="catalog-status">${t(
-            "Todavía no hay cajas ni sobres de este set a la venta. Aparecerán acá cuando los vendedores los publiquen."
-        )}</p>`;
-    return `<div class="scope-products">${products
+    if (!products.length) {
+        const none = t("Todavía no hay cajas ni sobres de este set a la venta. Aparecerán acá cuando los vendedores los publiquen.");
+        return `<p class="catalog-status">${none}</p>`;
+    }
+    const buttons = products
         .map(
-            (product) =>
-                `<button class="ghost" data-pd="${product.id}"><b>${h(window.productName(product))}</b><small>${h(
-                    t(product.category)
-                )} · ${t("tienda de demostración")}</small></button>`
+            (product) => html`
+                <button class="ghost" data-pd="${product.id}">
+                    <b>${h(window.productName(product))}</b>
+                    <small>${h(t(product.category))} · ${t("tienda de demostración")}</small>
+                </button>`
         )
-        .join("")}</div>`;
+        .join("");
+    return `<div class="scope-products">${buttons}</div>`;
 }
 
 // Header of a set or archetype page; info is the API answer (null while loading).
@@ -78,21 +78,29 @@ export function scopeHeadHtml(scope, info) {
     const inCatalogue = t(info.card_count === 1 ? "{count} carta en el catálogo" : "{count} cartas en el catálogo", {
         count: info.card_count
     });
-    if (scope.kind === "archetype")
-        return `<div class="scope-head gl"><div><small>${t("Arquetipo")}</small><h2>${h(info.name)}</h2><p>${h(
-            inCatalogue
-        )}</p></div>${close}</div>`;
+    const head = (kind, line) => html`
+        <div class="scope-head gl">
+            <div>
+                <small>${t(kind)}</small>
+                <h2>${h(info.name)}</h2>
+                <p>${h(line)}</p>
+            </div>
+            ${close}
+        </div>`;
+    if (scope.kind === "archetype") return head("Arquetipo", inCatalogue);
     const facts = [
         info.market,
         info.release_date ? t("lanzado el {date}", { date: formatDate(info.release_date) }) : "",
         info.product_type,
         inCatalogue
     ].filter(Boolean);
-    return `<div class="scope-head gl"><div><small>${t("Set")}</small><h2>${h(info.name)}</h2><p>${h(
-        facts.join(" · ")
-    )}</p></div>${close}</div><section class="scope-section"><h3>${t("Cajas y sobres")}</h3>${productsHtml(
-        info
-    )}</section><h3 class="scope-section">${t("Cartas sueltas")}</h3>`;
+    return html`
+        ${head("Set", facts.join(" · "))}
+        <section class="scope-section">
+            <h3>${t("Cajas y sobres")}</h3>
+            ${productsHtml(info)}
+        </section>
+        <h3 class="scope-section">${t("Cartas sueltas")}</h3>`;
 }
 
 // ---- Banner of the latest set ------------------------------------------------
@@ -100,18 +108,20 @@ export function scopeHeadHtml(scope, info) {
 export function promoHtml(set) {
     if (!set) return "";
     if (readJson(DISMISSED_KEY, []).includes(set.id)) return "";
-    return `<aside class="promo" aria-label="${t("Último set lanzado")}"><a href="${scopePath({
-        kind: "set",
-        id: set.id
-    })}" data-scope="set" data-scope-id="${h(set.id)}"><small>${h(t("Último set {market}", { market: set.market }))}${
-        set.release_date ? ` · ${h(formatDate(set.release_date))}` : ""
-    }</small><b>${h(set.name)}</b><span>${h(
-        t(set.card_count === 1 ? "Cajas, sobres y {count} carta suelta" : "Cajas, sobres y {count} cartas sueltas", {
-            count: set.card_count
-        })
-    )} →</span></a><button class="promo-close" data-promo-close="${h(set.id)}" aria-label="${t(
-        "Ocultar este aviso"
-    )}">×</button></aside>`;
+    const released = set.release_date ? ` · ${h(formatDate(set.release_date))}` : "";
+    const contents = t(
+        set.card_count === 1 ? "Cajas, sobres y {count} carta suelta" : "Cajas, sobres y {count} cartas sueltas",
+        { count: set.card_count }
+    );
+    return html`
+        <aside class="promo" aria-label="${t("Último set lanzado")}">
+            <a href="${scopePath({ kind: "set", id: set.id })}" data-scope="set" data-scope-id="${h(set.id)}">
+                <small>${h(t("Último set {market}", { market: set.market }))}${released}</small>
+                <b>${h(set.name)}</b>
+                <span>${h(contents)} →</span>
+            </a>
+            <button class="promo-close" data-promo-close="${h(set.id)}" aria-label="${t("Ocultar este aviso")}">×</button>
+        </aside>`;
 }
 
 export function dismissPromo(id) {

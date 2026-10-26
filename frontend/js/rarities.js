@@ -46,9 +46,7 @@ export function rarityBadge(printing) {
         .filter(Boolean)
         .map((part) => t(part))
         .join(" · ");
-    return `<span class="rr" data-tone="${tone(printing.rarity, family)}" title="${h(title)}">${h(
-        printing.rarity
-    )}</span>`;
+    return `<span class="rr" data-tone="${tone(printing.rarity, family)}" title="${h(title)}">${h(printing.rarity)}</span>`;
 }
 
 // A whole family is chosen with this prefix ("familia:gold").
