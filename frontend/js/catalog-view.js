@@ -125,9 +125,6 @@ export function catalogRows(data) {
     return data.items
         .map((card) => {
             const meta = cardMeta(card);
-            const source = card.name_is_official
-                ? ""
-                : ` · ${t("Fuente: {source}", { source: card.name_source || t("comunitaria") })}`;
             return `<tr class="catalog-row" tabindex="0" data-catalog-card="${h(
                 card.id
             )}" aria-label="${h(`${card.name}, ${meta}`)}"><td><div class="nm">${imageHtml(
@@ -137,9 +134,7 @@ export function catalogRows(data) {
                 )}`
             )}<div class="nm-text"><b data-preview="${h(card.id)}">${badgeHtml(
                 card.market_banlist
-            )}${h(card.name)}</b><small class="meta" title="${h(
-                meta + source
-            )}">${h(meta)}${h(source)}</small></div></div></td><td class="num hide">${
+            )}${h(card.name)}</b><small class="meta" title="${h(meta)}">${h(meta)}</small></div></div></td><td class="num hide">${
                 card.printing_count
             }</td>${saleCell(card.last_sale)}</tr>`;
         })
@@ -325,7 +320,7 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
                   `${
                       text.is_official
                           ? t("Texto oficial vigente")
-                          : `${t("Texto de catálogo")} · ${text.source_slug || t("fuente comunitaria")}`
+                          : t("Texto de catálogo")
                   } · ${text.language}`,
                   `<p class="card-text">${h(text.text)}</p>${
                       text.pendulum_text
@@ -337,7 +332,7 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
               )
             : `<p class="catalog-status">${t("Texto vigente todavía no disponible.")}</p>`;
     const ids = [
-        card.ygoprodeck_id ? `YGOPRODeck ${card.ygoprodeck_id}` : "",
+        card.passcode ? t("Código {code}", { code: card.passcode }) : "",
         card.konami_id ? `CID ${card.konami_id}` : ""
     ]
         .filter(Boolean)
@@ -425,8 +420,9 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
     )}${section("Erratas documentadas", errata)}${section(
         "Versiones históricas y textos comunitarios",
         history
-    )}${banlistSectionHtml(card, market)}${section(
-        "Procedencia",
-        sourceLinks ? `<ul>${sourceLinks}</ul>` : ""
-    )}</div>`;
+    )}${banlistSectionHtml(card, market)}${
+        sourceLinks
+            ? `<details class="cd-sources"><summary>${t("Procedencia")}</summary><ul>${sourceLinks}</ul></details>`
+            : ""
+    }</div>`;
 }

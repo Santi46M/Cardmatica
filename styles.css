@@ -864,6 +864,26 @@ small {
     margin-bottom: 16px;
 }
 
+/* Procedencia de los datos: plegada y discreta al pie de la ficha */
+.cd-sources {
+    margin-top: 22px;
+    font-size: 0.8rem;
+    color: var(--mu);
+}
+
+.cd-sources summary {
+    cursor: pointer;
+}
+
+.cd-sources ul {
+    margin: 6px 0 0;
+    padding-left: 18px;
+}
+
+.cd-sources a {
+    color: inherit;
+}
+
 .catalog-section summary {
     cursor: pointer;
     color: var(--mu);

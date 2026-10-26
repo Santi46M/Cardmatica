@@ -558,6 +558,7 @@ I18N.add({
     "Precio: menor a mayor": "Preço: menor para maior",
     "Prioridad": "Prioridade",
     "Privacidad": "Privacidade",
+    "Código {code}": "Código {code}",
     "Procedencia": "Procedência",
     "Procesadas": "Processadas",
     "Producto": "Produto",
