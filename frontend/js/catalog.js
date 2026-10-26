@@ -68,6 +68,8 @@ let scopeInfo = null;
 // The latest set of the market on screen, for the banner.
 let latestSet = null;
 let promoMarket = null;
+// The banner HTML on screen, to tell a new banner from the same one.
+let promoContent = "";
 let detail;
 let printingPage;
 let selectedPrinting = "";
@@ -453,7 +455,16 @@ function renderPromo() {
     // Not on the page of that same set, nor in the account panels.
     const sameSet = scope?.kind === "set" && scope.id === latestSet?.id;
     const shown = (window.tab === "Inicio" || isCatalog()) && !sameSet;
-    promoSlot.innerHTML = shown ? promoHtml(latestSet) : "";
+    const content = shown ? promoHtml(latestSet) : "";
+    // In the catalogue it shrinks to one line, so it does not get in the way
+    // of a search. The same banner is kept when only that changes, so the CSS
+    // transition plays (styles.css, .promo.compact).
+    const banner = promoSlot.querySelector(".promo");
+    if (!content || content !== promoContent || !banner) {
+        promoContent = content;
+        promoSlot.innerHTML = content;
+    }
+    promoSlot.querySelector(".promo")?.classList.toggle("compact", isCatalog());
 }
 
 document.addEventListener(

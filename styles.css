@@ -2386,6 +2386,7 @@ button.acc-avatar:hover,
         radial-gradient(520px 260px at 85% 20%, rgba(255, 210, 110, .28), transparent 70%),
         linear-gradient(115deg, #0b2a4a 0%, #13507a 55%, #1d7f86 100%);
     box-shadow: 0 10px 32px rgba(var(--shade), .4);
+    transition: min-height .3s ease, padding .3s ease;
 }
 
 .promo-bg {
@@ -2409,8 +2410,17 @@ button.acc-avatar:hover,
 
 .promo-body {
     display: grid;
+    grid-template-areas: "label" "title" "text" "actions";
     gap: 6px;
     max-width: 560px;
+}
+
+.promo-label {
+    grid-area: label;
+}
+
+.promo-text {
+    grid-area: text;
 }
 
 .promo-body small {
@@ -2428,6 +2438,8 @@ button.acc-avatar:hover,
     line-height: 1.05;
     text-transform: uppercase;
     text-shadow: 0 2px 10px rgba(0, 0, 0, .45);
+    grid-area: title;
+    transition: font-size .3s ease;
 }
 
 .promo-body p {
@@ -2437,6 +2449,7 @@ button.acc-avatar:hover,
 }
 
 .promo .promo-actions {
+    grid-area: actions;
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
@@ -2460,6 +2473,7 @@ button.acc-avatar:hover,
     margin: -12px 0 -12px auto;
     flex: none;
     transform: rotate(4deg);
+    transition: transform .3s ease, margin .3s ease;
 }
 
 .promo-art img {
@@ -2469,6 +2483,55 @@ button.acc-avatar:hover,
     height: 250px;
     object-fit: contain;
     filter: drop-shadow(0 14px 28px rgba(0, 0, 0, .55));
+    transition: height .3s ease;
+}
+
+/* En el catálogo: una franja de una línea con el nombre y «Ver el set». Solo
+   cambian tamaños y márgenes de este banner, una vez, en 0,3 s. */
+.promo.compact {
+    min-height: 0;
+    padding-block: 10px;
+}
+
+.promo.compact .promo-body {
+    flex: 1;
+    max-width: none;
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "label actions" "title actions";
+    row-gap: 2px;
+    column-gap: 16px;
+    align-items: center;
+}
+
+.promo.compact h2 {
+    font-size: 20px;
+}
+
+.promo.compact .promo-text,
+.promo.compact .ghost {
+    display: none;
+}
+
+.promo.compact .promo-actions {
+    margin-top: 0;
+}
+
+.promo.compact .promo-art {
+    margin: -4px 0;
+    transform: none;
+}
+
+.promo.compact .promo-art img {
+    height: 52px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .promo,
+    .promo h2,
+    .promo-art,
+    .promo-art img {
+        transition: none;
+    }
 }
 
 @media (max-width: 640px) {

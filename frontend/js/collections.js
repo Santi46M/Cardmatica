@@ -135,9 +135,9 @@ export function promoHtml(set) {
         <section class="promo${photo ? " with-photo" : ""}" aria-label="${t("Último set lanzado")}">
             ${background}
             <div class="promo-body">
-                <small>${h(t("Último set {market}", { market: set.market }))}${released}</small>
+                <small class="promo-label">${h(t("Último set {market}", { market: set.market }))}${released}</small>
                 <h2>${h(set.name)}</h2>
-                <p>${h(contents)}</p>
+                <p class="promo-text">${h(contents)}</p>
                 <p class="promo-actions">
                     <a class="btn" href="${scopePath({ kind: "set", id: set.id })}" data-scope="set" data-scope-id="${h(set.id)}">${t("Ver el set")}</a>
                     <button class="ghost" data-go="Productos">${t("Cajas y accesorios")}</button>

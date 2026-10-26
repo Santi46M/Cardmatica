@@ -866,6 +866,13 @@ def test_latest_set_banner_and_set_page(live_server, browser_page, factory, reco
     page.goto(live_server)
     expect(page.locator(".promo h2")).to_have_text("Beyond the Brave")
     expect(page.locator(".promo [data-promo-close]")).to_have_count(0)
+    # Big on the home page; one line in the catalogue, out of the search's way.
+    expect(page.locator(".promo")).not_to_have_class(re.compile("compact"))
+    page.locator('[data-g="Todas"]').click()
+    expect(page.locator(".promo")).to_have_class(re.compile("compact"))
+    expect(page.locator(".promo .promo-text")).to_be_hidden()
+    page.locator('[data-g="Inicio"]').click()
+    expect(page.locator(".promo")).not_to_have_class(re.compile("compact"))
     page.locator(".promo a").click()
     expect(page).to_have_url(re.compile(r"/set/[0-9a-f-]{36}$"))
     expect(page.locator(".scope-head h2")).to_have_text("Beyond the Brave")
