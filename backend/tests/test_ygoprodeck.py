@@ -362,3 +362,51 @@ def test_preview_images_downloads_only_missing_artwork(factory, settings, payloa
         session.scalar(select(CardArtwork)).local_path = "synthetic.png"
     calls.clear()
     assert preview_images(10, Runner()) == 0 and calls == []
+
+
+def test_card_texts_brings_only_the_missing_language(factory, settings, payload, monkeypatch):
+    from app.cli import card_texts
+    from app.services.catalog import card_summary
+
+    with factory.begin() as session:
+        IngestionService(session).ingest(parse_card(payload))
+    calls = []
+
+    class Runner:
+        def __init__(self):
+            self.factory = factory
+
+        def enqueue(self, request):
+            calls.append(request)
+            with factory.begin() as session:
+                job = SyncJob(source=request.source, mode=request.mode, status="completed")
+                session.add(job)
+                session.flush()
+                return job.id
+
+        def run(self, job_id):
+            async def done():
+                return None
+
+            return done()
+
+    # Portuguese comes from YGOPRODeck, card by card, for cards without it.
+    assert card_texts("pt", 10, Runner()) == 0
+    assert [(call.source, call.mode, call.language) for call in calls] == [
+        ("ygoprodeck", "card", "pt")
+    ]
+    with factory.begin() as session:
+        IngestionService(session).ingest(parse_card(payload, "pt"))
+    calls.clear()
+    assert card_texts("pt", 10, Runner()) == 0 and calls == []
+    # Spanish only Yugipedia has: it must be enabled first.
+    monkeypatch.setattr(settings, "yugipedia_enabled", False)
+    with pytest.raises(ValueError, match="YUGIPEDIA_ENABLED"):
+        card_texts("es", 10, Runner())
+    monkeypatch.setattr(settings, "yugipedia_enabled", True)
+    assert card_texts("es", 10, Runner()) == 0
+    assert calls[0].source == "yugipedia" and calls[0].identifier == payload["name"]
+    # A visitor whose language the card lacks reads its English name.
+    with factory() as session:
+        card = session.scalar(select(Card))
+        assert card_summary(card, "de").name == payload["name"]

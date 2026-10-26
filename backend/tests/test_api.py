@@ -398,6 +398,10 @@ def test_latest_set_set_and_archetype_pages(factory, client, record):
     latest = client.get("/api/v1/sets/latest", params={"market": "TCG"}).json()
     assert (latest["name"], latest["card_count"], latest["code"]) == ("New Set", 5, "NEW")
     assert client.get("/api/v1/sets/latest", params={"market": "OCG"}).status_code == 404
+    # The banner rotates through the newest sets; real ones first, then small ones.
+    recent = client.get("/api/v1/sets/recent", params={"market": "TCG"}).json()
+    assert [row["name"] for row in recent] == ["New Set", "Promo", "Old Set"]
+    assert client.get("/api/v1/sets/recent", params={"market": "OCG"}).json() == []
     assert client.get(f"/api/v1/sets/{latest['id']}").json()["card_count"] == 5
     assert client.get("/api/v1/cards", params={"set_id": latest["id"]}).json()["total"] == 5
     archetype = client.get("/api/v1/archetypes").json()["items"][0]

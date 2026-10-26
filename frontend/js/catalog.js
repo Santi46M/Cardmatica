@@ -1,4 +1,6 @@
 import { installAccountMenu } from "./account-menu.js";
+import { installLanguageMenu } from "./language-menu.js";
+import { installPromo } from "./promo.js";
 import { track, trackPage } from "./analytics.js";
 import { installAdmin, renderAdmin } from "./admin.js";
 import {
@@ -25,7 +27,6 @@ import {
 } from "./catalog-view.js";
 import { TYPE_FILTERS, typeFiltersHtml, typeParams } from "./card-types.js";
 import {
-    promoHtml,
     scopeFromPath,
     scopeHeadHtml,
     scopeInfoPath,
@@ -66,10 +67,6 @@ let facetsMarket;
 let scope = null;
 let scopeInfo = null;
 // The latest set of the market on screen, for the banner.
-let latestSet = null;
-let promoMarket = null;
-// The banner HTML on screen, to tell a new banner from the same one.
-let promoContent = "";
 let detail;
 let printingPage;
 let selectedPrinting = "";
@@ -134,6 +131,7 @@ element("cnt").before(viewToggle);
 const promoSlot = document.createElement("div");
 promoSlot.id = "promo";
 element("home").before(promoSlot);
+const promo = installPromo({ slot: promoSlot, api });
 const scopeSlot = document.createElement("div");
 scopeSlot.id = "scope-head";
 
@@ -441,36 +439,14 @@ function openScope(next) {
     window.scrollTo(0, 0);
 }
 
-// The set's photo may arrive after the banner is drawn.
-document.addEventListener("cm:product-photos", () => renderPromo());
-
+// The banner of the newest sets (promo.js): on the home page and the
+// catalogue, not on the page of a set it shows, nor in the other panels.
 function renderPromo() {
-    if (promoMarket !== window.market) {
-        const market = (promoMarket = window.market);
-        latestSet = null;
-        api.get("sets/latest", { market })
-            .then((set) => {
-                if (market !== window.market) return;
-                latestSet = set;
-                renderPromo();
-            })
-            .catch(() => {
-                /* A catalogue without dated sets simply has no banner. */
-            });
-    }
-    // Not on the page of that same set, nor in the account panels.
-    const sameSet = scope?.kind === "set" && scope.id === latestSet?.id;
-    const shown = (window.tab === "Inicio" || isCatalog()) && !sameSet;
-    const content = shown ? promoHtml(latestSet) : "";
-    // In the catalogue it shrinks to one line, so it does not get in the way
-    // of a search. The same banner is kept when only that changes, so the CSS
-    // transition plays (styles.css, .promo.compact).
-    const banner = promoSlot.querySelector(".promo");
-    if (!content || content !== promoContent || !banner) {
-        promoContent = content;
-        promoSlot.innerHTML = content;
-    }
-    promoSlot.querySelector(".promo")?.classList.toggle("compact", isCatalog());
+    promo.render(window.market, {
+        visible: window.tab === "Inicio" || isCatalog(),
+        compact: isCatalog(),
+        hideSetId: scope?.kind === "set" ? scope.id : null
+    });
 }
 
 document.addEventListener(
@@ -725,7 +701,7 @@ async function openCard(id, { push = true } = {}) {
             .get(`cards/${id}/price-history`, { market, days: CATALOG.historyDays })
             .catch(() => null);
         const [card, printings] = await Promise.all([
-            api.get(`cards/${id}`),
+            api.get(`cards/${id}`, { language: window.I18N.lang }),
             api.get(`cards/${id}/printings`, { page: 1, page_size: CATALOG.pageSize, market })
         ]);
         if (
@@ -945,6 +921,7 @@ installAuth({
     }
 });
 installAccountMenu();
+installLanguageMenu();
 installAdmin();
 // The home page's call to action depends on whether someone is signed in.
 document.addEventListener("cm:account", () => {

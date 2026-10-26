@@ -148,6 +148,62 @@ def preview_images(max_cards: int, runner=None):
     return 1 if failed else 0
 
 
+# Where the card text of each language comes from: YGOPRODeck translates into
+# French, German, Italian and Portuguese; Spanish (and the Asian languages)
+# only Yugipedia has, which must be enabled first (YUGIPEDIA_ENABLED).
+TEXT_SOURCES = {"pt": "ygoprodeck", "fr": "ygoprodeck", "de": "ygoprodeck", "it": "ygoprodeck"}
+TEXT_LANGUAGES = [*TEXT_SOURCES, "es", "ja", "ko"]
+
+
+def card_texts(language: str, max_cards: int, runner=None):
+    """Bring the name and effect text in one language for catalogue cards that lack it."""
+    from sqlalchemy import exists
+
+    from app.models import CardName, CardTextVersion
+
+    settings = get_settings()
+    source = TEXT_SOURCES.get(language, "yugipedia")
+    if source == "yugipedia" and not settings.yugipedia_enabled:
+        raise ValueError(
+            f"YGOPRODeck no tiene textos en «{language}»: los tiene Yugipedia. Revisar sus "
+            "condiciones de uso y activar YUGIPEDIA_ENABLED=true para traerlos."
+        )
+    runner = runner or SyncRunner()
+    has_text = exists().where(
+        CardTextVersion.card_id == Card.id, CardTextVersion.language == language
+    )
+    # Yugipedia finds a card by the title of its page, the English name.
+    english = (
+        select(CardName.name)
+        .where(CardName.card_id == Card.id, CardName.language == "en", CardName.is_current)
+        .limit(1)
+        .correlate(Card)
+        .scalar_subquery()
+    )
+    identifier = Card.ygoprodeck_id if source == "ygoprodeck" else english
+    with runner.factory() as session:
+        identifiers = list(
+            session.scalars(
+                select(identifier)
+                .select_from(Card)
+                .where(identifier.is_not(None), ~has_text)
+                .order_by(Card.display_name)
+                .limit(max_cards)
+            )
+        )
+    failed = 0
+    for value in identifiers:
+        job_id = runner.enqueue(
+            JobRequest(source=source, mode="card", identifier=str(value), language=language)
+        )
+        asyncio.run(runner.run(job_id))
+        with runner.factory() as session:
+            if session.get(SyncJob, job_id).status in {"failed", "completed_with_errors"}:
+                failed += 1
+    print(json.dumps({"language": language, "cards": len(identifiers), "failed": failed}))
+    return 1 if failed else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cardmatica")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -199,6 +255,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     images.add_argument("--max-cards", type=int, default=100)
 
+    texts = commands.add_parser(
+        "card-texts",
+        help="Traer el nombre y el texto de efecto en otro idioma para las cartas que no lo tienen",
+    )
+    texts.add_argument("language", choices=TEXT_LANGUAGES)
+    texts.add_argument("--max-cards", type=int, default=100)
+
     photos = commands.add_parser(
         "product-images",
         help="Descargar las fotos provisionales de los productos de la demo (solo vista local)",
@@ -234,6 +297,15 @@ def run_preview_images(args, parser):
     if not 1 <= args.max_cards <= 5000:
         parser.error("max-cards debe estar entre 1 y 5000")
     return preview_images(args.max_cards)
+
+
+def run_card_texts(args, parser):
+    if not 1 <= args.max_cards <= 20000:
+        parser.error("max-cards debe estar entre 1 y 20000")
+    try:
+        return card_texts(args.language, args.max_cards)
+    except ValueError as error:
+        parser.error(str(error))
 
 
 def run_product_images(args, parser):
@@ -336,6 +408,7 @@ COMMANDS = {
     "fetch-news": lambda args, parser: asyncio.run(refresh_news()),
     "news-worker": lambda args, parser: asyncio.run(refresh_news(forever=True)),
     "preview-images": run_preview_images,
+    "card-texts": run_card_texts,
     "product-images": run_product_images,
     "cleanup": run_cleanup,
     "set-role": run_set_role,

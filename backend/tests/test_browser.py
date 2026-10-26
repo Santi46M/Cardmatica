@@ -864,21 +864,33 @@ def test_latest_set_banner_and_set_page(live_server, browser_page, factory, reco
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     page.goto(live_server)
-    expect(page.locator(".promo h2")).to_have_text("Beyond the Brave")
+    current = page.locator(".promo-slide.current")
+    expect(current.locator("h2")).to_have_text("Beyond the Brave")
     expect(page.locator(".promo [data-promo-close]")).to_have_count(0)
+    # About four slides: this set, then the newest demo sets of the market.
+    slides = page.locator(".promo-slide")
+    expect(slides).to_have_count(4)
+    expect(slides.nth(1).locator("h2")).not_to_have_text("Beyond the Brave")
+    page.locator('[data-promo-show="1"]').click()
+    expect(slides.nth(1)).to_have_class(re.compile("current"))
+    expect(slides.first).to_have_attribute("inert", "")
+    page.locator("[data-promo-pause]").click()
+    expect(page.locator("[data-promo-pause]")).to_have_attribute("aria-pressed", "true")
+    page.locator('[data-promo-show="0"]').click()
     # Big on the home page; one line in the catalogue, out of the search's way.
     expect(page.locator(".promo")).not_to_have_class(re.compile("compact"))
     page.locator('[data-g="Todas"]').click()
     expect(page.locator(".promo")).to_have_class(re.compile("compact"))
-    expect(page.locator(".promo .promo-text")).to_be_hidden()
+    expect(page.locator(".promo-slide.current .promo-text")).to_be_hidden()
     page.locator('[data-g="Inicio"]').click()
     expect(page.locator(".promo")).not_to_have_class(re.compile("compact"))
-    page.locator(".promo a").click()
+    page.locator(".promo-slide.current a").click()
     expect(page).to_have_url(re.compile(r"/set/[0-9a-f-]{36}$"))
     expect(page.locator(".scope-head h2")).to_have_text("Beyond the Brave")
     expect(page.locator(".scope-products")).to_contain_text("Caja de sobres Beyond the Brave")
     expect(page.locator("#list [data-catalog-card]")).to_have_count(1)
-    expect(page.locator(".promo")).to_have_count(0)
+    # On the set's own page the banner shows the other sets.
+    expect(page.locator(".promo-slide h2", has_text="Beyond the Brave")).to_have_count(0)
     # From the card, its set name opens the set page again.
     page.locator("#list [data-catalog-card]").first.click()
     page.locator('.card-detail [data-scope="set"]').click()
@@ -889,8 +901,34 @@ def test_latest_set_banner_and_set_page(live_server, browser_page, factory, reco
     expect(page).to_have_url(re.compile(r"/$"))
     page.reload()
     expect(page.locator("#home h1")).to_be_visible()
-    expect(page.locator(".promo h2")).to_have_text("Beyond the Brave")
+    expect(page.locator(".promo-slide.current h2")).to_have_text("Beyond the Brave")
+    # OCG has its banner too, from its demo boxes when the catalogue has no OCG sets.
+    page.locator('[data-mk="OCG"]').click()
+    expect(page.locator(".promo-slide").first.locator(".promo-label")).to_contain_text("OCG")
     assert not errors
+
+
+def test_language_menu_with_flags(live_server, browser_page):
+    page = browser_page
+    page.goto(live_server)
+    button = page.locator("#lang-button")
+    expect(button).to_have_text("ES")
+    # At the far right of the header, after the account.
+    assert (
+        page.evaluate("document.querySelector('header .bar').lastElementChild.className")
+        == "lang-menu"
+    )
+    button.click()
+    options = page.locator("#lang-list [data-lang-pick]")
+    expect(options).to_have_text(["Español", "Português", "English"])
+    expect(options.first).to_have_attribute("aria-checked", "true")
+    expect(options.locator("svg")).to_have_count(3)
+    page.keyboard.press("Escape")
+    expect(page.locator("#lang-list")).to_be_hidden()
+    button.click()
+    options.nth(1).click()
+    expect(page.locator("html")).to_have_attribute("lang", "pt-BR")
+    expect(page.locator("#lang-button")).to_have_text("PT")
 
 
 def test_home_news_columns(live_server, browser_page, factory):

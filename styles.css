@@ -2377,27 +2377,40 @@ button.acc-avatar:hover,
     font-size: 14px;
 }
 
-/* Banner del último set (collections.js): fijo y grande, como el de Cardmarket.
-   Con foto (vista de prueba privada), la misma imagen va de fondo, tenue y
-   desenfocada, y nítida a la derecha. Un degradado oscuro bajo el texto lo
-   mantiene legible en los dos temas, con o sin foto. */
+/* Banner de los últimos sets (promo.js): fijo, grande y rotativo, como el de
+   Cardmarket. Las diapositivas están en fila y la fila se desliza (solo
+   transform, sin redibujar). Con foto (vista de prueba privada), la misma
+   imagen va de fondo, tenue y desenfocada, y nítida a la derecha; un degradado
+   oscuro bajo el texto lo mantiene legible en los dos temas. */
 .promo {
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 18px;
+    border: 1px solid rgba(var(--btn-line), .35);
+    border-radius: 16px;
+    color: #fff;
+    background: #0b2a4a;
+    box-shadow: 0 10px 32px rgba(var(--shade), .4);
+}
+
+.promo-track {
+    display: flex;
+    transition: transform .55s cubic-bezier(.22, .61, .36, 1);
+}
+
+.promo-slide {
     position: relative;
     isolation: isolate;
     overflow: hidden;
+    flex: 0 0 100%;
     display: flex;
     align-items: center;
     gap: 24px;
     min-height: 230px;
-    margin-bottom: 18px;
-    padding: 28px clamp(20px, 4vw, 48px);
-    border: 1px solid rgba(var(--btn-line), .35);
-    border-radius: 16px;
-    color: #fff;
+    padding: 28px clamp(20px, 4vw, 48px) 40px;
     background:
         radial-gradient(520px 260px at 85% 20%, rgba(255, 210, 110, .28), transparent 70%),
         linear-gradient(115deg, #0b2a4a 0%, #13507a 55%, #1d7f86 100%);
-    box-shadow: 0 10px 32px rgba(var(--shade), .4);
     transition: min-height .3s ease, padding .3s ease;
 }
 
@@ -2412,7 +2425,7 @@ button.acc-avatar:hover,
     filter: blur(3px) saturate(1.3);
 }
 
-.promo::after {
+.promo-slide::after {
     content: "";
     position: absolute;
     inset: 0;
@@ -2429,13 +2442,6 @@ button.acc-avatar:hover,
 
 .promo-label {
     grid-area: label;
-}
-
-.promo-text {
-    grid-area: text;
-}
-
-.promo-body small {
     color: rgba(255, 255, 255, .82);
     text-transform: uppercase;
     letter-spacing: .08em;
@@ -2444,17 +2450,18 @@ button.acc-avatar:hover,
 }
 
 .promo-body h2 {
+    grid-area: title;
     margin: 0;
     font-size: clamp(26px, 4.2vw, 42px);
     font-weight: 800;
     line-height: 1.05;
     text-transform: uppercase;
     text-shadow: 0 2px 10px rgba(0, 0, 0, .45);
-    grid-area: title;
     transition: font-size .3s ease;
 }
 
-.promo-body p {
+.promo-text {
+    grid-area: text;
     margin: 0;
     color: rgba(255, 255, 255, .9);
     font-size: 16px;
@@ -2465,7 +2472,7 @@ button.acc-avatar:hover,
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-top: 10px;
+    margin: 10px 0 0;
 }
 
 .promo .btn {
@@ -2498,9 +2505,73 @@ button.acc-avatar:hover,
     transition: height .3s ease;
 }
 
-/* En el catálogo: una franja de una línea con el nombre y «Ver el set». Solo
-   cambian tamaños y márgenes de este banner, una vez, en 0,3 s. */
-.promo.compact {
+/* Puntos para elegir una diapositiva y botón de pausa (WCAG 2.2.2). */
+.promo-controls {
+    position: absolute;
+    right: 18px;
+    bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.promo-dot {
+    width: 26px;
+    height: 4px;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, .4);
+    cursor: pointer;
+}
+
+.promo-dot[aria-current="true"] {
+    background: #fff;
+}
+
+/* Un área táctil mayor que la raya visible. */
+.promo-dot::before {
+    content: "";
+    display: block;
+    margin: -10px 0;
+    height: 24px;
+}
+
+.promo-pause {
+    width: 26px;
+    height: 26px;
+    margin-left: 6px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, .45);
+    border-radius: 50%;
+    /* Two white bars: «pausa». */
+    background-color: rgba(5, 12, 24, .35);
+    background-image: linear-gradient(#fff, #fff), linear-gradient(#fff, #fff);
+    background-repeat: no-repeat;
+    background-size: 3px 10px;
+    background-position: 8px center, 13px center;
+    cursor: pointer;
+}
+
+/* En pausa, el botón muestra «reproducir». */
+.promo-pause[aria-pressed="true"] {
+    background-image: none;
+}
+
+.promo-pause[aria-pressed="true"]::before {
+    content: "";
+    display: block;
+    margin-left: 9px;
+    border: 5px solid transparent;
+    border-left: 8px solid #fff;
+    border-right: 0;
+    width: 0;
+    height: 0;
+}
+
+/* En el catálogo: una franja de una línea con el nombre y el botón principal;
+   la rotación se detiene. Solo cambian tamaños de este banner, en 0,3 s. */
+.promo.compact .promo-slide {
     min-height: 0;
     padding-block: 10px;
 }
@@ -2520,7 +2591,8 @@ button.acc-avatar:hover,
 }
 
 .promo.compact .promo-text,
-.promo.compact .ghost {
+.promo.compact .ghost,
+.promo.compact .promo-controls {
     display: none;
 }
 
@@ -2537,23 +2609,39 @@ button.acc-avatar:hover,
     height: 52px;
 }
 
+/* En el teléfono, más bajo: sin la línea de contenido, para que el botón
+   principal del inicio siga a la vista sin desplazarse. */
+@media (max-width: 640px) {
+    .promo-slide {
+        min-height: 0;
+        padding: 16px 16px 30px;
+    }
+
+    .promo-body h2 {
+        font-size: 24px;
+    }
+
+    .promo-text,
+    .promo-art {
+        display: none;
+    }
+
+    .promo .promo-actions {
+        margin-top: 4px;
+    }
+
+    .promo-controls {
+        bottom: 8px;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
-    .promo,
+    .promo-track,
+    .promo-slide,
     .promo h2,
     .promo-art,
     .promo-art img {
         transition: none;
-    }
-}
-
-@media (max-width: 640px) {
-    .promo {
-        min-height: 0;
-        padding: 22px 18px;
-    }
-
-    .promo-art {
-        display: none;
     }
 }
 
@@ -2786,10 +2874,10 @@ button.acc-avatar:hover,
     .bar {
         position: relative;
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+        grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
         grid-template-areas:
-            "logo market market cart account"
-            "search search theme currency currency";
+            "logo market market market cart account"
+            "search search theme currency currency lang";
         gap: 8px 6px;
         padding: 8px 10px;
     }
@@ -2847,6 +2935,19 @@ button.acc-avatar:hover,
 
     .theme-toggle {
         grid-area: theme;
+    }
+
+    .lang-menu {
+        grid-area: lang;
+    }
+
+    .lang-button {
+        padding: 0 9px;
+    }
+
+    .lang-code,
+    .lang-chevron {
+        display: none;
     }
 }
 
@@ -2990,10 +3091,84 @@ button.acc-avatar:hover,
     line-height: 1;
 }
 
-/* Idioma: selector compacto en la cabecera (desde el teléfono, en el pie). */
-.bar > .lang-select {
+/* Idioma: bandera y código en el extremo derecho de la cabecera, con su menú
+   (frontend/js/language-menu.js). En el teléfono, solo la bandera. */
+.lang-menu {
+    position: relative;
     flex: none;
-    padding-right: 4px;
+}
+
+.lang-button {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 40px;
+    padding: 0 10px 0 9px;
+    border: 1px solid rgba(var(--btn-line), .45);
+    border-radius: 20px;
+    background: rgba(var(--tint), .06);
+    color: var(--tx);
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.lang-button:hover,
+.lang-button[aria-expanded="true"] {
+    border-color: var(--ac);
+}
+
+.lang-flag {
+    width: 24px;
+    height: 16px;
+    flex: none;
+    border-radius: 3px;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, .25);
+}
+
+.lang-chevron {
+    width: 12px;
+    height: 12px;
+    color: var(--mu);
+}
+
+.lang-list {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 10px);
+    z-index: 30;
+    display: grid;
+    gap: 2px;
+    min-width: 180px;
+    padding: 6px;
+    border-radius: 12px;
+    background: var(--pop-a);
+    box-shadow: 0 18px 50px rgba(var(--shade), .55);
+}
+
+.lang-list button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    color: var(--tx);
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.lang-list button:hover,
+.lang-list button:focus-visible {
+    background: rgba(var(--tint), .08);
+}
+
+.lang-list button[aria-checked="true"] {
+    color: var(--on-btn);
+    background: var(--btn);
+    font-weight: 600;
 }
 
 .lang-pick {
@@ -3004,11 +3179,6 @@ button.acc-avatar:hover,
     font-size: 13px;
 }
 
-@media (max-width: 760px) {
-    .bar > .lang-select {
-        display: none;
-    }
-}
 
 .acc-langs {
     display: flex;

@@ -336,11 +336,15 @@ function textHistoryHtml(card) {
         .join("");
 }
 
-// The visitor's language if the card has it, else the printing's.
+// Language names go in lowercase inside a Spanish or Portuguese sentence, not in English.
+const inSentence = (name) => (lang === "en" ? name : name.toLowerCase());
+
+// The visitor's language if the card has it; else English, else the printing's.
 function currentText(card, printing) {
     const texts = card.texts.filter((text) => text.is_current);
     return (
         texts.find((item) => item.language === lang) ||
+        texts.find((item) => item.language === "en") ||
         texts.find((item) => item.language === printing?.language) ||
         texts[0]
     );
@@ -348,11 +352,20 @@ function currentText(card, printing) {
 
 function cardTextHtml(text) {
     if (!text) return `<p class="catalog-status">${t("Texto vigente todavía no disponible.")}</p>`;
-    const title = `${text.is_official ? t("Texto oficial vigente") : t("Texto de catálogo")} · ${text.language}`;
+    const kind = text.is_official ? t("Texto oficial vigente") : t("Texto de catálogo");
+    const title = `${kind} · ${languageName(text.language)}`;
+    // Never translated here: when the card has no text in the page's language yet, say so.
+    const missing =
+        text.language === lang
+            ? ""
+            : `<p class="catalog-status">${t("Esta carta todavía no tiene su texto en {language}; se muestra en {shown}.", {
+                  language: inSentence(languageName(lang)),
+                  shown: inSentence(languageName(text.language))
+              })}</p>`;
     const pendulum = text.pendulum_text
         ? `<h4>${t("Efecto Péndulo")}</h4><p class="card-text">${h(text.pendulum_text)}</p>`
         : "";
-    return section(title, `<p class="card-text">${h(text.text)}</p>${pendulum}`);
+    return section(title, `${missing}<p class="card-text" lang="${h(text.language)}">${h(text.text)}</p>${pendulum}`);
 }
 
 // Who made the picture, under what terms, and where it comes from.

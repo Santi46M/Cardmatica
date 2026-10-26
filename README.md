@@ -102,6 +102,17 @@ alrededor de media hora; se puede cortar y retomar, solo baja las que faltan:
 docker compose exec api cardmatica preview-images --max-cards 1000
 ```
 
+El nombre y el texto de efecto de cada carta se muestran en el idioma de la página; si
+la carta todavía no lo tiene, se ven en inglés con un aviso (nunca se traducen acá). Para
+traerlos en portugués desde YGOPRODeck, para las cartas que aún no lo tienen:
+
+```bash
+docker compose exec api cardmatica card-texts pt --max-cards 1000
+```
+
+YGOPRODeck no tiene español: lo tiene Yugipedia (`card-texts es`), que pide revisar sus
+condiciones y activar `YUGIPEDIA_ENABLED=true` antes.
+
 Las fotos de los productos de la demo (boosters, cajas, fundas, deckboxes, binders, playmats,
 dados) salen de la página oficial de cada uno, listada en `backend/app/data/product_pages.json`
 (Konami, Dragon Shield, Ultra Pro, Ultimate Guard, Chessex y Yugipedia para los sets antiguos).

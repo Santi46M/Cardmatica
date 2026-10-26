@@ -356,9 +356,12 @@ def sets(
 LATEST_SET_MIN_CARDS = 5
 
 
-@router.get("/sets/latest", response_model=SetView)
-def latest_set(session: SessionDep, market: Market = "TCG"):
-    """The most recently released set of a market, for the home banner."""
+def recent_sets(session, market, limit):
+    """The newest released sets of a market, newest first, for the home banner.
+
+    Real sets (LATEST_SET_MIN_CARDS cards or more) come first; small ones (a
+    promo, a prize card) only fill the places left.
+    """
     cards = func.count(func.distinct(CardPrinting.card_id)).label("cards")
     counts = select(CardPrinting.set_id, cards).group_by(CardPrinting.set_id).subquery()
     query = (
@@ -370,14 +373,32 @@ def latest_set(session: SessionDep, market: Market = "TCG"):
             CardSet.release_date <= date.today(),
         )
         .order_by(CardSet.release_date.desc(), counts.c.cards.desc(), CardSet.name)
-        .limit(1)
     )
-    row = session.execute(query.where(counts.c.cards >= LATEST_SET_MIN_CARDS)).first()
-    row = row or session.execute(query).first()
-    if not row:
+    rows = session.execute(query.where(counts.c.cards >= LATEST_SET_MIN_CARDS).limit(limit)).all()
+    if len(rows) < limit:
+        chosen = {row[0].id for row in rows}
+        small = session.execute(query.limit(limit + len(rows))).all()
+        rows += [row for row in small if row[0].id not in chosen][: limit - len(rows)]
+    return [set_view(card_set, count, set_code(session, card_set.id)) for card_set, count in rows]
+
+
+@router.get("/sets/recent", response_model=list[SetView])
+def latest_sets(
+    session: SessionDep,
+    market: Market = "TCG",
+    limit: Annotated[int, Query(ge=1, le=8)] = 4,
+):
+    """The banner of the home page rotates through these."""
+    return recent_sets(session, market, limit)
+
+
+@router.get("/sets/latest", response_model=SetView)
+def latest_set(session: SessionDep, market: Market = "TCG"):
+    """The most recently released set of a market."""
+    found = recent_sets(session, market, 1)
+    if not found:
         raise HTTPException(404, "Ningún set con fecha de lanzamiento")
-    card_set, count = row
-    return set_view(card_set, count, set_code(session, card_set.id))
+    return found[0]
 
 
 @router.get("/sets/{set_id}", response_model=SetView)

@@ -100,10 +100,12 @@ def printing_view(printing):
 
 
 def card_summary(card, language="es", market=None):
+    # The visitor's language; if the card has no name in it, English.
     names = sorted(
         (name for name in card.names if name.is_current),
         key=lambda name: (
             name.language != language,
+            name.language != "en",
             not name.is_official,
             name.language,
             name.name,
