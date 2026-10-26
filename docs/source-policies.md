@@ -105,6 +105,15 @@ derechos y la interfaz marca cada ilustración así servida con un aviso de imag
 `cardmatica preview-images` descarga las ilustraciones generales de las cartas del catálogo con
 el mismo límite de una solicitud por segundo. No habilitarlo en un despliegue público.
 
+`cardmatica product-images` hace lo mismo con las fotos de los productos de la demo: lee la foto
+principal que declara cada página oficial de `backend/app/data/product_pages.json` (etiqueta
+`og:image`, o la imagen del cuadro de Yugipedia), respeta robots.txt, pide una página cada 5
+segundos (`PRODUCT_REQUEST_INTERVAL`) y solo acepta fotos del mismo sitio o de un CDN listado.
+Guarda una copia WebP de 480 px como máximo. Las fotos son de Konami y de cada marca y no tienen
+licencia: la API solo las sirve en la vista local (`/api/v1/product-images`, sin caché) y la
+tienda las marca con el aviso rojo. Para publicarlas hace falta permiso de cada titular o
+material de prensa con licencia de uso.
+
 ## Banlists
 
 Revisado: 2026-10-23. Las listas incluidas contienen únicamente nombres de cartas y su

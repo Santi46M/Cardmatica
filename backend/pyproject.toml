@@ -25,7 +25,7 @@ cardmatica = "app.cli:main"
 include = ["app*"]
 
 [tool.setuptools.package-data]
-app = ["data/banlists/*.json"]
+app = ["data/*.json", "data/banlists/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

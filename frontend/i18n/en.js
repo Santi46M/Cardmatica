@@ -300,6 +300,7 @@ I18N.add({
     "Filtros ({count})": "Filters ({count})",
     "Fin": "Finished",
     "Finalizar compra": "Check out",
+    "Foto provisional de la página oficial, sin licencia: visible solo en la vista de prueba privada. No publicar.": "Provisional photo from the official page, unlicensed: shown only in the private test preview. Do not publish.",
     "Francés": "French",
     "Fuente": "Source",
     "Fuente: {source}": "Source: {source}",

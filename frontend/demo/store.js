@@ -828,6 +828,54 @@ function productOrigin(product) {
     return product.set ? DEMO.sets[product.set].name : product.brand || "—";
 }
 
+// Fotos provisionales de los productos, de sus páginas oficiales. La API solo
+// las da en la vista de prueba privada con imágenes activadas
+// (backend/app/services/product_images.py); en cualquier otro caso la lista
+// llega vacía y cada producto muestra su ícono.
+var PRODUCT_PHOTOS = {};
+fetch("/api/v1/product-images")
+    .then((response) => (response.ok ? response.json() : {}))
+    .then((data) => {
+        PRODUCT_PHOTOS = data.images || {};
+        if (Object.keys(PRODUCT_PHOTOS).length && tab === "Productos") renderProducts();
+    })
+    .catch(() => {});
+
+const PHOTO_WARNING = () =>
+    t("Foto provisional de la página oficial, sin licencia: visible solo en la vista de prueba privada. No publicar.");
+
+function productIcon(product, big = false) {
+    return `<div class="thumb${big ? " big" : ""}" style="background:#3b4a6b"><i>${product.icon}</i></div>`;
+}
+
+// La foto del producto con su aviso, o su ícono si no hay foto.
+function productThumb(product, big = false) {
+    const photo = PRODUCT_PHOTOS[product.image];
+    if (!photo) return productIcon(product, big);
+    const size = big ? 220 : 54;
+    return `<span class="img-wrap"><img class="product-photo${big ? " big" : ""}" src="${escapeText(
+        photo
+    )}" alt="${big ? escapeText(productName(product)) : ""}" data-icon="${escapeText(product.icon)}" width="${size}" height="${size}" loading="lazy" decoding="async"><span class="img-warn"${
+        big ? ' tabindex="0"' : ""
+    } role="img" aria-label="${escapeText(PHOTO_WARNING())}" data-tip="${escapeText(PHOTO_WARNING())}">!</span></span>`;
+}
+
+// Una foto que no carga deja su lugar al ícono, sin aviso.
+document.addEventListener(
+    "error",
+    (event) => {
+        const photo = event.target;
+        if (!photo.matches?.(".product-photo")) return;
+        const icon = document.createElement("div");
+        icon.className = `thumb${photo.classList.contains("big") ? " big" : ""}`;
+        icon.style.background = "#3b4a6b";
+        icon.innerHTML = `<i>${escapeText(photo.dataset.icon)}</i>`;
+        photo.closest(".img-wrap").replaceWith(icon);
+    },
+    true
+);
+
+
 function inMarket(product) {
     return !product.market || product.market === market;
 }
@@ -846,7 +894,9 @@ function openProduct(id) {
         product
     )}<span class="chip">${t(product.category)}</span></div>${closeButton(
         "md"
-    )}</div><div class="facts" style="margin-bottom:10px">${facts}</div><div class="wrap"><table><thead><tr><th>${t("Vendedor")}</th><th>${t("Idioma")}</th><th>${t("Estado")}</th><th class="num">${t("Disp.")}</th><th class="num">${t("Precio")}</th><th></th></tr></thead><tbody id="pt"></tbody></table></div>`;
+    )}</div>${
+        PRODUCT_PHOTOS[product.image] ? `<div class="pd-photo">${productThumb(product, true)}</div>` : ""
+    }<div class="facts" style="margin-bottom:10px">${facts}</div><div class="wrap"><table><thead><tr><th>${t("Vendedor")}</th><th>${t("Idioma")}</th><th>${t("Estado")}</th><th class="num">${t("Disp.")}</th><th class="num">${t("Precio")}</th><th></th></tr></thead><tbody id="pt"></tbody></table></div>`;
     openDialog("p", id);
     renderProductOffers();
     byId("md").classList.add("on");
@@ -905,9 +955,7 @@ function renderProducts() {
                   const lowest = lowestPrice(offers);
                   return `<tr class="row" tabindex="0" data-pd="${
                       product.id
-                  }"><td><div class="nm"><div class="thumb" style="background:#3b4a6b"><i>${
-                      product.icon
-                  }</i></div><div><b>${escapeText(productName(product))}</b><small>${
+                  }"><td><div class="nm">${productThumb(product)}<div><b>${escapeText(productName(product))}</b><small>${
                       escapeText(productOrigin(product))
                   }</small></div></div></td><td>${productTag(product)}<span class="chip">${t(
                       product.category

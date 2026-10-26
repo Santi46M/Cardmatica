@@ -185,6 +185,11 @@ def main():
         help="Descargar ilustraciones de las cartas del catálogo para la vista local de prueba",
     )
     images.add_argument("--max-cards", type=int, default=100)
+    photos = commands.add_parser(
+        "product-images",
+        help="Descargar las fotos provisionales de los productos de la demo (solo vista local)",
+    )
+    photos.add_argument("--refresh", action="store_true", help="Volver a descargar todas")
     commands.add_parser(
         "cleanup", help="Borrar sesiones vencidas y enlaces de correo usados o vencidos"
     )
@@ -207,6 +212,12 @@ def main():
         if not 1 <= args.max_cards <= 5000:
             parser.error("max-cards debe estar entre 1 y 5000")
         return preview_images(args.max_cards)
+    if args.command == "product-images":
+        from app.services.product_images import download_all
+
+        result = asyncio.run(download_all(get_settings(), refresh=args.refresh))
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 1 if result["failed"] and not result["saved"] and not result["kept"] else 0
     if args.command == "cleanup":
         with session_factory().begin() as session:
             print(json.dumps(remove_expired(session)))

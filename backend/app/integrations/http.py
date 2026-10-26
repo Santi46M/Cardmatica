@@ -90,6 +90,7 @@ class PoliteHttpClient:
             "yugipedia": settings.yugipedia_request_interval,
             "konami": settings.konami_request_interval,
             "news": settings.news_request_interval,
+            "products": settings.product_request_interval,
         }[source]
         self.allowed_hosts = {
             "ygoprodeck": {"db.ygoprodeck.com", "images.ygoprodeck.com"},
@@ -100,6 +101,9 @@ class PoliteHttpClient:
                 urlsplit(feed.rpartition("|")[2].strip()).hostname for feed in settings.news_feeds
             }
             | {"api.github.com"},
+            # Pages from app/data/product_pages.json; the service adds each
+            # page's own image host once it has checked it.
+            "products": set(),
         }[source]
         self.client = httpx.AsyncClient(
             timeout=settings.http_timeout,
@@ -119,6 +123,11 @@ class PoliteHttpClient:
             raise AccessDenied("Konami requiere autorización escrita de extracción y uso comercial")
         if self.source == "news" and not self.settings.news_enabled:
             raise AccessDenied("Noticias externas deshabilitadas en la configuración")
+        if self.source == "products" and not self.settings.local_image_preview:
+            raise AccessDenied(
+                "Las fotos de productos son solo para la vista local: activar "
+                "DEPLOYMENT_MODE=local y ALLOW_LOCAL_IMAGE_PREVIEW=true"
+            )
         if self.source == "yugipedia" and not self.settings.yugipedia_enabled:
             raise AccessDenied(
                 "Yugipedia deshabilitada: revisar políticas y configurar el servicio"

@@ -167,42 +167,44 @@ DEMO.sellers = [
 // "brand" es la marca de un accesorio o de un producto sellado sin set;
 // "released" vale solo si el producto salió en otra fecha que su set.
 // "detail" es el contenido según el fabricante; "basePrice" está en euros
-// (inventado) e "icon" se muestra como miniatura.
+// (inventado). "image" es la clave de su página oficial en
+// backend/app/data/product_pages.json: con la vista local de imágenes activada
+// se muestra su foto provisional; si no, "icon" hace de miniatura.
 DEMO.productCategories = {
     "Producto sellado": ["Caja de sobres", "Sobre", "Mazo", "Colección"],
     Accesorios: ["Fundas", "Deckbox", "Binder", "Páginas de binder", "Playmat", "Dados"]
 };
 DEMO.products = [
-    { name: "Caja de sobres {set}", category: "Caja de sobres", set: "BETB", market: "TCG", detail: "24 sobres de 9 cartas · 100 cartas en el set", basePrice: 85, icon: "📦" },
-    { name: "Sobre {set}", category: "Sobre", set: "BETB", market: "TCG", detail: "9 cartas", basePrice: 4.2, icon: "🎴" },
-    { name: "Caja {set} (japonés)", category: "Caja de sobres", set: "BETB", market: "OCG", released: "2026-07-18", detail: "Edición japonesa", basePrice: 70, icon: "📦" },
-    { name: "{set}", category: "Caja de sobres", set: "MAMO", market: "TCG", detail: "3 sobres de 5 cartas y 3 Secret Rare, que pueden ser Starlight Rare · 126 cartas en el set", basePrice: 40, icon: "📦" },
-    { name: "Caja de sobres {set}", category: "Caja de sobres", set: "CORI", market: "TCG", detail: "24 sobres de 9 cartas · 100 cartas en el set", basePrice: 80, icon: "📦" },
-    { name: "Sobre {set}", category: "Sobre", set: "CORI", market: "TCG", detail: "9 cartas", basePrice: 4, icon: "🎴" },
-    { name: "Caja de sobres {set}", category: "Caja de sobres", set: "BLZD", market: "TCG", detail: "24 sobres de 9 cartas · 100 cartas en el set", basePrice: 78, icon: "📦" },
-    { name: "Caja de sobres {set}", category: "Caja de sobres", set: "RA05", market: "TCG", detail: "24 sobres de 5 cartas, todas foil; la quinta es de arte alternativo", basePrice: 120, icon: "📦" },
-    { name: "Sobre {set}", category: "Sobre", set: "BPRO", market: "TCG", detail: "100 cartas en el set, 25 de ellas Starlight Rare", basePrice: 4, icon: "🎴" },
-    { name: "Legendary Arc-V Decks", brand: "Konami", category: "Colección", market: "TCG", released: "2026-08-07", detail: "3 mazos de 55 cartas, cada uno con 6 Ultra Rare y 1 Secret Rare, y un sobre extra con una Secret Rare", basePrice: 30, icon: "🗃️" },
-    { name: "Legendary Modern Decks 2026", brand: "Konami", category: "Colección", market: "TCG", released: "2026-03-13", detail: "3 mazos de 55 cartas: Sky Striker, X-Saber y Mitsurugi", basePrice: 30, icon: "🗃️" },
-    { name: "The Chronicles Deck: Spirit Charmers", brand: "Konami", category: "Mazo", market: "TCG", released: "2026-01-23", detail: "Mazo de 51 cartas, todas foil; la 51.ª puede ser Starlight Rare", basePrice: 19, icon: "🃏" },
-    { name: "Caja {set} (japonés)", category: "Caja de sobres", set: "RC04", market: "OCG", detail: "Edición japonesa", basePrice: 110, icon: "📦" },
-    { name: "{set}", category: "Colección", set: "KACB", market: "TCG", detail: "Caja de coleccionista de 2017", basePrice: 60, icon: "🗃️" },
-    { name: "{set}", category: "Mazo", set: "SDK", market: "TCG", detail: "Mazo de 50 cartas de 2002", basePrice: 90, icon: "🃏" },
-    { name: "{set}", category: "Mazo", set: "SDY", market: "TCG", detail: "Mazo de 50 cartas de 2002", basePrice: 90, icon: "🃏" },
-    { name: "Dragon Shield Matte Japanese Size Sleeves (60)", brand: "Dragon Shield", category: "Fundas", detail: "60 fundas mate para cartas de tamaño japonés (59 × 86 mm), como las de Yu-Gi-Oh!", basePrice: 9, icon: "🛡️" },
-    { name: "Ultimate Guard Katana Sleeves Japanese Size (60)", brand: "Ultimate Guard", category: "Fundas", detail: "60 fundas de tamaño japonés", basePrice: 8, icon: "🛡️" },
-    { name: "Ultra Pro Eclipse Matte Small Sleeves (60)", brand: "Ultra Pro", category: "Fundas", detail: "60 fundas mate de 62 × 89 mm para cartas pequeñas, como las de Yu-Gi-Oh!", basePrice: 7, icon: "🛡️" },
-    { name: "Card Sleeves Jaden & Yubel", brand: "Konami", category: "Fundas", released: "2025-01-24", detail: "50 fundas oficiales", basePrice: 5, icon: "🛡️" },
-    { name: "Dragon Shield Nest 100", brand: "Dragon Shield", category: "Deckbox", detail: "115 cartas con una funda o 100 con doble funda; cierre magnético; tamaño estándar y japonés", basePrice: 6, icon: "🧳" },
-    { name: "Dragon Shield Deck Shell", brand: "Dragon Shield", category: "Deckbox", detail: "100 cartas con una funda u 80 con doble funda", basePrice: 12, icon: "🧳" },
-    { name: "Card Case Yugi & Kaiba Quarter Century", brand: "Konami", category: "Deckbox", detail: "Caben el Main, el Extra y el Side Deck; con separador", basePrice: 5, icon: "🧳" },
-    { name: "Dragon Shield Card Codex Zipster Small", brand: "Dragon Shield", category: "Binder", detail: "20 páginas de 8 bolsillos con carga lateral y cierre de cremallera", basePrice: 25, icon: "📒" },
-    { name: "Ultra Pro Zippered PRO-Binder 9-Pocket", brand: "Ultra Pro", category: "Binder", detail: "20 páginas de 9 bolsillos con carga lateral; hasta 360 cartas enfundadas", basePrice: 28, icon: "📒" },
-    { name: "Gold Pride Duelist Portfolio", brand: "Konami", category: "Binder", released: "2023-07-28", detail: "10 páginas de 9 bolsillos con carga lateral", basePrice: 10, icon: "📒" },
-    { name: "Dragon Shield 18-Pocket Pages Japanese Size (50)", brand: "Dragon Shield", category: "Páginas de binder", detail: "50 páginas de 18 bolsillos con carga lateral, para cartas de tamaño japonés", basePrice: 20, icon: "📄" },
-    { name: "Game Mat Jaden & Yubel", brand: "Konami", category: "Playmat", released: "2025-01-24", detail: "Playmat oficial", basePrice: 17, icon: "🟦" },
-    { name: "Gold Pride Playmat", brand: "Konami", category: "Playmat", released: "2023-07-28", detail: "Del tamaño de los playmats de premio de los torneos de Konami", basePrice: 17, icon: "🟦" },
-    { name: "Chessex Opaque 12mm d6 Dice Block (36)", brand: "Chessex", category: "Dados", detail: "36 dados de seis caras de 12 mm", basePrice: 12, icon: "🎲" }
+    { name: "Caja de sobres {set}", category: "Caja de sobres", set: "BETB", market: "TCG", detail: "24 sobres de 9 cartas · 100 cartas en el set", basePrice: 85, image: "betb", icon: "📦" },
+    { name: "Sobre {set}", category: "Sobre", set: "BETB", market: "TCG", detail: "9 cartas", basePrice: 4.2, image: "betb", icon: "🎴" },
+    { name: "Caja {set} (japonés)", category: "Caja de sobres", set: "BETB", market: "OCG", released: "2026-07-18", detail: "Edición japonesa", basePrice: 70, image: "betb", icon: "📦" },
+    { name: "{set}", category: "Caja de sobres", set: "MAMO", market: "TCG", detail: "3 sobres de 5 cartas y 3 Secret Rare, que pueden ser Starlight Rare · 126 cartas en el set", basePrice: 40, image: "mamo", icon: "📦" },
+    { name: "Caja de sobres {set}", category: "Caja de sobres", set: "CORI", market: "TCG", detail: "24 sobres de 9 cartas · 100 cartas en el set", basePrice: 80, image: "cori", icon: "📦" },
+    { name: "Sobre {set}", category: "Sobre", set: "CORI", market: "TCG", detail: "9 cartas", basePrice: 4, image: "cori", icon: "🎴" },
+    { name: "Caja de sobres {set}", category: "Caja de sobres", set: "BLZD", market: "TCG", detail: "24 sobres de 9 cartas · 100 cartas en el set", basePrice: 78, image: "blzd", icon: "📦" },
+    { name: "Caja de sobres {set}", category: "Caja de sobres", set: "RA05", market: "TCG", detail: "24 sobres de 5 cartas, todas foil; la quinta es de arte alternativo", basePrice: 120, image: "ra05", icon: "📦" },
+    { name: "Sobre {set}", category: "Sobre", set: "BPRO", market: "TCG", detail: "100 cartas en el set, 25 de ellas Starlight Rare", basePrice: 4, image: "bpro", icon: "🎴" },
+    { name: "Legendary Arc-V Decks", brand: "Konami", category: "Colección", market: "TCG", released: "2026-08-07", detail: "3 mazos de 55 cartas, cada uno con 6 Ultra Rare y 1 Secret Rare, y un sobre extra con una Secret Rare", basePrice: 30, image: "legendary-arc-v-decks", icon: "🗃️" },
+    { name: "Legendary Modern Decks 2026", brand: "Konami", category: "Colección", market: "TCG", released: "2026-03-13", detail: "3 mazos de 55 cartas: Sky Striker, X-Saber y Mitsurugi", basePrice: 30, image: "legendary-modern-decks-2026", icon: "🗃️" },
+    { name: "The Chronicles Deck: Spirit Charmers", brand: "Konami", category: "Mazo", market: "TCG", released: "2026-01-23", detail: "Mazo de 51 cartas, todas foil; la 51.ª puede ser Starlight Rare", basePrice: 19, image: "chronicles-spirit-charmers", icon: "🃏" },
+    { name: "Caja {set} (japonés)", category: "Caja de sobres", set: "RC04", market: "OCG", detail: "Edición japonesa", basePrice: 110, image: "rc04", icon: "📦" },
+    { name: "{set}", category: "Colección", set: "KACB", market: "TCG", detail: "Caja de coleccionista de 2017", basePrice: 60, image: "kacb", icon: "🗃️" },
+    { name: "{set}", category: "Mazo", set: "SDK", market: "TCG", detail: "Mazo de 50 cartas de 2002", basePrice: 90, image: "sdk", icon: "🃏" },
+    { name: "{set}", category: "Mazo", set: "SDY", market: "TCG", detail: "Mazo de 50 cartas de 2002", basePrice: 90, image: "sdy", icon: "🃏" },
+    { name: "Dragon Shield Matte Japanese Size Sleeves (60)", brand: "Dragon Shield", category: "Fundas", detail: "60 fundas mate para cartas de tamaño japonés (59 × 86 mm), como las de Yu-Gi-Oh!", basePrice: 9, image: "dragon-shield-matte-japanese", icon: "🛡️" },
+    { name: "Ultimate Guard Katana Sleeves Japanese Size (60)", brand: "Ultimate Guard", category: "Fundas", detail: "60 fundas de tamaño japonés", basePrice: 8, image: "katana-japanese", icon: "🛡️" },
+    { name: "Ultra Pro Eclipse Matte Small Sleeves (60)", brand: "Ultra Pro", category: "Fundas", detail: "60 fundas mate de 62 × 89 mm para cartas pequeñas, como las de Yu-Gi-Oh!", basePrice: 7, image: "eclipse-matte-small", icon: "🛡️" },
+    { name: "Card Sleeves Jaden & Yubel", brand: "Konami", category: "Fundas", released: "2025-01-24", detail: "50 fundas oficiales", basePrice: 5, image: "jaden-yubel-sleeves", icon: "🛡️" },
+    { name: "Dragon Shield Nest 100", brand: "Dragon Shield", category: "Deckbox", detail: "115 cartas con una funda o 100 con doble funda; cierre magnético; tamaño estándar y japonés", basePrice: 6, image: "nest-100", icon: "🧳" },
+    { name: "Dragon Shield Deck Shell", brand: "Dragon Shield", category: "Deckbox", detail: "100 cartas con una funda u 80 con doble funda", basePrice: 12, image: "deck-shell", icon: "🧳" },
+    { name: "Card Case Yugi & Kaiba Quarter Century", brand: "Konami", category: "Deckbox", detail: "Caben el Main, el Extra y el Side Deck; con separador", basePrice: 5, image: "yugi-kaiba-card-case", icon: "🧳" },
+    { name: "Dragon Shield Card Codex Zipster Small", brand: "Dragon Shield", category: "Binder", detail: "20 páginas de 8 bolsillos con carga lateral y cierre de cremallera", basePrice: 25, image: "zipster-small", icon: "📒" },
+    { name: "Ultra Pro Zippered PRO-Binder 9-Pocket", brand: "Ultra Pro", category: "Binder", detail: "20 páginas de 9 bolsillos con carga lateral; hasta 360 cartas enfundadas", basePrice: 28, image: "pro-binder-9", icon: "📒" },
+    { name: "Gold Pride Duelist Portfolio", brand: "Konami", category: "Binder", released: "2023-07-28", detail: "10 páginas de 9 bolsillos con carga lateral", basePrice: 10, image: "gold-pride-portfolio", icon: "📒" },
+    { name: "Dragon Shield 18-Pocket Pages Japanese Size (50)", brand: "Dragon Shield", category: "Páginas de binder", detail: "50 páginas de 18 bolsillos con carga lateral, para cartas de tamaño japonés", basePrice: 20, image: "dragon-shield-18-pocket-japanese", icon: "📄" },
+    { name: "Game Mat Jaden & Yubel", brand: "Konami", category: "Playmat", released: "2025-01-24", detail: "Playmat oficial", basePrice: 17, image: "jaden-yubel-game-mat", icon: "🟦" },
+    { name: "Gold Pride Playmat", brand: "Konami", category: "Playmat", released: "2023-07-28", detail: "Del tamaño de los playmats de premio de los torneos de Konami", basePrice: 17, image: "gold-pride-game-mat", icon: "🟦" },
+    { name: "Chessex Opaque 12mm d6 Dice Block (36)", brand: "Chessex", category: "Dados", detail: "36 dados de seis caras de 12 mm", basePrice: 12, image: "chessex-12mm-d6", icon: "🎲" }
 ];
 
 // Monedas del selector: primero las del Mercosur, por país, y después las

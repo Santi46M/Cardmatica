@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     yugipedia_enabled: bool = False
     yugipedia_request_interval: float = Field(default=1.0, ge=1.0)
     konami_request_interval: float = Field(default=2.0, ge=1.0)
+    # Pause between requests to the product pages of product_pages.json.
+    product_request_interval: float = Field(default=5.0, ge=1.0)
     http_timeout: float = Field(default=25, gt=0)
     http_retries: int = Field(default=3, ge=0, le=8)
     cache_directory: Path = ROOT / ".cache/http"

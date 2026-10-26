@@ -94,6 +94,18 @@ alrededor de media hora; se puede cortar y retomar, solo baja las que faltan:
 docker compose exec api cardmatica preview-images --max-cards 1000
 ```
 
+Las fotos de los productos de la demo (boosters, cajas, fundas, deckboxes, binders, playmats,
+dados) salen de la página oficial de cada uno, listada en `backend/app/data/product_pages.json`
+(Konami, Dragon Shield, Ultra Pro, Ultimate Guard, Chessex y Yugipedia para los sets antiguos).
+Con la misma vista provisional activada, bajan con (unos 3 minutos; una página cada 5 segundos):
+
+```bash
+docker compose exec api cardmatica product-images
+```
+
+Las que ya bajó no las vuelve a pedir (`--refresh` las renueva). Si una página falla, el comando
+dice cuál y ese producto sigue con su ícono; para cambiar de foto, cambiar su dirección en el JSON.
+
 El Codespace activa esa vista al crearse (`backend/scripts/enable_preview_images.py`, que
 acepta el dominio privado `.app.github.dev`). En un Codespace creado antes, ejecutar ese script
 y luego `docker compose up -d api`. Cada imagen así mostrada lleva un aviso rojo «!» que explica

@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import func, select
 
 from app.api.dependencies import SessionDep
@@ -32,6 +32,7 @@ from app.schemas.catalog import (
     PrintingView,
     SetView,
 )
+from app.services import product_images as product_photos
 from app.services import rarities
 from app.services.banlists import current_lists, list_view, statuses_for_cards
 from app.services.card_types import ATTRIBUTES, RACES, taxonomy
@@ -426,20 +427,21 @@ def image(image_id: UUID, session: SessionDep, thumbnail: bool = False):
     )
 
 
+def local_preview(request: Request) -> bool:
+    """Whether provisional, unlicensed pictures may be shown for this request."""
+    settings = get_settings()
+    # Codespaces forwards the private port under its own domain.
+    forwarded = request.headers.get("x-forwarded-host", "").split(",")[0].strip()
+    host = forwarded.rsplit(":", 1)[0] if forwarded else request.url.hostname
+    return settings.local_image_preview and settings.is_preview_host(host)
+
+
 @router.get("/artworks/{image_id}", tags=["Imágenes"])
 def artwork(image_id: UUID, request: Request, session: SessionDep, thumbnail: bool = False):
     row = session.get(CardArtwork, image_id)
     settings = get_settings()
     commercial = row and row.rights_status == "approved" and bool(row.authorization_reference)
-    # Codespaces forwards the private port under its own domain.
-    forwarded = request.headers.get("x-forwarded-host", "").split(",")[0].strip()
-    forwarded_host = forwarded.rsplit(":", 1)[0] if forwarded else None
-    local = settings.local_image_preview and (
-        settings.is_preview_host(request.url.hostname)
-        if not forwarded_host
-        else settings.is_preview_host(forwarded_host)
-    )
-    if not row or row.rights_status == "denied" or not (commercial or local):
+    if not row or row.rights_status == "denied" or not (commercial or local_preview(request)):
         raise HTTPException(404, "Ilustración no disponible para este uso")
     relative = row.thumbnail_path if thumbnail else row.local_path
     root = settings.image_directory.resolve()
@@ -457,3 +459,26 @@ def artwork(image_id: UUID, request: Request, session: SessionDep, thumbnail: bo
             else "local-preview-only",
         },
     )
+
+
+# Not stored by browsers or proxies: they only exist on a private preview.
+PREVIEW_ONLY = {"Cache-Control": "private, no-store", "X-Image-Usage": "local-preview-only"}
+
+
+@router.get("/product-images", tags=["Imágenes"])
+def product_images(request: Request):
+    """Addresses of the provisional demo product photos; empty outside the local preview."""
+    if not local_preview(request):
+        return JSONResponse({"images": {}}, headers=PREVIEW_ONLY)
+    keys = sorted(product_photos.read_index(get_settings()))
+    return JSONResponse(
+        {"images": {key: f"/api/v1/product-images/{key}" for key in keys}}, headers=PREVIEW_ONLY
+    )
+
+
+@router.get("/product-images/{key}", tags=["Imágenes"])
+def product_image(key: str, request: Request):
+    path = product_photos.stored_file(get_settings(), key) if local_preview(request) else None
+    if not path:
+        raise HTTPException(404, "Foto de producto no disponible para este uso")
+    return FileResponse(path, media_type="image/webp", headers=PREVIEW_ONLY)

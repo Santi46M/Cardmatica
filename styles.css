@@ -2955,3 +2955,22 @@ button.acc-avatar:hover,
 .check a {
     color: var(--ac);
 }
+
+/* Fotos provisionales de productos de la demo (solo vista de prueba privada) */
+.product-photo {
+    width: 54px;
+    height: 54px;
+    object-fit: contain;
+    border-radius: 4px;
+    background: rgba(var(--tint), .06);
+}
+
+.product-photo.big {
+    width: 220px;
+    height: 220px;
+    border-radius: 8px;
+}
+
+.pd-photo {
+    margin-bottom: 12px;
+}
