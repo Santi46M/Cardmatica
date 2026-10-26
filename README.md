@@ -305,49 +305,23 @@ autor y licencia cuando se conocen. No se inventa autor ni licencia ausentes.
 La vista local de ilustraciones solo acepta hosts localhost/127.0.0.1/::1; Docker
 publica el puerto únicamente en loopback. Deshabilitarla al desplegar públicamente.
 
-### Fotos por impresión: orden, vendedores y moderación
+### Imágenes del catálogo: de la más a la menos específica
 
-Cada impresión puede tener varias imágenes (`card_images.source_slug`). La ficha
-muestra la primera disponible en este orden:
+La ficha muestra la imagen más específica de la impresión elegida:
 
-1. **staff**: una foto o un escaneo propio de Cardmática.
-2. **yugipedia**: el escaneo de la galería, asociado con la regla anterior. Se reconocen
-   todas las rarezas de `app/services/rarities.py` (QCScR, PScR, StR, CR…). Los escaneos
-   OCG no llevan edición y se asocian con la edición `not_applicable`; los TCG siguen
-   exigiendo 1E/UE/LE.
-3. **seller**: una foto que envió un vendedor desde la ficha («Subir foto de esta
-   impresión»). Entra como `pending` y no se muestra ni aparece en la API pública hasta
-   que un moderador la aprueba indicando qué permiso la cubre.
-4. **Respaldo**: sin ninguna de las anteriores, la ilustración general de la carta con la
-   rareza de la impresión elegida dibujada encima (y su aviso de ilustración general).
+1. **Escaneo de la impresión exacta** (set, rareza, idioma y edición), hoy de la galería
+   de Yugipedia con la regla anterior. Se reconocen todas las rarezas de
+   `app/services/rarities.py` (QCScR, PScR, StR, CR…). Los escaneos OCG no llevan edición
+   y se asocian con la edición `not_applicable`; los TCG siguen exigiendo 1E/UE/LE.
+2. **Ilustración general** de la carta, con la rareza de la impresión elegida dibujada
+   encima y el aviso de que no verifica rareza, edición ni set.
 
-Son fotos de la impresión en sí. La foto de la copia que cada vendedor tiene a la venta,
-para mostrar su estado, irá con su publicación cuando exista el mercado.
+Cada nivel sigue sujeto a su permiso: sin referencia de autorización no se sirve. Otra
+fuente de escaneos se agrega como un nuevo `source_slug` cuando sus condiciones lo
+permitan (ver `docs/source-policies.md`).
 
-Las fotos se decodifican y se vuelven a guardar como PNG (máx. 8 MB, PNG/JPEG/WebP): nunca
-se sirve el archivo enviado. Cada cuenta puede tener hasta 20 fotos esperando revisión.
-Las revisan las cuentas con rol `moderator` o `admin` desde el panel («Fotos de vendedores
-por revisar»), o por consola:
-
-```bash
-cardmatica photo-upload UUID_IMPRESION foto.jpg     # foto propia (staff), también pendiente
-cardmatica photo-pending
-cardmatica photo-review UUID_IMAGEN approved --authorization-reference "Términos de subida v1"
-cardmatica photo-review UUID_IMAGEN rejected --note "Foto borrosa"
-```
-
-```text
-POST /api/v1/account/photos/{printing_id}         vendedor con sesión (cuerpo image/png|jpeg|webp)
-GET  /api/v1/account/photos                       las fotos que envió y su estado
-GET  /api/v1/admin/images/pending                 moderador o admin
-GET  /api/v1/admin/images/{image_id}/file         vista previa para moderar
-POST /api/v1/admin/images/{image_id}/review       {"decision", "authorization_reference", "note"}
-POST /api/v1/admin/images/printings/{printing_id} foto propia (staff)
-```
-
-Qué permiso cubre una foto de vendedor (por ejemplo, la licencia que el vendedor concede
-al aceptar unos términos de subida) es una decisión legal pendiente: el sistema solo
-guarda la referencia que indique quien la aprueba. El arte sigue siendo de Konami.
+Las fotos que suba cada vendedor no son imágenes del catálogo: irán adjuntas a su
+propia publicación (su copia, para mostrar el estado) cuando exista el mercado.
 
 ## Banlist, historial de precios, listas de deseados y perfil
 

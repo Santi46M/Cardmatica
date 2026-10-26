@@ -96,12 +96,29 @@ Galerías ambiguas, edición/arte desconocidos o metadatos insuficientes se regi
 para revisión. Se descargaron ilustraciones generales de YGOPRODeck para la
 prueba local; no se descargaron ni aprobaron escaneos de Yugipedia.
 
-Las fotos que envían vendedores o el equipo (`source_slug` seller o staff) siguen las
-mismas reglas: entran `pending` y `unverified`, y solo se sirven con
-`review_status=approved`, `rights_status=approved` y una referencia de permiso.
-Rechazarlas las deja `denied`. Esa referencia cubre la foto, no el arte de la carta:
-antes de abrir las subidas al público hay que definir la base legal (términos de
-subida) con asesoramiento.
+### Otras fuentes de escaneos por rareza
+
+Revisado: 2026-10-26. Ninguna alternativa ofrece hoy escaneos por impresión con
+condiciones claras para un sitio comercial:
+
+- **Cardmarket API**: no acepta solicitudes de acceso nuevas y prohíbe compartir
+  credenciales con terceros (https://help.cardmarket.com/en/cardmarket-api).
+- **TCGplayer API**: el alta de desarrolladores está cerrada al público; el acceso queda
+  para cuentas existentes y socios aprobados (https://docs.tcgplayer.com/docs/getting-started).
+- **YGOPRODeck**: solo ilustraciones generales por arte, no por rareza.
+- **Konami**: sin API pública; sus términos exigen permiso escrito para uso comercial.
+- **Yugipedia**: la única con escaneos por impresión, publicados bajo uso justo; su
+  licencia CC BY-SA cubre el texto, no el arte de Konami.
+
+Vías posibles: pedir permiso por escrito a Yugipedia para usar sus escaneos con atribución,
+o una licencia de Konami. Hasta entonces cada escaneo necesita su referencia de permiso.
+
+### Fotos de vendedores
+
+Las fotos que suba un vendedor van con su publicación (la copia en venta), no con el
+catálogo. Al implementarlas: decodificarlas y volver a codificarlas (como `_save`),
+limitar tamaño y formato, y definir en los términos de subida la licencia que el vendedor
+concede sobre su foto. El arte de la carta sigue siendo de Konami.
 
 ## Vista provisional de imágenes en desarrollo
 
