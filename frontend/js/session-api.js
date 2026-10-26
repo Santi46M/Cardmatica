@@ -15,16 +15,18 @@ export function hasSession() {
     return Boolean(csrfToken());
 }
 
-export async function request(path, { method = "GET", body } = {}) {
+// file: a File or Blob (a photo); it is sent as is, with its own type.
+export async function request(path, { method = "GET", body, file } = {}) {
+    const type = file ? { "Content-Type": file.type } : body ? { "Content-Type": "application/json" } : {};
     const response = await fetch(path, {
         method,
         credentials: "same-origin",
         headers: {
             Accept: "application/json",
-            ...(body ? { "Content-Type": "application/json" } : {}),
+            ...type,
             ...(method !== "GET" ? { "X-CSRF-Token": csrfToken() } : {})
         },
-        body: body ? JSON.stringify(body) : undefined
+        body: file || (body ? JSON.stringify(body) : undefined)
     });
     if (response.status === 204) return null;
     let data = null;

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from uuid import UUID
 
 from sqlalchemy import (
@@ -6,6 +6,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -134,9 +135,33 @@ class CardPrinting(Entity, Base):
 
 
 class CardImage(Entity, Base):
+    """Image of one specific printing (set, code, rarity, language and edition).
+
+    Shown in this order: staff, then Yugipedia, then a seller's photo
+    (app/services/images.py). Uploads start pending and are never served until a
+    moderator approves them; the rights rules apply to every source.
+    """
+
     __tablename__ = "card_images"
-    __table_args__ = (UniqueConstraint("printing_id", "source_url"),)
+    __table_args__ = (
+        UniqueConstraint("printing_id", "source_url"),
+        CheckConstraint(
+            "source_slug IN ('staff', 'yugipedia', 'seller')", name="valid_image_source"
+        ),
+        CheckConstraint(
+            "review_status IN ('pending', 'approved', 'rejected')", name="valid_review_status"
+        ),
+    )
     printing_id: Mapped[UUID] = mapped_column(ForeignKey("card_printings.id"), index=True)
+    source_slug: Mapped[str] = mapped_column(String(20), default="yugipedia")
+    review_status: Mapped[str] = mapped_column(String(20), default="approved", index=True)
+    # The account that sent an upload; kept empty if that account is deleted.
+    uploaded_by_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    reviewed_by: Mapped[str | None] = mapped_column(String(254))
+    review_note: Mapped[str | None] = mapped_column(Text)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     source_url: Mapped[str] = mapped_column(Text)
     file_title: Mapped[str] = mapped_column(String(300))
     author: Mapped[str | None] = mapped_column(Text)

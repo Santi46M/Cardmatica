@@ -10,7 +10,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.base import utcnow
-from app.models import Card, CardPrinting, CardSet, Rarity
+from app.models import Card, CardImage, CardPrinting, CardSet, Rarity
 from app.models.accounts import User, UserProfile, UserSession, Wantlist, WantlistItem
 from app.schemas.accounts import (
     AccountData,
@@ -202,6 +202,15 @@ def export(session: Session, user: User) -> dict:
         "preferences": data.preferences.model_dump(),
         "wantlists": wantlists(session, user).model_dump(mode="json"),
         "viewed_cards": [str(card_id) for card_id in card_views.recent_ids(session, user)],
+        # Catalogue photos the person sent; the files are kept for the catalogue.
+        "photos": [
+            {
+                "printing_id": str(row.printing_id),
+                "review_status": row.review_status,
+                "sent_at": _iso(row.created_at),
+            }
+            for row in session.scalars(select(CardImage).where(CardImage.uploaded_by_id == user.id))
+        ],
         "sessions": [
             {
                 "started_at": _iso(row.created_at),

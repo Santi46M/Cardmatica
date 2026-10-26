@@ -30,10 +30,20 @@ from app.schemas.catalog import (
 from app.services import rarities
 from app.services.banlists import card_statuses
 from app.services.card_types import normalize_kind
+from app.services.images import displayable, ranked_images
+
+
+def public_images(images):
+    """A printing's images in display order. Uploads not yet approved stay private."""
+    return [
+        image
+        for image in ranked_images(images)
+        if image.source_slug == "yugipedia" or displayable(image)
+    ]
 
 
 def image_view(image):
-    approved = image.rights_status == "approved" and bool(image.authorization_reference)
+    approved = displayable(image)
     available = approved and bool(image.local_path)
     return ImageView(
         id=image.id,
@@ -46,6 +56,7 @@ def image_view(image):
         license=image.license,
         license_url=image.license_url,
         rights_status=image.rights_status,
+        source=image.source_slug,
         fallback_reason=None
         if available
         else "Imagen pendiente de descarga autorizada"
@@ -69,6 +80,7 @@ def artwork_view(image):
         license=image.license,
         license_url=image.license_url,
         rights_status=image.rights_status,
+        source=image.source_slug,
         association="card_artwork",
         usage_scope="commercial_permission_verified" if commercial else "local_preview_only",
         fallback_reason=None
@@ -93,9 +105,7 @@ def printing_view(printing):
         edition=printing.edition,
         artwork=printing.artwork,
         release_date=printing.release_date,
-        images=[
-            image_view(image) for image in sorted(printing.images, key=lambda value: str(value.id))
-        ],
+        images=[image_view(image) for image in public_images(printing.images)],
     )
 
 
@@ -113,7 +123,9 @@ def card_summary(card, language="es", market=None):
     )
     name = names[0] if names else None
     printings = [printing for printing in card.printings if not market or printing.market == market]
-    images = [image_view(image) for printing in printings for image in printing.images]
+    images = [
+        image_view(image) for printing in printings for image in public_images(printing.images)
+    ]
     available = next((image for image in images if image.url), None)
     if available is None:
         available = next(

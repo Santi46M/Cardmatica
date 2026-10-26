@@ -38,6 +38,7 @@ from app.services import product_images as product_photos
 from app.services.banlists import current_lists, list_view, statuses_for_cards
 from app.services.card_types import ATTRIBUTES, RACES, taxonomy
 from app.services.catalog import card_detail, card_summary, errata_views, printing_view
+from app.services.images import displayable
 from app.services.prices import last_sales, price_history
 from app.services.trending import trending
 
@@ -482,7 +483,7 @@ def facets(session: SessionDep, market: Market | None = None):
 @router.get("/images/{image_id}", tags=["Imágenes"])
 def image(image_id: UUID, session: SessionDep, thumbnail: bool = False):
     row = session.get(CardImage, image_id)
-    if not row or row.rights_status != "approved" or not row.authorization_reference:
+    if not row or not displayable(row):
         raise HTTPException(404, "Imagen no disponible con permiso verificado")
     relative = row.thumbnail_path if thumbnail else row.local_path
     root = get_settings().image_directory.resolve()

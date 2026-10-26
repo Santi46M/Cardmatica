@@ -73,15 +73,8 @@ Current = Annotated[tuple, Depends(current)]
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
-def require_admin(
-    request: Request,
-    session: SessionDep,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
-    token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
-    csrf_header: Annotated[str | None, Header(alias=CSRF_HEADER)] = None,
-    csrf_cookie: Annotated[str | None, Cookie(alias=CSRF_COOKIE)] = None,
-):
-    """Administration: an admin account's session, or the ADMIN_TOKEN for scripts."""
+def _require_role(roles, request, session, credentials, token, csrf_header, csrf_cookie):
+    """An account with one of these roles signed in here, or the ADMIN_TOKEN for scripts."""
     if credentials:
         admin_token = get_settings().admin_token
         if len(admin_token) < 32:
@@ -100,9 +93,35 @@ def require_admin(
             401, "Inicia sesión como administrador", headers={"WWW-Authenticate": "Bearer"}
         )
     user = found[0]
-    if user.role != "admin":
+    if user.role not in roles:
         raise HTTPException(403, "Tu cuenta no tiene permisos de administración")
     if request.method not in SAFE_METHODS:
         same_origin(request)
         csrf(csrf_header, csrf_cookie)
     return user
+
+
+def require_admin(
+    request: Request,
+    session: SessionDep,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+    token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
+    csrf_header: Annotated[str | None, Header(alias=CSRF_HEADER)] = None,
+    csrf_cookie: Annotated[str | None, Cookie(alias=CSRF_COOKIE)] = None,
+):
+    """Administration: an admin account's session, or the ADMIN_TOKEN for scripts."""
+    return _require_role({"admin"}, request, session, credentials, token, csrf_header, csrf_cookie)
+
+
+def require_moderator(
+    request: Request,
+    session: SessionDep,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+    token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
+    csrf_header: Annotated[str | None, Header(alias=CSRF_HEADER)] = None,
+    csrf_cookie: Annotated[str | None, Cookie(alias=CSRF_COOKIE)] = None,
+):
+    """Moderation (reviewing uploaded photos): a moderator or an admin."""
+    return _require_role(
+        {"moderator", "admin"}, request, session, credentials, token, csrf_header, csrf_cookie
+    )

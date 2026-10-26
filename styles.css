@@ -1540,6 +1540,73 @@ button:disabled {
     cursor: help;
 }
 
+/* Ilustración general sin foto de la impresión: la rareza elegida, sobre la imagen */
+.rarity-stamp {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    z-index: 1;
+    line-height: 1.4;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .45));
+}
+
+.rarity-stamp .rr {
+    backdrop-filter: blur(6px);
+}
+
+/* Botón del vendedor para enviar la foto de la impresión, bajo la imagen */
+.cd-photo {
+    display: grid;
+    gap: 4px;
+    justify-items: center;
+    margin-top: 8px;
+}
+
+/* Fotos esperando revisión, en el panel de administración */
+.mod-photos {
+    display: grid;
+    gap: 8px;
+    margin: 8px 0;
+    padding: 0;
+    list-style: none;
+}
+
+.mod-photo {
+    display: grid;
+    grid-template-columns: 60px 1fr auto;
+    gap: 10px;
+    align-items: center;
+}
+
+.mod-photo img {
+    width: 60px;
+    height: 88px;
+    border-radius: 4px;
+    object-fit: contain;
+}
+
+.mod-photo small {
+    display: block;
+}
+
+.mod-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+@media (max-width: 600px) {
+    .mod-photo {
+        grid-template-columns: 60px 1fr;
+    }
+
+    .mod-actions {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+    }
+}
+
 .img-warn.inline {
     position: static;
     display: inline-grid;

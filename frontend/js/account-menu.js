@@ -100,9 +100,11 @@ function accessHtml() {
         </div>`;
 }
 
-// Only administrators see the way into the panel.
+// Administrators see the panel; moderators, its photo review.
 function adminHtml() {
-    if (currentUser()?.role !== "admin") return "";
+    const role = currentUser()?.role;
+    if (role === "moderator") return sectionHtml(["Administración", [["Moderación de fotos", "Admin"]]]);
+    if (role !== "admin") return "";
     return sectionHtml(["Administración", [["Panel de administración", "Admin"]]]);
 }
 

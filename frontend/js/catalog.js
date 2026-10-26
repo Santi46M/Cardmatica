@@ -3,6 +3,7 @@ import { installLanguageMenu } from "./language-menu.js";
 import { installPromo } from "./promo.js";
 import { track, trackPage } from "./analytics.js";
 import { installAdmin, renderAdmin } from "./admin.js";
+import { installPhotoUpload } from "./photos.js";
 import {
     currentUser,
     installAuth,
@@ -836,6 +837,7 @@ document.addEventListener(
 
 const { hidePreview } = installCardPreview({ lookup: (id) => knownCards.get(id) });
 installBackToTop({ focus: element("q") });
+installPhotoUpload();
 installHeaderScroll();
 
 // ---- Keyboard shortcut and back to top ----------------------------------------

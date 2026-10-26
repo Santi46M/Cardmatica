@@ -18,6 +18,7 @@ from app.schemas.catalog import JobRequest
 from app.schemas.ingestion import CardRecord
 from app.services.accounts import normalize_email, remove_expired
 from app.services.banlists import bundled_files, import_banlist, load_file
+from app.services.images import UploadService, pending_uploads
 from app.services.ingestion import IngestionService
 
 
@@ -287,6 +288,20 @@ def build_parser() -> argparse.ArgumentParser:
     approval.add_argument(
         "--artwork", action="store_true", help="Ilustración general, no escaneo de impresión"
     )
+
+    upload = commands.add_parser(
+        "photo-upload", help="Subir una foto o escaneo propio de una impresión (queda pendiente)"
+    )
+    upload.add_argument("printing_id", type=UUID)
+    upload.add_argument("path", type=Path)
+    commands.add_parser("photo-pending", help="Listar las fotos que esperan revisión")
+    review = commands.add_parser("photo-review", help="Aprobar o rechazar una foto subida")
+    review.add_argument("image_id", type=UUID)
+    review.add_argument("decision", choices=["approved", "rejected"])
+    review.add_argument(
+        "--authorization-reference", help="Qué permiso cubre la foto (obligatorio al aprobar)"
+    )
+    review.add_argument("--note", help="Motivo, visible para quien la subió")
     return parser
 
 
@@ -399,6 +414,44 @@ def run_sync(args, parser):
         return 1 if job.status in {"failed", "completed_with_errors"} else 0
 
 
+def run_photos(args, parser):
+    """Catalogue photos from the console: our own uploads and their review."""
+    with session_factory().begin() as session:
+        service = UploadService(get_settings(), session)
+        try:
+            if args.command == "photo-upload":
+                row, created = service.upload(
+                    args.printing_id,
+                    args.path.read_bytes(),
+                    source="staff",
+                    filename=args.path.name,
+                )
+                print(json.dumps({"image_id": str(row.id), "created": created}))
+            elif args.command == "photo-pending":
+                for row in pending_uploads(session):
+                    print(
+                        json.dumps(
+                            {
+                                "image_id": str(row.id),
+                                "printing_id": str(row.printing_id),
+                                "source": row.source_slug,
+                                "file": row.local_path,
+                            }
+                        )
+                    )
+            else:
+                service.review(
+                    args.image_id,
+                    args.decision,
+                    reviewer="consola",
+                    authorization_reference=args.authorization_reference,
+                    note=args.note,
+                )
+        except (LookupError, ValueError, OSError) as error:
+            parser.error(str(error))
+    return 0
+
+
 COMMANDS = {
     "sync": run_sync,
     "resume": run_sync,
@@ -413,6 +466,9 @@ COMMANDS = {
     "cleanup": run_cleanup,
     "set-role": run_set_role,
     "image-rights": run_image_rights,
+    "photo-upload": run_photos,
+    "photo-pending": run_photos,
+    "photo-review": run_photos,
 }
 
 

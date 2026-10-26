@@ -1,8 +1,10 @@
-// Administration panel, only for accounts with the admin role.
+// Administration panel: everything for admins, photo review for moderators.
 // Reads /api/v1/admin (backend/app/api/admin.py) with the admin's session.
 import { escapeHtml, html } from "./html.js";
 import { lang, locale, t } from "./lang.js";
 import { request } from "./session-api.js";
+import { currentUser } from "./auth.js";
+import { installModeration, loadModeration, moderationHtml } from "./photos.js";
 
 const h = escapeHtml;
 const ADMIN = "/api/v1/admin";
@@ -179,6 +181,12 @@ async function loadUsers() {
 
 export async function renderAdmin(container) {
     container.innerHTML = `<h3>${t("Administración")}</h3><p class="catalog-status">${t("Cargando…")}</p>`;
+    // A moderator only reviews photos; the rest of the panel is for admins.
+    if (currentUser()?.role === "moderator") {
+        container.innerHTML = `<h3>${t("Moderación")}</h3>${moderationHtml()}`;
+        loadModeration();
+        return;
+    }
     try {
         const [overview, jobs] = await Promise.all([
             request(`${ADMIN}/overview`),
@@ -195,6 +203,7 @@ export async function renderAdmin(container) {
                 ${topHtml(overview.top_pages)}
                 <small>${t("Recuentos anónimos por día, sin cookies ni datos personales.")}</small>
             </section>
+            ${moderationHtml()}
             <section class="gl pnl">
                 <b>${t("Cuentas")}</b>
                 <input id="admin-search" type="search" placeholder="${t("Buscar por correo o nombre")}" aria-label="${t("Buscar cuentas")}" value="${h(search)}">
@@ -213,12 +222,14 @@ export async function renderAdmin(container) {
             </section>`;
         loadUsers();
         loadNews();
+        loadModeration();
     } catch (error) {
         container.innerHTML = `<h3>${t("Administración")}</h3><p class="warn">${h(error.message)}</p>`;
     }
 }
 
 export function installAdmin() {
+    installModeration();
     let timer;
     document.addEventListener("input", (event) => {
         if (event.target.id !== "admin-search") return;

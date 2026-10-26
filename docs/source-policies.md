@@ -96,6 +96,13 @@ Galerías ambiguas, edición/arte desconocidos o metadatos insuficientes se regi
 para revisión. Se descargaron ilustraciones generales de YGOPRODeck para la
 prueba local; no se descargaron ni aprobaron escaneos de Yugipedia.
 
+Las fotos que envían vendedores o el equipo (`source_slug` seller o staff) siguen las
+mismas reglas: entran `pending` y `unverified`, y solo se sirven con
+`review_status=approved`, `rights_status=approved` y una referencia de permiso.
+Rechazarlas las deja `denied`. Esa referencia cubre la foto, no el arte de la carta:
+antes de abrir las subidas al público hay que definir la base legal (términos de
+subida) con asesoramiento.
+
 ## Vista provisional de imágenes en desarrollo
 
 `LOCAL_PREVIEW_HOST_SUFFIXES` permite tratar un dominio privado de desarrollo (por ejemplo

@@ -24,6 +24,8 @@ class ImageView(BaseModel):
     license: str | None = None
     license_url: str | None = None
     rights_status: str
+    # staff, yugipedia or seller for a printing's image; the provider for artwork.
+    source: str | None = None
     fallback_reason: str | None = None
     association: Literal["printing", "card_artwork"] = "printing"
     usage_scope: str = "commercial_permission_verified"

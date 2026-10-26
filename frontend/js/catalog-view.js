@@ -8,6 +8,7 @@ import { lang, locale, t } from "./lang.js";
 import { scopeLink } from "./collections.js";
 import { editionName, languageName, printingOptionsHtml } from "./printings.js";
 import { rarityBadge } from "./rarities.js";
+import { photoUploadHtml } from "./photos.js";
 
 const h = escapeHtml;
 const chip = (value) => `<span class="chip">${h(value)}</span>`;
@@ -101,6 +102,15 @@ function imageHtml(image, name, large = false) {
         `<img class="catalog-image ${size}" src="${h(url)}" alt="${h(name)}" loading="lazy" decoding="async" width="${width}" height="${height}">`,
         image
     );
+}
+
+// The printing's own picture or, without one, the card's general illustration
+// with the chosen printing's rarity drawn over it, so the badge says what the
+// picture cannot.
+function pictureHtml(image, name, printing) {
+    const picture = imageHtml(image, name, true);
+    if (image?.association !== "card_artwork" || !printing?.rarity || printing.rarity === "Unknown") return picture;
+    return `<span class="img-wrap">${picture}<span class="rarity-stamp">${rarityBadge(printing)}</span></span>`;
 }
 
 export function pager(data, kind = "catalog") {
@@ -355,12 +365,21 @@ function cardTextHtml(text) {
 }
 
 // Who made the picture, under what terms, and where it comes from.
+// Who sent a printing's photo, when it is not a Yugipedia scan.
+const PHOTO_ORIGIN = {
+    seller: "Foto aportada por un vendedor y revisada por Cardmática.",
+    staff: "Foto de Cardmática."
+};
+
 function creditHtml(image) {
     if (!image) return "";
+    const origin = PHOTO_ORIGIN[image.source];
     const general =
         image.association === "card_artwork"
             ? `${t("Ilustración general: no verifica la rareza, edición o set seleccionado.")}<br>`
-            : "";
+            : origin
+              ? `${t(origin)}<br>`
+              : "";
     const terms =
         image.usage_scope === "local_preview_only"
             ? t("Vista local de prueba; derechos comerciales sin verificar")
@@ -453,7 +472,7 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
                 <div class="top-actions"><button class="ghost" data-close="md">${t("Cerrar")}</button></div>
             </div>
             <div class="cd-top">
-                <figure class="cd-image gl">${imageHtml(image, imageName, true)}${creditHtml(image)}</figure>
+                <figure class="cd-image gl">${pictureHtml(image, imageName, printing)}${creditHtml(image)}${photoUploadHtml(printing)}</figure>
                 <div class="cd-info gl">
                     ${cardTabs()}
                     <div class="cd-panel" data-cd-panel="info">
