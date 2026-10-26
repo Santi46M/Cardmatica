@@ -1306,6 +1306,18 @@ button:disabled {
     margin-left: auto;
 }
 
+.view-toggle button {
+    display: grid;
+    place-items: center;
+    padding: 5px 10px;
+}
+
+.view-toggle svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
 .view-toggle + .cnt {
     margin-left: 0;
 }

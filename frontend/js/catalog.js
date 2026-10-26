@@ -174,16 +174,22 @@ function showCurrentTab() {
     nav.scrollLeft += left - (nav.clientWidth - current.offsetWidth) / 2;
 }
 
+// List and grid as icons (three bars, four squares); the name stays for
+// screen readers and as a tooltip.
+const VIEW_ICONS = {
+    list: '<rect x="3" y="4.5" width="14" height="2.4" rx="1.2"/><rect x="3" y="8.8" width="14" height="2.4" rx="1.2"/><rect x="3" y="13.1" width="14" height="2.4" rx="1.2"/>',
+    grid: '<rect x="3" y="3" width="6.2" height="6.2" rx="1.4"/><rect x="10.8" y="3" width="6.2" height="6.2" rx="1.4"/><rect x="3" y="10.8" width="6.2" height="6.2" rx="1.4"/><rect x="10.8" y="10.8" width="6.2" height="6.2" rx="1.4"/>'
+};
+const VIEWS = [
+    ["list", "Lista"],
+    ["grid", "Cuadrícula"]
+];
+
 function renderViewToggle() {
-    viewToggle.innerHTML = [
-        ["list", "Lista"],
-        ["grid", "Cuadrícula"]
-    ]
-        .map(
-            ([value, label]) =>
-                `<button data-view="${value}" aria-pressed="${value === view}">${t(label)}</button>`
-        )
-        .join("");
+    viewToggle.innerHTML = VIEWS.map(
+        ([value, label]) =>
+            `<button data-view="${value}" aria-pressed="${value === view}" aria-label="${t(label)}" title="${t(label)}"><svg viewBox="0 0 20 20" aria-hidden="true">${VIEW_ICONS[value]}</svg></button>`
+    ).join("");
 }
 
 function status(message, { quiet = false } = {}) {
