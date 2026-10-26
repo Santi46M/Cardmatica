@@ -188,7 +188,7 @@ async def refresh(session, client, settings) -> dict:
             results[name] = store(session, "yugioh", name, parse_feed(response.content), language)
         except Exception as error:  # noqa: BLE001 - logged, the other sources go on
             logger.warning("Noticias de %s no disponibles: %s", name, error)
-            results[name] = f"error: {type(error).__name__}"
+            results[name] = f"error: {type(error).__name__}: {error}"
     if settings.news_site_repo:
         try:
             response = await client.get(
@@ -207,6 +207,6 @@ async def refresh(session, client, settings) -> dict:
             results["GitHub"] = store(session, "site", None, entries)
         except Exception as error:  # noqa: BLE001
             logger.warning("Novedades del sitio no disponibles: %s", error)
-            results["GitHub"] = f"error: {type(error).__name__}"
+            results["GitHub"] = f"error: {type(error).__name__}: {error}"
     prune(session)
     return results

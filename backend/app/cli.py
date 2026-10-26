@@ -96,7 +96,14 @@ async def refresh_news(*, forever=False):
         client = PoliteHttpClient("news", settings)
         try:
             with session_factory().begin() as session:
-                print(json.dumps(await news_feeds.refresh(session, client, settings)), flush=True)
+                print(
+                    json.dumps(
+                        await news_feeds.refresh(session, client, settings),
+                        ensure_ascii=False,
+                        indent=2,
+                    ),
+                    flush=True,
+                )
         finally:
             await client.close()
         if not forever:
