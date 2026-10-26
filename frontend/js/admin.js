@@ -1,6 +1,6 @@
 // Administration panel, only for accounts with the admin role.
 // Reads /api/v1/admin (backend/app/api/admin.py) with the admin's session.
-import { escapeHtml } from "./html.js";
+import { escapeHtml, html } from "./html.js";
 import { lang, locale, t } from "./lang.js";
 import { request } from "./session-api.js";
 
@@ -29,45 +29,65 @@ let search = "";
 
 const when = (value) => (value ? new Date(value).toLocaleString(locale) : "—");
 
-function usersHtml(data) {
-    const rows = data.items
-        .map(
-            (user) =>
-                `<tr><td><b>${h(user.display_name)}</b><small>${h(user.email)}</small></td><td>${h(
-                    new Date(user.created_at).toLocaleDateString(locale)
-                )}</td><td>${user.locked ? `<span class="warn-text">${t("Bloqueada")}</span>` : t("Activa")}</td><td><select data-admin-role="${h(
-                    user.id
-                )}" aria-label="${h(t("Rol de {name}", { name: user.display_name }))}">${Object.entries(ROLE_LABELS)
-                    .map(
-                        ([value, label]) =>
-                            `<option value="${value}"${value === user.role ? " selected" : ""}>${t(label)}</option>`
-                    )
-                    .join("")}</select></td></tr>`
-        )
+const selectedIf = (yes) => (yes ? " selected" : "");
+
+function userRow(user) {
+    const status = user.locked ? `<span class="warn-text">${t("Bloqueada")}</span>` : t("Activa");
+    const roles = Object.entries(ROLE_LABELS)
+        .map(([value, label]) => `<option value="${value}"${selectedIf(value === user.role)}>${t(label)}</option>`)
         .join("");
-    return `<table><thead><tr><th>${t("Cuenta")}</th><th>${t("Alta")}</th><th>${t("Estado")}</th><th>${t(
-        "Rol"
-    )}</th></tr></thead><tbody>${
-        rows || `<tr><td colspan="4" class="empty">${t("Ninguna cuenta coincide.")}</td></tr>`
-    }</tbody></table><small class="catalog-status">${t(data.total === 1 ? "{count} cuenta" : "{count} cuentas", {
-        count: data.total
-    })}</small>`;
+    const roleLabel = h(t("Rol de {name}", { name: user.display_name }));
+    return html`
+        <tr>
+            <td><b>${h(user.display_name)}</b><small>${h(user.email)}</small></td>
+            <td>${h(new Date(user.created_at).toLocaleDateString(locale))}</td>
+            <td>${status}</td>
+            <td><select data-admin-role="${h(user.id)}" aria-label="${roleLabel}">${roles}</select></td>
+        </tr>`;
+}
+
+function usersHtml(data) {
+    const rows = data.items.map(userRow).join("") || `<tr><td colspan="4" class="empty">${t("Ninguna cuenta coincide.")}</td></tr>`;
+    const count = t(data.total === 1 ? "{count} cuenta" : "{count} cuentas", { count: data.total });
+    return html`
+        <table>
+            <thead>
+                <tr><th>${t("Cuenta")}</th><th>${t("Alta")}</th><th>${t("Estado")}</th><th>${t("Rol")}</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+        <small class="catalog-status">${count}</small>`;
 }
 
 function jobsHtml(jobs) {
     if (!jobs.length) return `<p class="catalog-status">${t("Todavía no hubo sincronizaciones.")}</p>`;
-    return `<table><thead><tr><th>${t("Fuente")}</th><th>${t("Modo")}</th><th>${t("Estado")}</th><th class="num">${t(
-        "Procesadas"
-    )}</th><th class="num">${t("Fallos")}</th><th>${t("Fin")}</th></tr></thead><tbody>${jobs
+    const rows = jobs
         .map(
-            (job) =>
-                `<tr><td>${h(job.source)}</td><td>${h(job.mode)}</td><td>${h(
-                    JOB_STATUS[job.status] ? t(JOB_STATUS[job.status]) : job.status
-                )}</td><td class="num">${job.processed}</td><td class="num">${job.failures}</td><td>${h(
-                    when(job.finished_at)
-                )}</td></tr>`
+            (job) => html`
+                <tr>
+                    <td>${h(job.source)}</td>
+                    <td>${h(job.mode)}</td>
+                    <td>${h(JOB_STATUS[job.status] ? t(JOB_STATUS[job.status]) : job.status)}</td>
+                    <td class="num">${job.processed}</td>
+                    <td class="num">${job.failures}</td>
+                    <td>${h(when(job.finished_at))}</td>
+                </tr>`
         )
-        .join("")}</tbody></table>`;
+        .join("");
+    return html`
+        <table>
+            <thead>
+                <tr>
+                    <th>${t("Fuente")}</th>
+                    <th>${t("Modo")}</th>
+                    <th>${t("Estado")}</th>
+                    <th class="num">${t("Procesadas")}</th>
+                    <th class="num">${t("Fallos")}</th>
+                    <th>${t("Fin")}</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>`;
 }
 
 // "tab:Todas" → "Todas las cartas"; events keep a readable name.
@@ -78,18 +98,18 @@ const KEY_LABELS = {
     "wantlist:agregar": "Cartas añadidas a listas de deseados"
 };
 
+function keyLabel(key) {
+    if (key.startsWith("tab:")) {
+        const tab = key.slice(4);
+        return t("Pestaña {name}", { name: t(window.TAB_LABELS[tab] || tab) });
+    }
+    return KEY_LABELS[key] ? t(KEY_LABELS[key]) : key;
+}
+
 function topHtml(rows) {
     if (!rows.length) return `<p class="catalog-status">${t("Todavía no hay visitas registradas.")}</p>`;
-    return `<ul class="admin-top">${rows
-        .map((row) => {
-            const label = row.key.startsWith("tab:")
-                ? t("Pestaña {name}", { name: t(window.TAB_LABELS[row.key.slice(4)] || row.key.slice(4)) })
-                : KEY_LABELS[row.key]
-                  ? t(KEY_LABELS[row.key])
-                  : row.key;
-            return `<li><span>${h(label)}</span><b>${row.count}</b></li>`;
-        })
-        .join("")}</ul>`;
+    const items = rows.map((row) => `<li><span>${h(keyLabel(row.key))}</span><b>${row.count}</b></li>`).join("");
+    return `<ul class="admin-top">${items}</ul>`;
 }
 
 // ---- News of the home page (backend/app/api/news.py) ---------------------------
@@ -98,36 +118,44 @@ const NEWS_SECTIONS = { site: "Cardmática", yugioh: "Yu-Gi-Oh!" };
 
 function newsListHtml(items) {
     if (!items.length) return `<p class="catalog-status">${t("Todavía no hay noticias.")}</p>`;
-    return `<ul class="admin-news">${items
-        .map(
-            (item) =>
-                `<li lang="${h(item.language)}"><span><b>${h(item.title)}</b><small>${h(NEWS_SECTIONS[item.section])} · ${h(
-                    item.language.toUpperCase()
-                )} · ${h(item.published_on)}${
-                    item.source_name ? ` · ${h(item.source_name)}` : ""
-                }</small></span><button class="ghost" data-admin-news-delete="${h(item.id)}">${t("Quitar")}</button></li>`
-        )
-        .join("")}</ul>`;
+    const rows = items
+        .map((item) => {
+            const source = item.source_name ? ` · ${h(item.source_name)}` : "";
+            const about = `${h(NEWS_SECTIONS[item.section])} · ${h(item.language.toUpperCase())} · ${h(item.published_on)}${source}`;
+            return html`
+                <li lang="${h(item.language)}">
+                    <span><b>${h(item.title)}</b><small>${about}</small></span>
+                    <button class="ghost" data-admin-news-delete="${h(item.id)}">${t("Quitar")}</button>
+                </li>`;
+        })
+        .join("");
+    return `<ul class="admin-news">${rows}</ul>`;
 }
 
 // A news item is written in one language, which the form asks for: it is
-// shown first to visitors who read that language, and never translated.
-const newsForm = () =>
-    `<form id="admin-news-form" class="fm-stack"><label>${t("Sección")}<select name="section"><option value="site">${t(
-        "Novedades de Cardmática"
-    )}</option><option value="yugioh">${t("Noticias de Yu-Gi-Oh! (con fuente)")}</option></select></label><label>${t(
-        "Idioma de la noticia"
-    )}<select name="language">${window.I18N.languages
-        .map(([code, name]) => `<option value="${code}"${code === lang ? " selected" : ""}>${name}</option>`)
-        .join("")}</select></label><label>${t("Título")}<input name="title" required minlength="3" maxlength="140"></label><label>${t(
-        "Resumen"
-    )}<textarea name="summary" required minlength="3" maxlength="400" rows="2"></textarea></label><label>${t(
-        "Enlace a la fuente"
-    )}<input name="url" type="url" maxlength="500" placeholder="https://"></label><label>${t(
-        "Nombre de la fuente"
-    )}<input name="source_name" maxlength="120" placeholder="Konami, YGOrganization…"></label><label>${t(
-        "Fecha"
-    )}<input name="published_on" type="date" required></label><button class="btn s" type="submit">${t("Publicar")}</button></form>`;
+// shown only to visitors who read that language, and never translated.
+function newsForm() {
+    const languages = window.I18N.languages
+        .map(([code, name]) => `<option value="${code}"${selectedIf(code === lang)}>${name}</option>`)
+        .join("");
+    return html`
+        <form id="admin-news-form" class="fm-stack">
+            <label>
+                ${t("Sección")}
+                <select name="section">
+                    <option value="site">${t("Novedades de Cardmática")}</option>
+                    <option value="yugioh">${t("Noticias de Yu-Gi-Oh! (con fuente)")}</option>
+                </select>
+            </label>
+            <label>${t("Idioma de la noticia")}<select name="language">${languages}</select></label>
+            <label>${t("Título")}<input name="title" required minlength="3" maxlength="140"></label>
+            <label>${t("Resumen")}<textarea name="summary" required minlength="3" maxlength="400" rows="2"></textarea></label>
+            <label>${t("Enlace a la fuente")}<input name="url" type="url" maxlength="500" placeholder="https://"></label>
+            <label>${t("Nombre de la fuente")}<input name="source_name" maxlength="120" placeholder="Konami, YGOrganization…"></label>
+            <label>${t("Fecha")}<input name="published_on" type="date" required></label>
+            <button class="btn s" type="submit">${t("Publicar")}</button>
+        </form>`;
+}
 
 async function loadNews() {
     const slot = document.getElementById("admin-news");
@@ -156,21 +184,33 @@ export async function renderAdmin(container) {
             request(`${ADMIN}/overview`),
             request(`${ADMIN}/sync-jobs?limit=10`)
         ]);
-        container.innerHTML = `<h3>${t("Administración")}</h3><div class="admin-stats">${OVERVIEW.map(
+        const stats = OVERVIEW.map(
             ([key, label]) => `<div class="gl pnl"><small>${t(label)}</small><b>${overview[key]}</b></div>`
-        ).join("")}</div><section class="gl pnl"><b>${t("Lo más visto · últimos 7 días")}</b>${topHtml(
-            overview.top_pages
-        )}<small>${t("Recuentos anónimos por día, sin cookies ni datos personales.")}</small></section><section class="gl pnl"><b>${t(
-            "Cuentas"
-        )}</b><input id="admin-search" type="search" placeholder="${t("Buscar por correo o nombre")}" aria-label="${t(
-            "Buscar cuentas"
-        )}" value="${h(search)}"><div class="wrap" id="admin-users"></div></section><section class="gl pnl"><b>${t(
-            "Últimas sincronizaciones"
-        )}</b><div class="wrap">${jobsHtml(jobs)}</div><small>${t(
-            "Se encolan con <code>cardmatica sync</code> y las procesa el worker."
-        )}</small></section><section class="gl pnl"><b>${t("Noticias del inicio")}</b>${newsForm()}<div id="admin-news"></div><small>${t(
-            "Las de Yu-Gi-Oh! siempre llevan su fuente. Las de los feeds llegan solas, cada una en su idioma."
-        )}</small></section>`;
+        ).join("");
+        container.innerHTML = html`
+            <h3>${t("Administración")}</h3>
+            <div class="admin-stats">${stats}</div>
+            <section class="gl pnl">
+                <b>${t("Lo más visto · últimos 7 días")}</b>
+                ${topHtml(overview.top_pages)}
+                <small>${t("Recuentos anónimos por día, sin cookies ni datos personales.")}</small>
+            </section>
+            <section class="gl pnl">
+                <b>${t("Cuentas")}</b>
+                <input id="admin-search" type="search" placeholder="${t("Buscar por correo o nombre")}" aria-label="${t("Buscar cuentas")}" value="${h(search)}">
+                <div class="wrap" id="admin-users"></div>
+            </section>
+            <section class="gl pnl">
+                <b>${t("Últimas sincronizaciones")}</b>
+                <div class="wrap">${jobsHtml(jobs)}</div>
+                <small>${t("Se encolan con <code>cardmatica sync</code> y las procesa el worker.")}</small>
+            </section>
+            <section class="gl pnl">
+                <b>${t("Noticias del inicio")}</b>
+                ${newsForm()}
+                <div id="admin-news"></div>
+                <small>${t("Las de Yu-Gi-Oh! siempre llevan su fuente. Las de los feeds llegan solas, cada una en su idioma.")}</small>
+            </section>`;
         loadUsers();
         loadNews();
     } catch (error) {

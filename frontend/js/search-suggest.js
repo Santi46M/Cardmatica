@@ -2,7 +2,7 @@
 // thumbnail and type line, as on Cardmarket and TCGplayer. Arrow keys move,
 // Enter opens the card, Escape closes the list. The catalogue below keeps
 // filtering as before; this is a shortcut to one card.
-import { escapeHtml } from "./html.js";
+import { escapeHtml, html } from "./html.js";
 import { typeLine } from "./card-types.js";
 import { assetUrl } from "./catalog-view.js";
 import { SUGGEST } from "./config.js";
@@ -14,11 +14,11 @@ function optionHtml(card, index, active) {
     const thumb = url
         ? `<img src="${h(url)}" alt="" width="32" height="46" loading="lazy" decoding="async">`
         : `<span class="suggest-ph" data-kind="${h(card.types?.kind || "")}" aria-hidden="true"></span>`;
-    return `<li role="option" id="q-suggest-${index}" data-suggest="${index}" aria-selected="${
-        index === active
-    }">${thumb}<span class="suggest-text"><b>${h(card.name)}</b><small>${h(
-        typeLine(card)
-    )}</small></span></li>`;
+    return html`
+        <li role="option" id="q-suggest-${index}" data-suggest="${index}" aria-selected="${index === active}">
+            ${thumb}
+            <span class="suggest-text"><b>${h(card.name)}</b><small>${h(typeLine(card))}</small></span>
+        </li>`;
 }
 
 export function installSearchSuggest({ input, api, market, onPick }) {

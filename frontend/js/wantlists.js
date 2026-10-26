@@ -1,4 +1,6 @@
-import { escapeHtml } from "./html.js";
+// Wish lists: kept in the browser for guests and in the account once signed
+// in, with price alerts and the purchase planner (shopping-wizard.js).
+import { escapeHtml, html } from "./html.js";
 import { t } from "./lang.js";
 import { WANTLIST } from "./config.js";
 import { formatDate, money, toEuro } from "./format.js";
@@ -113,17 +115,11 @@ function createList(name) {
 }
 
 function options(entries, selected = "", any = "") {
-    return (
-        (any ? `<option value="">${h(t(any))}</option>` : "") +
-        entries
-            .map(
-                ([value, label]) =>
-                    `<option value="${h(value)}"${value === selected ? " selected" : ""}>${h(
-                        t(label)
-                    )}</option>`
-            )
-            .join("")
-    );
+    const first = any ? `<option value="">${h(t(any))}</option>` : "";
+    const rest = entries
+        .map(([value, label]) => `<option value="${h(value)}"${value === selected ? " selected" : ""}>${h(t(label))}</option>`)
+        .join("");
+    return first + rest;
 }
 
 export function countItems() {
@@ -138,35 +134,29 @@ export function listCount() {
 function pickerHtml(card, printings, selectedId, market) {
     const printing = printings.items.find((item) => item.id === selectedId) || printings.items[0];
     const language = API_LANGUAGES[String(printing?.language || "").toLowerCase()] || "";
-    return `<div class="pick gl" id="wl-form" data-card-id="${h(card.id)}"><b>${t(
-        "Añadir a una lista de deseados"
-    )}</b><select id="wl-list" aria-label="${t("Lista de deseados")}">${state.lists
+    const active = activeList()?.id;
+    const lists = state.lists
         .map(
             (list) =>
-                `<option value="${h(list.id)}"${
-                    list.id === activeList()?.id ? " selected" : ""
-                }>${h(list.name)} (${list.items.length})</option>`
+                `<option value="${h(list.id)}"${list.id === active ? " selected" : ""}>${h(list.name)} (${list.items.length})</option>`
         )
-        .join(
-            ""
-        )}<option value="new"${state.lists.length ? "" : " selected"}>+ ${t("Nueva lista…")}</option></select><input id="wl-list-name" placeholder="${t(
-        "Nombre de la nueva lista"
-    )}" maxlength="60"${state.lists.length ? " hidden" : ""}><select id="wl-printing" aria-label="${t(
-        "Impresión"
-    )}">${printingOptionsHtml(printings.items, printing?.id, {
-        any: t("Cualquier impresión"),
-        details: false
-    })}</select><select id="wl-language" aria-label="${t("Idioma")}">${options(
-        LANGUAGES[market],
-        language,
-        "Cualquier idioma"
-    )}</select><select id="wl-edition" aria-label="${t("Edición")}">${options(
-        EDITIONS,
-        "",
-        "Cualquier edición"
-    )}</select><label class="qty">${t("Cantidad")} <input id="wl-quantity" type="number" min="1" max="${
-        WANTLIST.maxQuantity
-    }" value="1"></label><button class="btn s" data-wl-add>${t("Añadir")}</button></div>`;
+        .join("");
+    const noLists = !state.lists.length;
+    const printingChoice = printingOptionsHtml(printings.items, printing?.id, { any: t("Cualquier impresión"), details: false });
+    return html`
+        <div class="pick gl" id="wl-form" data-card-id="${h(card.id)}">
+            <b>${t("Añadir a una lista de deseados")}</b>
+            <select id="wl-list" aria-label="${t("Lista de deseados")}">
+                ${lists}
+                <option value="new"${noLists ? " selected" : ""}>+ ${t("Nueva lista…")}</option>
+            </select>
+            <input id="wl-list-name" placeholder="${t("Nombre de la nueva lista")}" maxlength="60"${noLists ? "" : " hidden"}>
+            <select id="wl-printing" aria-label="${t("Impresión")}">${printingChoice}</select>
+            <select id="wl-language" aria-label="${t("Idioma")}">${options(LANGUAGES[market], language, "Cualquier idioma")}</select>
+            <select id="wl-edition" aria-label="${t("Edición")}">${options(EDITIONS, "", "Cualquier edición")}</select>
+            <label class="qty">${t("Cantidad")} <input id="wl-quantity" type="number" min="1" max="${WANTLIST.maxQuantity}" value="1"></label>
+            <button class="btn s" data-wl-add>${t("Añadir")}</button>
+        </div>`;
 }
 
 // "Deseados" tab of a card's detail: the lists that already include it.
@@ -175,27 +165,26 @@ export function cardWantsHtml(cardId) {
         list.items.filter((item) => item.cardId === cardId).map((item) => ({ list, item }))
     );
     const rows = entries
-        .map(
-            ({ list, item }) =>
-                `<li><b>${h(list.name)}</b> · ${item.quantity} × ${h(
-                    item.code ? `${item.code} · ${item.rarity}` : t("Cualquier impresión")
-                )}${item.language ? ` · ${h(item.language)}` : ""}${
-                    item.edition ? ` · ${h(item.edition)}` : ""
-                }</li>`
-        )
+        .map(({ list, item }) => {
+            const which = item.code ? `${item.code} · ${item.rarity}` : t("Cualquier impresión");
+            const language = item.language ? ` · ${h(item.language)}` : "";
+            const edition = item.edition ? ` · ${h(item.edition)}` : "";
+            return `<li><b>${h(list.name)}</b> · ${item.quantity} × ${h(which)}${language}${edition}</li>`;
+        })
         .join("");
-    return `${
-        rows
-            ? `<p>${t(
-                  entries.length === 1
-                      ? "Esta carta está en 1 de tus listas de deseados:"
-                      : "Esta carta está en {count} entradas de tus listas de deseados:",
-                  { count: entries.length }
-              )}</p><ul class="cd-wants">${rows}</ul>`
-            : `<p class="catalog-status">${t("Esta carta todavía no está en ninguna de tus listas de deseados.")}</p>`
-    }<p><button class="btn s" data-wl-open aria-controls="wl-picker">♥ ${t(
-        "Añadir a la lista de deseados"
-    )}</button></p><small class="catalog-status">${t("Las listas se gestionan en la pestaña «Lista de deseados».")}</small>`;
+    const intro = t(
+        entries.length === 1
+            ? "Esta carta está en 1 de tus listas de deseados:"
+            : "Esta carta está en {count} entradas de tus listas de deseados:",
+        { count: entries.length }
+    );
+    const found = rows
+        ? `<p>${intro}</p><ul class="cd-wants">${rows}</ul>`
+        : `<p class="catalog-status">${t("Esta carta todavía no está en ninguna de tus listas de deseados.")}</p>`;
+    return html`
+        ${found}
+        <p><button class="btn s" data-wl-open aria-controls="wl-picker">♥ ${t("Añadir a la lista de deseados")}</button></p>
+        <small class="catalog-status">${t("Las listas se gestionan en la pestaña «Lista de deseados».")}</small>`;
 }
 
 function addFromForm(card, printings, market) {
@@ -270,36 +259,37 @@ function rowsHtml(list) {
         shown: rows.length,
         total: list.items.length
     });
-    return rows.length
-        ? rows
-              .map(
-                  (item) =>
-                      `<tr><td><button class="lk" data-catalog-card="${h(item.cardId)}">${h(
-                          item.name
-                      )}</button><small><span class="tag ${item.market === "OCG" ? "o" : "t"}">${h(
-                          item.market
-                      )}</span>${h(TYPES[item.cardType] ? t(TYPES[item.cardType]) : item.cardType || "")}${
-                          item.subtypes.length ? ` · ${h(item.subtypes.join(" / "))}` : ""
-                      }</small></td><td>${
-                          item.code
-                              ? `<b>${h(item.code)}</b> ${h(item.rarity || "")}<small>${h(item.setName || "")}</small>`
-                              : t("Cualquier impresión")
-                      }</td><td>${h(t(LANGUAGE_NAMES[item.language] || "Cualquiera"))}</td><td>${h(
-                          EDITION_NAMES[item.edition] || t("Cualquiera")
-                      )}</td><td class="num"><input class="wl-qty" type="number" min="1" max="${WANTLIST.maxQuantity}" value="${
-                          item.quantity
-                      }" data-wl-qty="${h(item.id)}" aria-label="${h(
-                          t("Cantidad de {name}", { name: item.name })
-                      )}"></td><td class="num">${alertCell(item)}</td><td class="num"><button class="ghost" data-wl-remove="${h(
-                          item.id
-                      )}">${t("Quitar")}</button></td></tr>`
-              )
-              .join("")
-        : `<tr><td colspan="7" class="empty">${t(
-              list.items.length
-                  ? "Ninguna carta de esta lista coincide con los filtros."
-                  : "Esta lista está vacía. Abre una carta y usa «♥ Añadir a la lista de deseados»."
-          )}</td></tr>`;
+    if (!rows.length) {
+        const empty = list.items.length
+            ? "Ninguna carta de esta lista coincide con los filtros."
+            : "Esta lista está vacía. Abre una carta y usa «♥ Añadir a la lista de deseados».";
+        return `<tr><td colspan="7" class="empty">${t(empty)}</td></tr>`;
+    }
+    return rows.map(itemRow).join("");
+}
+
+function itemRow(item) {
+    const type = TYPES[item.cardType] ? t(TYPES[item.cardType]) : item.cardType || "";
+    const subtypes = item.subtypes.length ? ` · ${h(item.subtypes.join(" / "))}` : "";
+    const printing = item.code
+        ? `<b>${h(item.code)}</b> ${h(item.rarity || "")}<small>${h(item.setName || "")}</small>`
+        : t("Cualquier impresión");
+    const quantityLabel = h(t("Cantidad de {name}", { name: item.name }));
+    return html`
+        <tr>
+            <td>
+                <button class="lk" data-catalog-card="${h(item.cardId)}">${h(item.name)}</button>
+                <small><span class="tag ${item.market === "OCG" ? "o" : "t"}">${h(item.market)}</span>${h(type)}${subtypes}</small>
+            </td>
+            <td>${printing}</td>
+            <td>${h(t(LANGUAGE_NAMES[item.language] || "Cualquiera"))}</td>
+            <td>${h(EDITION_NAMES[item.edition] || t("Cualquiera"))}</td>
+            <td class="num">
+                <input class="wl-qty" type="number" min="1" max="${WANTLIST.maxQuantity}" value="${item.quantity}" data-wl-qty="${h(item.id)}" aria-label="${quantityLabel}">
+            </td>
+            <td class="num">${alertCell(item)}</td>
+            <td class="num"><button class="ghost" data-wl-remove="${h(item.id)}">${t("Quitar")}</button></td>
+        </tr>`;
 }
 
 // The purchase plan follows the list: a removed card or a new quantity redraws it.
@@ -312,13 +302,14 @@ function alertCell(item) {
     const target = item.alert;
     const currency = target?.currency || window.currency;
     const hit = alerts.get(item.id);
-    return `<label class="wl-alert"><input type="number" min="0" step="0.01" inputmode="decimal" value="${
-        target ? h(target.amount) : ""
-    }" placeholder="${t("Precio")}" data-wl-alert="${h(item.id)}" aria-label="${h(
-        t("Avisar si {name} baja de este precio en {currency}", { name: item.name, currency })
-    )}"><span>${h(currency)}</span></label>${
-        hit ? `<small class="wl-hit">${h(t("Última venta {price}", { price: money(hit.price, hit.currency) }))}</small>` : ""
-    }`;
+    const label = h(t("Avisar si {name} baja de este precio en {currency}", { name: item.name, currency }));
+    const sale = hit ? `<small class="wl-hit">${h(t("Última venta {price}", { price: money(hit.price, hit.currency) }))}</small>` : "";
+    return html`
+        <label class="wl-alert">
+            <input type="number" min="0" step="0.01" inputmode="decimal" value="${target ? h(target.amount) : ""}" placeholder="${t("Precio")}" data-wl-alert="${h(item.id)}" aria-label="${label}">
+            <span>${h(currency)}</span>
+        </label>
+        ${sale}`;
 }
 
 function allItems() {
@@ -328,23 +319,32 @@ function allItems() {
 function alertsHtml() {
     const hits = allItems().filter(({ item }) => alerts.has(item.id));
     if (!hits.length) return "";
-    return `<section class="gl pnl wl-alerts" role="status"><b>${t("Avisos de precio")}</b>${hits
+    const rows = hits
         .map(({ item, list }) => {
             const sale = alerts.get(item.id);
-            return `<div class="wl-alert-row"><div><button class="lk" data-catalog-card="${h(
-                item.cardId
-            )}">${h(item.name)}</button><small>${h(list.name)} · ${h(
-                t("última venta {price} el {date} ({code}), por debajo de tu objetivo de {target}", {
-                    price: money(sale.price, sale.currency),
-                    date: formatDate(sale.observed_at),
-                    code: sale.code,
-                    target: `${item.alert.amount} ${item.alert.currency}`
-                })
-            )}</small></div><button class="ghost" data-wl-seen="${h(item.id)}">${t("Marcar como visto")}</button></div>`;
+            const detail = t("última venta {price} el {date} ({code}), por debajo de tu objetivo de {target}", {
+                price: money(sale.price, sale.currency),
+                date: formatDate(sale.observed_at),
+                code: sale.code,
+                target: `${item.alert.amount} ${item.alert.currency}`
+            });
+            return html`
+                <div class="wl-alert-row">
+                    <div>
+                        <button class="lk" data-catalog-card="${h(item.cardId)}">${h(item.name)}</button>
+                        <small>${h(list.name)} · ${h(detail)}</small>
+                    </div>
+                    <button class="ghost" data-wl-seen="${h(item.id)}">${t("Marcar como visto")}</button>
+                </div>`;
         })
-        .join("")}<small>${t(
-        "Se compara con la última venta registrada que coincide con la impresión, el idioma y la edición elegidos."
-    )}</small></section>`;
+        .join("");
+    const how = t("Se compara con la última venta registrada que coincide con la impresión, el idioma y la edición elegidos.");
+    return html`
+        <section class="gl pnl wl-alerts" role="status">
+            <b>${t("Avisos de precio")}</b>
+            ${rows}
+            <small>${how}</small>
+        </section>`;
 }
 
 function updateBadge() {
@@ -410,52 +410,63 @@ export async function refreshAlerts() {
 
 export function renderWantlists(container) {
     const list = activeList();
-    const create = `<input id="wl-new-name" placeholder="${t("Nueva lista")}" maxlength="60" aria-label="${t(
-        "Nombre de la nueva lista"
-    )}"><button class="btn s" data-wl-create>${t("Crear lista")}</button>`;
+    const create = html`
+        <input id="wl-new-name" placeholder="${t("Nueva lista")}" maxlength="60" aria-label="${t("Nombre de la nueva lista")}">
+        <button class="btn s" data-wl-create>${t("Crear lista")}</button>`;
     if (!list) {
-        container.innerHTML = `<h3>${t("Mis listas de deseados")}</h3><div class="gl pnl"><p class="empty">${t(
-            "Todavía no tienes listas de deseados. Crea una aquí o abre una carta y usa «♥ Añadir a la lista de deseados»."
-        )}</p><div class="tools">${create}</div></div>`;
+        const none = t("Todavía no tienes listas de deseados. Crea una aquí o abre una carta y usa «♥ Añadir a la lista de deseados».");
+        container.innerHTML = html`
+            <h3>${t("Mis listas de deseados")}</h3>
+            <div class="gl pnl">
+                <p class="empty">${none}</p>
+                <div class="tools">${create}</div>
+            </div>`;
         return;
     }
     const sets = [...new Set(list.items.map((item) => item.setName).filter(Boolean))].sort();
-    container.innerHTML = `<h3>${t("Mis listas de deseados")}</h3>${alertsHtml()}<div class="tools">${state.lists
+    const pills = state.lists
         .map(
             (item) =>
-                `<button class="pill" aria-pressed="${item.id === list.id}" data-wl-select="${h(
-                    item.id
-                )}">${h(item.name)} (${item.items.length})</button>`
+                `<button class="pill" aria-pressed="${item.id === list.id}" data-wl-select="${h(item.id)}">${h(item.name)} (${item.items.length})</button>`
         )
-        .join("")}${create}</div><div class="tools"><input id="wl-q" type="search" placeholder="${t(
-        "Buscar por carta, set o código"
-    )}" aria-label="${t("Buscar en la lista")}"><select id="wl-type" aria-label="${t("Tipo")}">${options(
-        Object.entries(TYPES),
-        "",
-        "Todos los tipos"
-    )}</select><select id="wl-set" aria-label="${t("Set")}">${options(
-        sets.map((name) => [name, name]),
-        "",
-        "Todos los sets"
-    )}</select><select id="wl-filter-language" aria-label="${t("Idioma")}"><option value="">${t(
-        "Todos los idiomas"
-    )}</option><optgroup label="TCG">${options(LANGUAGES.TCG)}</optgroup><optgroup label="OCG">${options(
-        LANGUAGES.OCG
-    )}</optgroup></select><select id="wl-filter-edition" aria-label="${t("Edición")}">${options(
-        EDITIONS,
-        "",
-        "Cualquier edición"
-    )}</select><span class="cnt" id="wl-count"></span></div><div class="pn gl wrap"><table><thead><tr><th>${t("Carta")}</th><th>${t(
-        "Impresión"
-    )}</th><th>${t("Idioma")}</th><th>${t("Edición")}</th><th class="num">${t("Cant.")}</th><th class="num">${t(
-        "Avisar si baja de"
-    )}</th><th></th></tr></thead><tbody id="wl-rows"></tbody></table></div><p><small>${h(
-        t("Creada el {date}.", { date: formatDate(list.createdAt) })
-    )} ${t(
-        currentUser() ? "Tus listas se guardan en tu cuenta." : "Tus listas se guardan en este navegador."
-    )}</small> <button class="ghost" data-wl-delete="${h(list.id)}">${t(
-        pendingDelete === list.id ? "Confirmar: eliminar la lista" : "Eliminar esta lista"
-    )}</button></p>${wizardHtml(list)}`;
+        .join("");
+    const created = h(t("Creada el {date}.", { date: formatDate(list.createdAt) }));
+    const where = t(currentUser() ? "Tus listas se guardan en tu cuenta." : "Tus listas se guardan en este navegador.");
+    const remove = t(pendingDelete === list.id ? "Confirmar: eliminar la lista" : "Eliminar esta lista");
+    container.innerHTML = html`
+        <h3>${t("Mis listas de deseados")}</h3>
+        ${alertsHtml()}
+        <div class="tools">${pills}${create}</div>
+        <div class="tools">
+            <input id="wl-q" type="search" placeholder="${t("Buscar por carta, set o código")}" aria-label="${t("Buscar en la lista")}">
+            <select id="wl-type" aria-label="${t("Tipo")}">${options(Object.entries(TYPES), "", "Todos los tipos")}</select>
+            <select id="wl-set" aria-label="${t("Set")}">${options(sets.map((name) => [name, name]), "", "Todos los sets")}</select>
+            <select id="wl-filter-language" aria-label="${t("Idioma")}">
+                <option value="">${t("Todos los idiomas")}</option>
+                <optgroup label="TCG">${options(LANGUAGES.TCG)}</optgroup>
+                <optgroup label="OCG">${options(LANGUAGES.OCG)}</optgroup>
+            </select>
+            <select id="wl-filter-edition" aria-label="${t("Edición")}">${options(EDITIONS, "", "Cualquier edición")}</select>
+            <span class="cnt" id="wl-count"></span>
+        </div>
+        <div class="pn gl wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>${t("Carta")}</th>
+                        <th>${t("Impresión")}</th>
+                        <th>${t("Idioma")}</th>
+                        <th>${t("Edición")}</th>
+                        <th class="num">${t("Cant.")}</th>
+                        <th class="num">${t("Avisar si baja de")}</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="wl-rows"></tbody>
+            </table>
+        </div>
+        <p><small>${created} ${where}</small> <button class="ghost" data-wl-delete="${h(list.id)}">${remove}</button></p>
+        ${wizardHtml(list)}`;
     document.getElementById("wl-rows").innerHTML = rowsHtml(list);
 }
 

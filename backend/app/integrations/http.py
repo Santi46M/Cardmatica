@@ -227,85 +227,106 @@ class PoliteHttpClient:
         return response
 
     async def _fetch(self, url, *, ttl, refresh, allow_missing=False):
+        """One address, from the cache while fresh; otherwise asked again (with
+        ETag/Last-Modified), within the request budget and with retries."""
         key = digest([self.source, url, self.settings.user_agent])
         cached = self.store.read(key)
         if cached and not refresh and time.time() - cached[3] < ttl:
-            return httpx.Response(
-                cached[0],
-                headers=json.loads(cached[1]),
-                content=cached[2],
-                request=httpx.Request("GET", url),
-            )
-        headers = {}
-        if cached:
-            old_headers = json.loads(cached[1])
-            if old_headers.get("etag"):
-                headers["If-None-Match"] = old_headers["etag"]
-            if old_headers.get("last-modified"):
-                headers["If-Modified-Since"] = old_headers["last-modified"]
+            return cached_response(cached, url)
+        headers = revalidation_headers(cached)
         for attempt in range(self.settings.http_retries + 1):
             await self.store.wait(self.source, self.interval)
+            last = attempt == self.settings.http_retries
             try:
-                async with self.client.stream("GET", url, headers=headers) as streamed:
-                    content = bytearray()
-                    async for chunk in streamed.aiter_bytes():
-                        content.extend(chunk)
-                        if len(content) > 12 * 1024 * 1024:
-                            raise ExternalError("Respuesta externa superior a 12 MiB")
-                    clean_headers = dict(streamed.headers)
-                    clean_headers.pop("content-encoding", None)
-                    response = httpx.Response(
-                        streamed.status_code,
-                        headers=clean_headers,
-                        content=bytes(content),
-                        request=streamed.request,
-                    )
-                if response.status_code in (401, 403):
-                    raise AccessDenied(f"{self.source} rechazó el acceso ({response.status_code})")
-                if response.status_code == 304 and cached:
-                    response = httpx.Response(
-                        200,
-                        headers=json.loads(cached[1]),
-                        content=cached[2],
-                        request=httpx.Request("GET", url),
-                    )
-                if response.status_code == 429 or response.status_code >= 500:
-                    if attempt == self.settings.http_retries:
-                        raise ExternalError(
-                            f"{self.source}: HTTP {response.status_code} tras reintentos"
-                        )
-                    retry_after = response.headers.get("Retry-After", "")
-                    delay = 2**attempt
-                    if retry_after.isdigit():
-                        delay = max(delay, int(retry_after))
-                    elif retry_after:
-                        try:
-                            delay = max(
-                                delay,
-                                (
-                                    parsedate_to_datetime(retry_after) - datetime.now(timezone.utc)
-                                ).total_seconds(),
-                            )
-                        except (ValueError, TypeError):
-                            pass
-                    await asyncio.sleep(delay)
-                    continue
-                if allow_missing and response.status_code in (404, 410):
-                    self.store.write(key, response)
-                    return response
-                if not response.is_redirect:
-                    response.raise_for_status()
-                if "text/html" in response.headers.get("content-type", "") and any(
-                    marker in response.text[:65536].lower()
-                    for marker in ("cf-chl-", "challenge-platform", "g-recaptcha", "hcaptcha")
-                ):
-                    raise AccessDenied("Desafío de acceso detectado; no se intenta eludirlo")
-                if response.status_code == 200:
-                    self.store.write(key, response)
-                logger.info("source=%s status=%s cached=false", self.source, response.status_code)
-                return response
+                response = await self._download(url, headers)
             except (httpx.TimeoutException, httpx.NetworkError) as exc:
-                if attempt == self.settings.http_retries:
+                if last:
                     raise ExternalError(f"{self.source}: fallo de red tras reintentos") from exc
                 await asyncio.sleep(2**attempt)
+                continue
+            if response.status_code in (401, 403):
+                raise AccessDenied(f"{self.source} rechazó el acceso ({response.status_code})")
+            if response.status_code == 304 and cached:
+                response = cached_response(cached, url)
+            if response.status_code == 429 or response.status_code >= 500:
+                if last:
+                    raise ExternalError(
+                        f"{self.source}: HTTP {response.status_code} tras reintentos"
+                    )
+                await asyncio.sleep(retry_delay(response, attempt))
+                continue
+            if allow_missing and response.status_code in (404, 410):
+                self.store.write(key, response)
+                return response
+            if not response.is_redirect:
+                response.raise_for_status()
+            if is_challenge(response):
+                raise AccessDenied("Desafío de acceso detectado; no se intenta eludirlo")
+            if response.status_code == 200:
+                self.store.write(key, response)
+            logger.info("source=%s status=%s cached=false", self.source, response.status_code)
+            return response
         raise ExternalError("No se obtuvo respuesta")
+
+    async def _download(self, url, headers):
+        """The answer, read in pieces so an oversized one is cut off early."""
+        async with self.client.stream("GET", url, headers=headers) as streamed:
+            content = bytearray()
+            async for chunk in streamed.aiter_bytes():
+                content.extend(chunk)
+                if len(content) > MAX_RESPONSE_BYTES:
+                    raise ExternalError("Respuesta externa superior a 12 MiB")
+            clean_headers = dict(streamed.headers)
+            clean_headers.pop("content-encoding", None)
+            return httpx.Response(
+                streamed.status_code,
+                headers=clean_headers,
+                content=bytes(content),
+                request=streamed.request,
+            )
+
+
+MAX_RESPONSE_BYTES = 12 * 1024 * 1024
+# Signs of a page that asks to prove you are a person: it is never worked around.
+CHALLENGE_MARKERS = ("cf-chl-", "challenge-platform", "g-recaptcha", "hcaptcha")
+
+
+def cached_response(cached, url):
+    status, headers, body, _ = cached
+    return httpx.Response(
+        status, headers=json.loads(headers), content=body, request=httpx.Request("GET", url)
+    )
+
+
+def revalidation_headers(cached):
+    """Ask only for changes since the stored copy, when the server told us how."""
+    if not cached:
+        return {}
+    old = json.loads(cached[1])
+    headers = {}
+    if old.get("etag"):
+        headers["If-None-Match"] = old["etag"]
+    if old.get("last-modified"):
+        headers["If-Modified-Since"] = old["last-modified"]
+    return headers
+
+
+def retry_delay(response, attempt):
+    """Seconds to wait: doubling each time, or longer if the server says so (Retry-After)."""
+    delay = 2**attempt
+    retry_after = response.headers.get("Retry-After", "")
+    if retry_after.isdigit():
+        return max(delay, int(retry_after))
+    if retry_after:
+        try:
+            when = parsedate_to_datetime(retry_after) - datetime.now(timezone.utc)
+            return max(delay, when.total_seconds())
+        except (ValueError, TypeError):
+            pass
+    return delay
+
+
+def is_challenge(response):
+    return "text/html" in response.headers.get("content-type", "") and any(
+        marker in response.text[:65536].lower() for marker in CHALLENGE_MARKERS
+    )

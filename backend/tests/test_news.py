@@ -21,7 +21,7 @@ def game_news(factory, language, day, title):
         )
 
 
-def test_news_in_the_visitors_language_then_the_others(client, factory):
+def test_news_only_in_the_visitors_language(client, factory):
     game_news(factory, "es", 20, "Noticia en español")
     game_news(factory, "pt", 21, "Notícia em português")
     game_news(factory, "en", 22, "News in English")
@@ -35,15 +35,12 @@ def test_news_in_the_visitors_language_then_the_others(client, factory):
             ]
         ]
 
-    # Their language first, newest first; then Spanish, Portuguese, English.
-    assert titles("pt") == [
-        "Notícia em português",
-        "Outra notícia",
-        "Noticia en español",
-        "News in English",
-    ]
-    assert titles("en", 2) == ["News in English", "Noticia en español"]
-    assert titles("es", 1) == ["Noticia en español"]
+    # Only their language, newest first; never filled up with the others.
+    assert titles("pt") == ["Notícia em português", "Outra notícia"]
+    assert titles("pt", 1) == ["Notícia em português"]
+    assert titles("en") == ["News in English"]
+    assert titles("es") == ["Noticia en español"]
+    assert client.get("/api/v1/news", params={"lang": "en"}).json()["site"] == []
     assert client.get("/api/v1/news", params={"lang": "fr"}).status_code == 422
     assert client.get("/api/v1/news").headers["Cache-Control"] == "public, max-age=60"
 

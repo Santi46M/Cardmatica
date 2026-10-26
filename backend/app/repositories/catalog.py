@@ -25,6 +25,84 @@ def looks_like_code(text):
     return "-" in text and " " not in text.strip()
 
 
+def listed(column, value):
+    """The JSON list in `column` includes `value`."""
+    return column.cast(Text).contains('"' + value + '"', autoescape=True)
+
+
+def matches_search(q, printing_filters):
+    """The search box: a word of the name, a printing code, set or rarity, an archetype or a type."""
+    printing = (
+        select(1)
+        .select_from(CardPrinting)
+        .join(CardSet)
+        .join(Rarity)
+        .where(CardPrinting.card_id == Card.id, *printing_filters)
+    )
+    return or_(
+        # In a name, every word counts, in any order.
+        exists(
+            select(1).where(
+                CardName.card_id == Card.id,
+                *(CardName.name.icontains(word, autoescape=True) for word in q.split()),
+            )
+        ),
+        exists(
+            printing.where(
+                or_(
+                    CardPrinting.code.icontains(q, autoescape=True),
+                    CardSet.name.icontains(q, autoescape=True),
+                    Rarity.name.icontains(q, autoescape=True),
+                )
+            )
+        ),
+        exists(
+            select(1)
+            .select_from(CardArchetype)
+            .join(Archetype)
+            .where(
+                CardArchetype.card_id == Card.id,
+                CardArchetype.relation == "member",
+                Archetype.name.icontains(q, autoescape=True),
+            )
+        ),
+        Card.card_type.icontains(q, autoescape=True),
+    )
+
+
+def ordering(sort, market, language):
+    """ORDER BY of the list: name (in the visitor's language), release date or last update."""
+    if sort == "updated":
+        return (Card.updated_at.desc(), Card.id)
+    if sort in ("newest", "oldest"):
+        # By the card's latest printing (in this market), as Cardmarket's
+        # "release date"; cards without a known date go last either way.
+        released = (
+            select(func.max(func.coalesce(CardPrinting.release_date, CardSet.release_date)))
+            .select_from(CardPrinting)
+            .join(CardSet)
+            .where(CardPrinting.card_id == Card.id)
+        )
+        if market:
+            released = released.where(CardPrinting.market == market)
+        released = released.scalar_subquery()
+        direction = released.desc() if sort == "newest" else released.asc()
+        return (direction.nullslast(), Card.display_name, Card.id)
+    localized = (
+        select(CardName.name)
+        .where(
+            CardName.card_id == Card.id,
+            CardName.language == language,
+            CardName.is_current.is_(True),
+        )
+        .order_by(CardName.is_official.desc(), CardName.name)
+        .limit(1)
+        .scalar_subquery()
+    )
+    name_order = func.lower(func.coalesce(localized, Card.display_name))
+    return (name_order.desc() if sort == "name_desc" else name_order.asc(), Card.id)
+
+
 class CatalogRepository:
     def __init__(self, session: Session):
         self.session = session
@@ -53,7 +131,8 @@ class CatalogRepository:
         sort="name",
         language="es",
     ):
-        query = select(Card)
+        """One page of the catalogue with the filters of the list, and the total."""
+        # Filters that are about a card's printings rather than the card.
         printing_filters = []
         if market:
             printing_filters.append(CardPrinting.market == market)
@@ -64,13 +143,8 @@ class CatalogRepository:
             printing_filters.append(CardPrinting.set_id == set_id)
         if product_type:
             printing_filters.append(CardSet.product_type == product_type)
-        printing_query = (
-            select(1)
-            .select_from(CardPrinting)
-            .join(CardSet)
-            .join(Rarity)
-            .where(CardPrinting.card_id == Card.id, *printing_filters)
-        )
+
+        query = select(Card)
         if market:
             query = query.where(in_market(market))
         if rarity_names is not None or set_id or product_type:
@@ -80,35 +154,29 @@ class CatalogRepository:
                 select(CardPrinting.card_id).join(CardSet).join(Rarity).where(*printing_filters)
             )
             query = query.where(Card.id.in_(matching_cards))
-        if card_type:
-            query = query.where(Card.card_type == card_type)
+        # Plain columns; Level, Rank (Xyz) and Link rating are different numbers on the card.
+        equal = {
+            Card.card_type: card_type,
+            Card.monster_race: race,
+            Card.attribute: attribute,
+            Card.card_property: card_property,
+        }
+        numbers = {Card.level: level, Card.rank: rank, Card.link_rating: link_rating}
+        query = query.where(
+            *(column == value for column, value in equal.items() if value),
+            *(column == value for column, value in numbers.items() if value is not None),
+        )
+        # Lists stored as JSON: the value must be one of their items.
         if subtype:
-            query = query.where(
-                Card.subtypes.cast(Text).contains('"' + subtype + '"', autoescape=True)
-            )
+            query = query.where(listed(Card.subtypes, subtype))
+        if ability:
+            query = query.where(listed(Card.monster_abilities, ability))
         # Type levels (app/services/card_types.py). "Pendulum" is a flag on top
         # of a frame, so it is filtered on its own column.
         if frame == "Pendulum":
             query = query.where(Card.is_pendulum.is_(True))
         elif frame:
             query = query.where(Card.monster_frame == frame)
-        if ability:
-            query = query.where(
-                Card.monster_abilities.cast(Text).contains('"' + ability + '"', autoescape=True)
-            )
-        if race:
-            query = query.where(Card.monster_race == race)
-        if attribute:
-            query = query.where(Card.attribute == attribute)
-        # Level, Rank (Xyz) and Link rating are different numbers on the card.
-        if level is not None:
-            query = query.where(Card.level == level)
-        if rank is not None:
-            query = query.where(Card.rank == rank)
-        if link_rating is not None:
-            query = query.where(Card.link_rating == link_rating)
-        if card_property:
-            query = query.where(Card.card_property == card_property)
         if archetype_id:
             query = query.where(
                 exists(
@@ -122,75 +190,16 @@ class CatalogRepository:
                 )
             )
         if q:
-            query = query.where(
-                or_(
-                    # In a name, every word counts, in any order.
-                    exists(
-                        select(1).where(
-                            CardName.card_id == Card.id,
-                            *(CardName.name.icontains(word, autoescape=True) for word in q.split()),
-                        )
-                    ),
-                    exists(
-                        printing_query.where(
-                            or_(
-                                CardPrinting.code.icontains(q, autoescape=True),
-                                CardSet.name.icontains(q, autoescape=True),
-                                Rarity.name.icontains(q, autoescape=True),
-                            )
-                        )
-                    ),
-                    exists(
-                        select(1)
-                        .select_from(CardArchetype)
-                        .join(Archetype)
-                        .where(
-                            CardArchetype.card_id == Card.id,
-                            CardArchetype.relation == "member",
-                            Archetype.name.icontains(q, autoescape=True),
-                        )
-                    ),
-                    Card.card_type.icontains(q, autoescape=True),
-                )
-            )
+            query = query.where(matches_search(q, printing_filters))
+
         total = self.session.scalar(select(func.count()).select_from(query.subquery()))
-        if sort == "updated":
-            ordering = (Card.updated_at.desc(), Card.id)
-        elif sort in ("newest", "oldest"):
-            # By the card's latest printing (in this market), as Cardmarket's
-            # "release date"; cards without a known date go last either way.
-            released = (
-                select(func.max(func.coalesce(CardPrinting.release_date, CardSet.release_date)))
-                .select_from(CardPrinting)
-                .join(CardSet)
-                .where(CardPrinting.card_id == Card.id)
-            )
-            if market:
-                released = released.where(CardPrinting.market == market)
-            released = released.scalar_subquery()
-            direction = released.desc() if sort == "newest" else released.asc()
-            ordering = (direction.nullslast(), Card.display_name, Card.id)
-        else:
-            localized = (
-                select(CardName.name)
-                .where(
-                    CardName.card_id == Card.id,
-                    CardName.language == language,
-                    CardName.is_current.is_(True),
-                )
-                .order_by(CardName.is_official.desc(), CardName.name)
-                .limit(1)
-                .scalar_subquery()
-            )
-            name_order = func.lower(func.coalesce(localized, Card.display_name))
-            ordering = (name_order.desc() if sort == "name_desc" else name_order.asc(), Card.id)
         cards = self.session.scalars(
             query.options(
                 selectinload(Card.names),
                 selectinload(Card.artworks),
                 selectinload(Card.printings).options(*printing_loads()),
             )
-            .order_by(*ordering)
+            .order_by(*ordering(sort, market, language))
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()

@@ -285,11 +285,7 @@ export function typeFiltersHtml(tab, types) {
     return TYPE_FILTERS.filter((filter) => filter.tabs.includes(tab))
         .map((filter) => {
             const label = labelOf(filter, tab);
-            return `<select id="${filter.id}" aria-label="${h(label)}" title="${h(label)}">${optionsFor(
-                filter,
-                tab,
-                types
-            )}</select>`;
+            return `<select id="${filter.id}" aria-label="${h(label)}" title="${h(label)}">${optionsFor(filter, tab, types)}</select>`;
         })
         .join("");
 }

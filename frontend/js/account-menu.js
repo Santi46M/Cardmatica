@@ -1,7 +1,7 @@
 // Account menu: the round avatar at the top right and its dropdown, in the
 // style of Cardmarket and TCGplayer. Entries that already work open their
 // panel; the rest show what is coming next (see the roadmap) and are disabled.
-import { escapeHtml } from "./html.js";
+import { escapeHtml, html } from "./html.js";
 import { lang, t } from "./lang.js";
 import { currentUser } from "./auth.js";
 import { currentProfile, ROLE_LABELS } from "./profile.js";
@@ -69,43 +69,35 @@ function avatarHtml() {
 
 function itemHtml([label, tab, anchor]) {
     if (!tab)
-        return `<button role="menuitem" class="acc-item" disabled aria-disabled="true">${h(
-            t(label)
-        )}<small>${t("Próximamente")}</small></button>`;
+        return `<button role="menuitem" class="acc-item" disabled aria-disabled="true">${h(t(label))}<small>${t("Próximamente")}</small></button>`;
     const badge = tab === "Deseados" && countItems() ? `<small>${countItems()}</small>` : "";
-    return `<button role="menuitem" class="acc-item" data-go="${h(tab)}"${
-        anchor ? ` data-acc-scroll="${h(anchor)}"` : ""
-    }>${h(t(label))}${badge}</button>`;
+    const scroll = anchor ? ` data-acc-scroll="${h(anchor)}"` : "";
+    return `<button role="menuitem" class="acc-item" data-go="${h(tab)}"${scroll}>${h(t(label))}${badge}</button>`;
 }
 
 function whoHtml() {
     const user = currentUser();
     const profile = currentProfile();
-    if (user)
-        return `<b>${h(user.display_name)}</b><small>${h(user.email)}${
-            user.email_verified ? "" : ` · <span class="warn-text">${t("sin confirmar")}</span>`
-        }${
-            profile?.store ? ` · ${h(profile.store)}` : ""
-        }</small>`;
+    const store = profile?.store ? ` · ${h(profile.store)}` : "";
+    if (user) {
+        const unconfirmed = user.email_verified ? "" : ` · <span class="warn-text">${t("sin confirmar")}</span>`;
+        return `<b>${h(user.display_name)}</b><small>${h(user.email)}${unconfirmed}${store}</small>`;
+    }
     // Without an account, the profile kept in this browser still names the person.
     if (profile)
-        return `<b>${h(profile.name)}</b><small>${h(t(ROLE_LABELS[profile.role] || ""))}${
-            profile.store ? ` · ${h(profile.store)}` : ""
-        } · ${t("sin cuenta")}</small>`;
+        return `<b>${h(profile.name)}</b><small>${h(t(ROLE_LABELS[profile.role] || ""))}${store} · ${t("sin cuenta")}</small>`;
     return `<b>${t("Invitado")}</b><small>${t("Inicia sesión o crea una cuenta")}</small>`;
 }
 
 // Signed out: the way in comes first. Signed in: the way out comes last.
 function accessHtml() {
     if (currentUser())
-        return `<div class="acc-section"><button role="menuitem" class="acc-item" data-auth-logout>${t(
-            "Cerrar sesión"
-        )}</button></div>`;
-    return `<div class="acc-access"><button role="menuitem" class="btn s acc-item-main" data-go="Acceso" data-auth-mode="login">${t(
-        "Iniciar sesión"
-    )}</button><button role="menuitem" class="ghost acc-item-main" data-go="Acceso" data-auth-mode="register">${t(
-        "Crear cuenta"
-    )}</button></div>`;
+        return `<div class="acc-section"><button role="menuitem" class="acc-item" data-auth-logout>${t("Cerrar sesión")}</button></div>`;
+    return html`
+        <div class="acc-access">
+            <button role="menuitem" class="btn s acc-item-main" data-go="Acceso" data-auth-mode="login">${t("Iniciar sesión")}</button>
+            <button role="menuitem" class="ghost acc-item-main" data-go="Acceso" data-auth-mode="register">${t("Crear cuenta")}</button>
+        </div>`;
 }
 
 // Only administrators see the way into the panel.
@@ -115,23 +107,26 @@ function adminHtml() {
 }
 
 function sectionHtml([title, items]) {
-    return `<div class="acc-section" role="group" aria-label="${h(t(title))}"><span class="acc-title">${h(
-        t(title)
-    )}</span>${items.map(itemHtml).join("")}</div>`;
+    return html`
+        <div class="acc-section" role="group" aria-label="${h(t(title))}">
+            <span class="acc-title">${h(t(title))}</span>
+            ${items.map(itemHtml).join("")}
+        </div>`;
 }
 
 // The site's three languages, each written in itself (frontend/i18n.js).
 function languageHtml() {
-    return `<div class="acc-section" role="group" aria-label="${t("Idioma")}"><span class="acc-title">${t(
-        "Idioma"
-    )}</span><div class="acc-langs">${window.I18N.languages
+    const buttons = window.I18N.languages
         .map(
             ([code, name]) =>
-                `<button role="menuitem" class="ghost" data-lang="${code}" lang="${code}" aria-pressed="${
-                    code === lang
-                }">${name}</button>`
+                `<button role="menuitem" class="ghost" data-lang="${code}" lang="${code}" aria-pressed="${code === lang}">${name}</button>`
         )
-        .join("")}</div></div>`;
+        .join("");
+    return html`
+        <div class="acc-section" role="group" aria-label="${t("Idioma")}">
+            <span class="acc-title">${t("Idioma")}</span>
+            <div class="acc-langs">${buttons}</div>
+        </div>`;
 }
 
 function menuHtml() {
@@ -143,9 +138,7 @@ function menuHtml() {
             : "Sin cuenta, el perfil y las listas de deseados se guardan solo en este navegador."
     );
     return [
-        `<div class="acc-who"><span class="acc-avatar big" aria-hidden="true">${avatarHtml()}</span><div>${whoHtml()}${
-            role ? `<small>${h(role)}</small>` : ""
-        }</div></div>`,
+        `<div class="acc-who"><span class="acc-avatar big" aria-hidden="true">${avatarHtml()}</span><div>${whoHtml()}${role ? `<small>${h(role)}</small>` : ""}</div></div>`,
         signedIn ? "" : accessHtml(),
         ...SECTIONS.map(sectionHtml),
         languageHtml(),
@@ -159,8 +152,9 @@ export function installAccountMenu() {
     const bar = document.querySelector("header .bar");
     const wrap = document.createElement("div");
     wrap.className = "acc";
-    wrap.innerHTML =
-        `<button class="acc-avatar" id="account-button" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu" title="${t("Mi cuenta")}"></button><div class="acc-menu gl" id="account-menu" role="menu" aria-labelledby="account-button" hidden></div>`;
+    wrap.innerHTML = html`
+        <button class="acc-avatar" id="account-button" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu" title="${t("Mi cuenta")}"></button>
+        <div class="acc-menu gl" id="account-menu" role="menu" aria-labelledby="account-button" hidden></div>`;
     bar.append(wrap);
     const button = wrap.querySelector("#account-button");
     const menu = wrap.querySelector("#account-menu");

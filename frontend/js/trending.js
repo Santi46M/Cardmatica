@@ -1,7 +1,7 @@
 // "En tendencia" on the home page: the lists the API finds in the catalogue
 // (backend/app/services/trending.py), one at a time, each with its tab. A list
 // without cards does not come, so a new catalogue may show only some.
-import { escapeHtml } from "./html.js";
+import { escapeHtml, html } from "./html.js";
 import { formatDate, money } from "./format.js";
 import { t } from "./lang.js";
 
@@ -50,16 +50,19 @@ export function trendingHtml(data, tile) {
     if (!lists.length) return "";
     if (!lists.some((list) => list.key === active)) active = lists[0].key;
     const current = lists.find((list) => list.key === active);
-    return `<section class="trend" aria-labelledby="trend-title"><h2 class="sec-title" id="trend-title">${t("En tendencia")}</h2><div class="trend-tabs" role="tablist">${lists
+    const tabs = lists
         .map(
             (list) =>
-                `<button role="tab" aria-selected="${list.key === active}" data-trend="${list.key}">${h(
-                    t(LISTS[list.key][0])
-                )}</button>`
+                `<button role="tab" aria-selected="${list.key === active}" data-trend="${list.key}">${h(t(LISTS[list.key][0]))}</button>`
         )
-        .join("")}</div><div class="grid" role="tabpanel">${current.items
-        .map((item) => tile(item.card, LISTS[current.key][1](item.reason)))
-        .join("")}</div></section>`;
+        .join("");
+    const tiles = current.items.map((item) => tile(item.card, LISTS[current.key][1](item.reason))).join("");
+    return html`
+        <section class="trend" aria-labelledby="trend-title">
+            <h2 class="sec-title" id="trend-title">${t("En tendencia")}</h2>
+            <div class="trend-tabs" role="tablist">${tabs}</div>
+            <div class="grid" role="tabpanel">${tiles}</div>
+        </section>`;
 }
 
 // Switching tabs redraws the section in place with the data already loaded.
