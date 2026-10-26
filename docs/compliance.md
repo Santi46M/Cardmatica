@@ -26,7 +26,7 @@ Las páginas existen en español, portugués e inglés.
 | Edad y datos de menores | Solo mayores de 18 (casilla obligatoria, fecha guardada); no se recogen datos de menores (LGPD art. 14 pediría consentimiento de los padres) | migración 014 |
 | Darse de baja de correos | Solo hay correos de la cuenta (confirmar correo, recuperar contraseña), no publicidad: no hay lista de la que darse de baja. El pie de cada correo lo dice y enlaza para descargar o borrar los datos. Si un día hay boletines, necesitarán consentimiento y un enlace de baja en cada envío | `backend/app/services/accounts.py` |
 | Licencias de fuentes e imágenes | Tipografías del sistema (no se descargan); logo, íconos, banderas e imagen social propios; ilustraciones de cartas nunca públicas sin licencia; marcas de productos de sus dueños. Créditos en el aviso legal | `/aviso-legal` |
-| Pedido de borrado de datos | «Seguridad e inicio de sesión» → «Borrar mi cuenta» (contraseña + casilla) borra cuenta, perfil, preferencias, listas y sesiones; «Descargar mis datos» da un JSON con todo | `/api/v1/account/delete`, `/api/v1/account/export` |
+| Pedido de borrado de datos | «Seguridad e inicio de sesión» → «Borrar mi cuenta» (contraseña + casilla) borra cuenta, perfil, preferencias, listas, cartas vistas y sesiones; «Descargar mis datos» da un JSON con todo | `/api/v1/account/delete`, `/api/v1/account/export` |
 
 ## Pendiente antes de abrir ventas reales
 

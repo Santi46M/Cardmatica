@@ -33,8 +33,8 @@ from app.schemas.catalog import (
     PrintingView,
     SetView,
 )
+from app.services import card_views, rarities, recommendations
 from app.services import product_images as product_photos
-from app.services import rarities
 from app.services.banlists import current_lists, list_view, statuses_for_cards
 from app.services.card_types import ATTRIBUTES, RACES, taxonomy
 from app.services.catalog import card_detail, card_summary, errata_views, printing_view
@@ -170,6 +170,39 @@ def require_card(session, card_id):
 def require_card_exists(session, card_id):
     if not session.scalar(select(Card.id).where(Card.id == card_id)):
         raise HTTPException(404, "Carta inexistente")
+
+
+@router.get("/cards/for-you")
+def cards_for_you(
+    session: SessionDep,
+    ids: Annotated[
+        str,
+        Query(
+            max_length=1000,
+            description="Cartas vistas, la más reciente primero, separadas por comas",
+        ),
+    ] = "",
+    market: Market | None = None,
+    language: Annotated[str, Query(min_length=2, max_length=12)] = "es",
+    limit: Annotated[int, Query(ge=1, le=24)] = 12,
+):
+    """The home page's own section for each person, from the cards they opened."""
+    viewed = []
+    for value in ids.split(",")[: card_views.KEEP]:
+        try:
+            viewed.append(UUID(value.strip()))
+        except ValueError:
+            continue
+    recent, related, printed_together = recommendations.for_you(session, viewed, market, limit)
+
+    def summaries(cards):
+        return [card_summary(card, language, market) for card in cards[:limit]]
+
+    return {
+        "recent": summaries(recent),
+        "archetypes": summaries(related),
+        "sets": summaries(printed_together),
+    }
 
 
 @router.get("/cards/{card_id}", response_model=CardDetail)

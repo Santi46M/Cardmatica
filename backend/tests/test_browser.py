@@ -91,7 +91,7 @@ def test_catalog_printing_switch_currency_and_market(live_server, browser_page):
     page.on("pageerror", lambda error: errors.append(str(error)))
 
     page.goto(live_server)
-    expect(page.locator("#home")).to_contain_text("Synthetic Test Dragon")
+    expect(page.locator("#home h1")).to_be_visible()
     page.locator('[data-go="Todas"]').click()
     expect(page.locator("#list")).to_contain_text("Synthetic Test Dragon")
     page.locator("#list [data-catalog-card]").first.click()
@@ -1019,3 +1019,32 @@ def test_delete_my_account_from_security(live_server, browser_page):
     expect(page.locator("#ts")).to_contain_text("se borraron")
     page.locator("#account-button").click()
     expect(page.locator("#account-menu")).to_contain_text("Invitado")
+
+
+def test_for_you_shows_the_cards_this_person_opened(live_server, browser_page):
+    page = browser_page
+    page.goto(live_server)
+    # Nothing opened yet: no section of one's own.
+    expect(page.locator("#home h1")).to_be_visible()
+    expect(page.locator("#home-for-you section")).to_have_count(0)
+    page.goto(f"{live_server}/?tab=Todas")
+    page.locator("#list [data-catalog-card]").first.click()
+    expect(page.locator("#mb")).to_contain_text("Synthetic official test text.")
+    assert len(page.evaluate("JSON.parse(localStorage.getItem('cm_recent_cards'))")) == 1
+    page.goto(live_server)
+    section = page.locator("#home-for-you section")
+    expect(section).to_contain_text("Para ti")
+    expect(section.locator('[role="tab"]').first).to_have_text("Vistas recientemente")
+    tile = section.locator(".card-tile").first
+    expect(tile).to_contain_text("Synthetic Test Dragon")
+    # Hovering the card shows its preview, drawn above everything else (once
+    # the other sections have arrived and nothing moves under the pointer).
+    page.wait_for_load_state("networkidle")
+    picture = tile.locator("img, .catalog-image-fallback").first
+    picture.hover()
+    # Scrolling hides it; moving over the card again brings it back.
+    box = picture.bounding_box()
+    page.mouse.move(box["x"] + 20, box["y"] + 20)
+    preview = page.locator("#card-preview")
+    expect(preview).to_be_visible()
+    assert page.evaluate("document.getElementById('card-preview').matches(':popover-open')")

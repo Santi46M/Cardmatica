@@ -3,8 +3,9 @@
 export const CATALOG = {
     // Cards per page in the catalogue and in a card's list of printings.
     pageSize: 24,
-    // Cards shown on the home page, and news in each of its two columns.
-    homeSize: 8,
+    // Cards in each list of the home page: 12 fill whole rows of 2, 3, 4 or 6.
+    homeTiles: 12,
+    // News in each of the home page's two columns.
     newsSize: 3,
     // Wait this long after the last keystroke before searching.
     searchDelayMs: 250,
@@ -27,6 +28,10 @@ export const API_CACHE = {
     // Oldest answers are dropped beyond this many.
     maxEntries: 100
 };
+
+// Cards opened lately, for "Para ti" on the home page; the account keeps as
+// many (backend/app/services/card_views.py, KEEP).
+export const RECENT_CARDS = { keep: 24 };
 
 export const HOVER_PREVIEW = {
     // Hover this long before the card preview appears.

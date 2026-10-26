@@ -45,7 +45,9 @@ import { installProfile, renderProfile } from "./profile.js";
 import { rarityOptionsHtml, rarityParams } from "./rarities.js";
 import { installSearchSuggest } from "./search-suggest.js";
 import { readJson, writeJson } from "./storage.js";
-import { installTrending, trendingHtml } from "./trending.js";
+import { trendingHtml } from "./trending.js";
+import { forYouHtml, recentCards, rememberCard, syncRecentCards } from "./for-you.js";
+import { installTileTabs, showTileTabs } from "./tile-tabs.js";
 import { newsHtml } from "./news.js";
 import { cardWantsHtml, installWantlists, refreshAlerts, renderWantlists } from "./wantlists.js";
 
@@ -73,7 +75,6 @@ let selectedPrinting = "";
 let priceHistory;
 let chartDays = 365;
 let view = readJson("cm_view", "list") === "grid" ? "grid" : "list";
-let shownItems = new Map();
 let closingFromHistory = false;
 // Filter values from the URL wait here until their options exist.
 const wanted = {};
@@ -471,18 +472,56 @@ document.addEventListener(
     true
 );
 
-let trendingData = null;
-async function showTrending(request) {
-    try {
-        trendingData = await request;
-    } catch {
-        // Without trending lists the home page simply goes on to the catalogue.
-        trendingData = null;
-    }
-    const slot = element("home-trending");
-    if (slot) slot.innerHTML = trendingHtml(trendingData, tileHtml);
+// ---- The home page -------------------------------------------------------------
+
+// Every card drawn on the page, by id, for the preview on hover.
+const knownCards = new Map();
+function learn(cards) {
+    if (knownCards.size > 500) knownCards.clear();
+    for (const card of cards) knownCards.set(card.id, card);
 }
-installTrending({ slot: () => element("home-trending"), data: () => trendingData, tile: tileHtml });
+
+let trendingData = null;
+let forYouData = null;
+const homeSlot = (name) => element(`home-${name}`);
+installTileTabs("trend", {
+    slot: () => homeSlot("trending"),
+    draw: (key) => trendingHtml(trendingData, tileHtml, key)
+});
+installTileTabs("for-you", {
+    slot: () => homeSlot("for-you"),
+    draw: (key) => forYouHtml(forYouData, tileHtml, key)
+});
+
+// The top of the page at once; each section under it when its answer
+// arrives. A section that fails, or has nothing to show, is left out.
+function showHome(current) {
+    const { market } = window;
+    const language = window.I18N.lang;
+    const still = () => current === generation && window.tab === "Inicio";
+    element("home").innerHTML = homeHtml({ signedIn: Boolean(currentUser()) });
+    status("");
+    writeUrl();
+    api.get("trending", { market, language, limit: CATALOG.homeTiles }).then((data) => {
+        if (!still()) return;
+        trendingData = data;
+        learn(data.lists.flatMap((list) => list.items.map((item) => item.card)));
+        showTileTabs(homeSlot("trending"), trendingHtml(data, tileHtml));
+    }, () => {});
+    const seen = recentCards();
+    if (seen.length)
+        api.get("cards/for-you", { ids: seen.join(","), market, language, limit: CATALOG.homeTiles }).then((data) => {
+            if (!still()) return;
+            forYouData = data;
+            learn([...data.recent, ...data.archetypes, ...data.sets]);
+            showTileTabs(homeSlot("for-you"), forYouHtml(data, tileHtml));
+        }, () => {});
+    showHomeBanlist(api.get("banlists"));
+    api.get("news", { limit: CATALOG.newsSize, lang: language }).then((data) => {
+        if (still()) homeSlot("news").innerHTML = newsHtml(data);
+    }, () => {});
+    loadFacets().catch(() => {});
+}
 
 async function showHomeBanlist(request) {
     const slot = element("home-banlist");
@@ -501,19 +540,14 @@ function showViewContainers() {
     grid.hidden = view !== "grid";
 }
 
-function showSkeleton(home) {
-    if (home) {
-        if (!element("home").innerHTML.trim())
-            element("home").innerHTML = `<div class="sk-hero gl" aria-hidden="true"></div><div class="grid">${skeletonTiles(4)}</div>`;
-        return;
-    }
+function showSkeleton() {
     showViewContainers();
     if (view === "grid") grid.innerHTML = skeletonTiles(12);
     else element("list").innerHTML = skeletonRows(8);
 }
 
 function renderResults(data) {
-    shownItems = new Map(data.items.map((card) => [card.id, card]));
+    learn(data.items);
     showViewContainers();
     if (view === "grid") grid.innerHTML = catalogGrid(data);
     else element("list").innerHTML = catalogRows(data);
@@ -539,42 +573,32 @@ async function loadCards(reset = false) {
     controller?.abort();
     controller = new AbortController();
     const current = ++generation;
-    const home = window.tab === "Inicio";
+    if (window.tab === "Inicio") return showHome(current);
     status(t("Consultando catálogo…"), { quiet: true });
-    element(home ? "home" : "cat").setAttribute("aria-busy", "true");
+    element("cat").setAttribute("aria-busy", "true");
     // Cached answers arrive at once; only slower ones show placeholders.
-    const skeleton = setTimeout(
-        () => current === generation && showSkeleton(home),
-        CATALOG.skeletonDelayMs
-    );
-    // The home page's banlist and trending cards are asked for with its cards.
-    const banlist = home ? api.get("banlists") : null;
-    const trending = home ? api.get("trending", { market: window.market, language: window.I18N.lang }) : null;
-    const news = home ? api.get("news", { limit: CATALOG.newsSize, lang: window.I18N.lang }) : null;
-    for (const request of [banlist, trending, news]) request?.catch(() => {});
+    const skeleton = setTimeout(() => current === generation && showSkeleton(), CATALOG.skeletonDelayMs);
     try {
-        if (!home) {
-            renderScopeHead();
-            await loadFacets();
-            renderTypeFilters();
-            applyWanted();
-            hideEmptyFilters();
-            updateFiltersToggle();
-        }
+        renderScopeHead();
+        await loadFacets();
+        renderTypeFilters();
+        applyWanted();
+        hideEmptyFilters();
+        updateFiltersToggle();
         writeUrl();
         const data = await api.get(
             "cards",
             {
-                page: home ? 1 : page,
-                page_size: home ? CATALOG.homeSize : CATALOG.pageSize,
-                market: scope?.kind === "set" && !home ? undefined : window.market,
-                ...(home ? {} : scopeParams(scope)),
+                page,
+                page_size: CATALOG.pageSize,
+                market: scope?.kind === "set" ? undefined : window.market,
+                ...scopeParams(scope),
                 q: element("q").value.trim(),
                 card_type: cardTypes[window.tab],
-                ...(home ? {} : typeParams()),
-                ...(home ? {} : rarityParams(element("rar").value)),
-                product_type: home ? undefined : element("stp").value,
-                sort: home ? "updated" : element("srt").value,
+                ...typeParams(),
+                ...rarityParams(element("rar").value),
+                product_type: element("stp").value,
+                sort: element("srt").value,
                 language: window.I18N.lang
             },
             { signal: controller.signal }
@@ -584,37 +608,21 @@ async function loadCards(reset = false) {
         const query = element("q").value.trim();
         if (query && query !== lastSearch) track("busqueda");
         lastSearch = query;
-        if (home) {
-            element("home").innerHTML = `${homeHtml(data, {
-                signedIn: Boolean(currentUser())
-            })}<div id="home-banlist"></div><div id="home-news"></div>`;
-            showHomeBanlist(banlist);
-            showTrending(trending);
-            news.then((data) => {
-                const slot = element("home-news");
-                if (slot) slot.innerHTML = newsHtml(data);
-            }, () => {});
-            loadFacets().catch(() => {});
-        } else {
-            lastData = data;
-            renderResults(data);
-        }
+        lastData = data;
+        renderResults(data);
         status(data.total ? "" : t("El catálogo no contiene resultados para este mercado y estos filtros."));
     } catch (error) {
         if (error.name === "AbortError" || current !== generation) return;
         const message = `${h(error.message)} <button class="ghost" data-catalog-retry>${t("Reintentar")}</button>`;
-        if (home) element("home").innerHTML = `<div class="empty gl" role="alert">${message}</div>`;
-        else {
-            showViewContainers();
-            element("list").innerHTML = `<tr><td colspan="3" class="empty" role="alert">${message}</td></tr>`;
-            grid.innerHTML = `<p class="empty" role="alert">${message}</p>`;
-            pagination.innerHTML = "";
-            topPagination.innerHTML = "";
-        }
+        showViewContainers();
+        element("list").innerHTML = `<tr><td colspan="3" class="empty" role="alert">${message}</td></tr>`;
+        grid.innerHTML = `<p class="empty" role="alert">${message}</p>`;
+        pagination.innerHTML = "";
+        topPagination.innerHTML = "";
         status(t("No se pudo cargar el catálogo."));
     } finally {
         clearTimeout(skeleton);
-        if (current === generation) element(home ? "home" : "cat").removeAttribute("aria-busy");
+        if (current === generation) element("cat").removeAttribute("aria-busy");
     }
 }
 
@@ -713,6 +721,7 @@ async function openCard(id, { push = true } = {}) {
         detail = card;
         cardMeta(card.name);
         track("carta");
+        rememberCard(id);
         printingPage = printings;
         selectedPrinting = printingInChosenRarity(printings.items);
         renderDetail();
@@ -825,7 +834,7 @@ document.addEventListener(
 
 // ---- Card preview on hover and back to top (their own modules) ---------------
 
-const { hidePreview } = installCardPreview({ lookup: (id) => shownItems.get(id) });
+const { hidePreview } = installCardPreview({ lookup: (id) => knownCards.get(id) });
 installBackToTop({ focus: element("q") });
 installHeaderScroll();
 
@@ -923,8 +932,9 @@ installAuth({
 installAccountMenu();
 installLanguageMenu();
 installAdmin();
-// The home page's call to action depends on whether someone is signed in.
-document.addEventListener("cm:account", () => {
+// The home page's call to action and "Para ti" depend on who is signed in.
+document.addEventListener("cm:account", async () => {
+    await syncRecentCards();
     if (window.tab === "Inicio") window.refreshList();
 });
 loadAccount();

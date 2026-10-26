@@ -21,6 +21,7 @@ from app.db.base import Base, Entity
 __all__ = [
     "ROLES",
     "AccountToken",
+    "CardView",
     "User",
     "UserProfile",
     "UserSession",
@@ -130,3 +131,17 @@ class AccountToken(Entity, Base):
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class CardView(Entity, Base):
+    """A card the person opened, for "Vistas recientemente" on the home page.
+
+    Only the latest few are kept (app/services/card_views.py); they go with the
+    account when it is deleted, and in the copy of its data.
+    """
+
+    __tablename__ = "card_views"
+    __table_args__ = (UniqueConstraint("user_id", "card_id"),)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    card_id: Mapped[UUID] = mapped_column(ForeignKey("cards.id", ondelete="CASCADE"))
+    viewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

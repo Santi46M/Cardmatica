@@ -134,10 +134,10 @@ function catalogRow(card) {
     return html`
         <tr class="catalog-row" tabindex="0" data-catalog-card="${h(card.id)}" aria-label="${h(`${card.name}, ${meta}`)}">
             <td>
-                <div class="nm">
+                <div class="nm" data-preview="${h(card.id)}">
                     ${imageHtml(card.image, `${card.name} — ${t(kind)}`)}
                     <div class="nm-text">
-                        <b data-preview="${h(card.id)}">${badgeHtml(card.market_banlist)}${h(card.name)}</b>
+                        <b>${badgeHtml(card.market_banlist)}${h(card.name)}</b>
                         <small class="meta" title="${h(meta)}">${h(meta)}</small>
                     </div>
                 </div>
@@ -167,22 +167,23 @@ function tilePrice(sale) {
     return `<b class="price">${salePrice(sale)}</b><small>${saleDate(sale)}</small>`;
 }
 
-// Image-first tiles for collectors; same data and click target as the table rows.
+// An image-first tile, for collectors: the catalogue's grid and the home page's
+// sections. Same data and click target as a table row; line says why it is there.
+export function tileHtml(card, line = cardMeta(card)) {
+    return html`
+        <button class="card-tile gl" data-catalog-card="${h(card.id)}" data-preview="${h(card.id)}">
+            ${gridImage(card)}
+            <span class="card-tile-body">
+                <b>${badgeHtml(card.market_banlist)}${h(card.name)}</b>
+                <small class="meta" title="${h(line)}">${h(line)}</small>
+                <span class="card-tile-price">${tilePrice(card.last_sale)}</span>
+            </span>
+        </button>`;
+}
+
 export function catalogGrid(data) {
     if (!data.items.length) return `<p class="empty">${t(NO_CARDS)}</p>`;
-    return data.items
-        .map(
-            (card) => html`
-                <button class="card-tile gl" data-catalog-card="${h(card.id)}">
-                    ${gridImage(card)}
-                    <span class="card-tile-body">
-                        <b>${badgeHtml(card.market_banlist)}${h(card.name)}</b>
-                        <small class="meta">${h(cardMeta(card))}</small>
-                        <span class="card-tile-price">${tilePrice(card.last_sale)}</span>
-                    </span>
-                </button>`
-        )
-        .join("");
+    return data.items.map((card) => tileHtml(card)).join("");
 }
 
 // Placeholders shaped like the content, so the layout does not jump while loading.
@@ -249,28 +250,12 @@ export function previewHtml(card) {
         </div>`;
 }
 
-// A home tile: image, name and one line of detail.
-export function tileHtml(card, line) {
-    return html`
-        <button class="tile gl" data-catalog-card="${h(card.id)}">
-            ${imageHtml(card.image, card.name)}
-            <span><b>${h(card.name)}</b><small>${h(line)}</small></span>
-        </button>`;
-}
-
-export function homeHtml(data, { signedIn = false } = {}) {
+// The top of the home page: its one <h1> and the calls to action, visible
+// without scrolling; the sections under it arrive on their own (catalog.js).
+export function homeHtml({ signedIn = false } = {}) {
     const second = signedIn
         ? `<button class="ghost" data-go="Deseados">${t("Mi lista de deseados")}</button>`
         : `<button class="ghost" data-go="Acceso" data-auth-mode="register">${t("Crear cuenta gratis")}</button>`;
-    const tiles = data.items
-        .map((card) =>
-            tileHtml(card, `${t("{count} impresiones", { count: card.printing_count })} · ${card.markets.join(" / ")}`)
-        )
-        .join("");
-    const catalog = data.items.length
-        ? `<div class="grid">${tiles}</div>`
-        : `<div class="empty gl">${t("Todavía no hay cartas importadas para este mercado.")}</div>`;
-    // The page's one <h1> and its calls to action, visible without scrolling.
     return html`
         <section class="hero2 gl">
             <h1>${t("Cartas de <b>Yu-Gi-Oh!</b> para el Mercosur")}</h1>
@@ -281,8 +266,9 @@ export function homeHtml(data, { signedIn = false } = {}) {
             </p>
         </section>
         <div id="home-trending"></div>
-        <h2 class="sec-title">${t("Cartas del catálogo")}</h2>
-        ${catalog}`;
+        <div id="home-for-you"></div>
+        <div id="home-banlist"></div>
+        <div id="home-news"></div>`;
 }
 
 // ---- The card window ----------------------------------------------------------

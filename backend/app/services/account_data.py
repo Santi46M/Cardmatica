@@ -21,6 +21,7 @@ from app.schemas.accounts import (
     WantlistItemData,
     WantlistsData,
 )
+from app.services import card_views
 from app.services.accounts import AccountError, as_aware
 from app.services.rarities import canonical
 
@@ -200,6 +201,7 @@ def export(session: Session, user: User) -> dict:
         "profile": data.profile.model_dump() if data.profile else None,
         "preferences": data.preferences.model_dump(),
         "wantlists": wantlists(session, user).model_dump(mode="json"),
+        "viewed_cards": [str(card_id) for card_id in card_views.recent_ids(session, user)],
         "sessions": [
             {
                 "started_at": _iso(row.created_at),

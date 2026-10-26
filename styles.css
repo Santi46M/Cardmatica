@@ -726,29 +726,6 @@ small {
     color: var(--warn);
 }
 
-/* Tarjetas */
-.grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-    gap: 10px;
-}
-
-.tile {
-    text-align: left;
-    color: inherit;
-    font: inherit;
-    padding: 12px;
-    border-radius: 12px;
-    cursor: pointer;
-    display: flex;
-    gap: 11px;
-    align-items: center;
-}
-
-.tile:hover {
-    filter: brightness(1.15);
-}
-
 .hero2 {
     padding: 26px 22px;
     border-radius: 16px;
@@ -1397,7 +1374,6 @@ button:disabled {
 .sk-small { height: 10px; width: 38%; }
 .sk-num { height: 13px; width: 64px; margin-left: auto; }
 .sk-art { width: 100%; aspect-ratio: 59 / 86; }
-.sk-hero { height: 190px; border-radius: 16px; margin-bottom: 16px; }
 .sk-tile { cursor: default; }
 
 @keyframes sk-shine {
@@ -1409,10 +1385,15 @@ button:disabled {
     .sk { animation: none; }
 }
 
-/* Vista previa de la carta al pasar el mouse */
+/* Vista previa de la carta al pasar el mouse: un popover, en la capa superior
+   (card-preview.js); el z-index queda para navegadores sin popover. */
 .card-preview {
     position: fixed;
-    z-index: 40;
+    inset: auto;
+    margin: 0;
+    overflow: visible;
+    color: inherit;
+    z-index: 1000;
     display: flex;
     gap: 12px;
     width: 360px;
@@ -2278,7 +2259,15 @@ button.acc-avatar:hover,
     outline: none;
 }
 
-/* En tendencia (trending.js) */
+/* Secciones del inicio con pestañas: En tendencia y Para ti (tile-tabs.js).
+   Las cartas, como en la cuadrícula del catálogo; en el teléfono, de a dos. */
+@media (max-width: 560px) {
+    .tile-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+}
+
 .trend-tabs {
     display: flex;
     gap: 6px;

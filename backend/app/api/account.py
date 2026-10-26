@@ -1,6 +1,8 @@
 """The signed-in person's own data: profile, preferences and wantlists, and the
 right to take a copy of it or to delete the account (privacy policy)."""
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -8,7 +10,7 @@ from pydantic import BaseModel, Field
 from app.api.auth import clear_cookies
 from app.api.dependencies import Current, SessionDep, csrf, same_origin
 from app.schemas.accounts import AccountData, Preferences, ProfileData, WantlistsData
-from app.services import account_data
+from app.services import account_data, card_views
 from app.services.accounts import AccountError
 from app.services.passwords import verify_password
 
@@ -48,6 +50,25 @@ def put_wantlists(payload: WantlistsData, found: Current, session: SessionDep):
         raise HTTPException(400, str(error)) from error
     session.commit()
     return saved
+
+
+class ViewedCards(BaseModel):
+    """Cards opened lately, newest first."""
+
+    card_ids: list[UUID] = Field(default_factory=list, max_length=card_views.KEEP)
+
+
+@router.get("/viewed", response_model=ViewedCards)
+def get_viewed(found: Current, session: SessionDep):
+    return ViewedCards(card_ids=card_views.recent_ids(session, found[0]))
+
+
+@router.put("/viewed", response_model=ViewedCards, dependencies=changes)
+def put_viewed(payload: ViewedCards, found: Current, session: SessionDep):
+    """These go on top of the stored list (the browser's, on signing in, or a card just opened)."""
+    saved = card_views.record(session, found[0], payload.card_ids)
+    session.commit()
+    return ViewedCards(card_ids=saved)
 
 
 @router.get("/export")
