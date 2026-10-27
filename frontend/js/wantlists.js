@@ -30,6 +30,11 @@ const LANGUAGES = {
         ["AE", "Asian-English"]
     ]
 };
+// Magic prints every set in these languages; Pokémon's international market
+// adds Portuguese, and its Japanese market is Japanese only.
+LANGUAGES.MTG = [...LANGUAGES.TCG.filter(([code]) => code !== "PT"), ["JP", "Japonés"]];
+LANGUAGES.PKM = LANGUAGES.TCG;
+LANGUAGES.PKMJ = [["JP", "Japonés"]];
 const LANGUAGE_NAMES = Object.fromEntries([...LANGUAGES.TCG, ...LANGUAGES.OCG]);
 const API_LANGUAGES = { en: "EN", es: "ES", fr: "FR", de: "DE", it: "IT", pt: "PT", ja: "JP", ko: "KR", zh: "SC", ae: "AE" };
 const EDITIONS = [
@@ -38,7 +43,28 @@ const EDITIONS = [
     ["Unlimited", "Unlimited"]
 ];
 const EDITION_NAMES = Object.fromEntries(EDITIONS);
-const TYPES = { Monster: "Monstruo", Spell: "Magia", Trap: "Trampa" };
+const TYPES = {
+    Monster: "Monstruo",
+    Spell: "Magia",
+    Trap: "Trampa",
+    Creature: "Criatura",
+    Instant: "Instantáneo",
+    Sorcery: "Conjuro",
+    Artifact: "Artefacto",
+    Enchantment: "Encantamiento",
+    Planeswalker: "Planeswalker",
+    Land: "Tierra",
+    Pokemon: "Pokémon",
+    Trainer: "Entrenador",
+    Energy: "Energía"
+};
+
+// "OCG", "JP": the market of a list entry; for Magic, the game's name.
+function marketTag(market) {
+    const text = window.marketTagText(market) || window.GAMES[window.gameOfMarket(market)]?.short || market;
+    const second = window.GAMES[window.gameOfMarket(market)]?.markets[1]?.code === market;
+    return `<span class="tag ${second ? "o" : "t"}">${h(text)}</span>`;
+}
 
 const EMPTY = () => ({ lists: [], active: null });
 function localState() {
@@ -152,7 +178,7 @@ function pickerHtml(card, printings, selectedId, market) {
             </select>
             <input id="wl-list-name" placeholder="${t("Nombre de la nueva lista")}" maxlength="60"${noLists ? "" : " hidden"}>
             <select id="wl-printing" aria-label="${t("Impresión")}">${printingChoice}</select>
-            <select id="wl-language" aria-label="${t("Idioma")}">${options(LANGUAGES[market], language, "Cualquier idioma")}</select>
+            <select id="wl-language" aria-label="${t("Idioma")}">${options(LANGUAGES[market] || LANGUAGES.TCG, language, "Cualquier idioma")}</select>
             <select id="wl-edition" aria-label="${t("Edición")}">${options(EDITIONS, "", "Cualquier edición")}</select>
             <label class="qty">${t("Cantidad")} <input id="wl-quantity" type="number" min="1" max="${WANTLIST.maxQuantity}" value="1"></label>
             <button class="btn s" data-wl-add>${t("Añadir")}</button>
@@ -279,7 +305,7 @@ function itemRow(item) {
         <tr>
             <td>
                 <button class="lk" data-catalog-card="${h(item.cardId)}">${h(item.name)}</button>
-                <small><span class="tag ${item.market === "OCG" ? "o" : "t"}">${h(item.market)}</span>${h(type)}${subtypes}</small>
+                <small>${marketTag(item.market)}${h(type)}${subtypes}</small>
             </td>
             <td>${printing}</td>
             <td>${h(t(LANGUAGE_NAMES[item.language] || "Cualquiera"))}</td>
@@ -443,8 +469,8 @@ export function renderWantlists(container) {
             <select id="wl-set" aria-label="${t("Set")}">${options(sets.map((name) => [name, name]), "", "Todos los sets")}</select>
             <select id="wl-filter-language" aria-label="${t("Idioma")}">
                 <option value="">${t("Todos los idiomas")}</option>
-                <optgroup label="TCG">${options(LANGUAGES.TCG)}</optgroup>
-                <optgroup label="OCG">${options(LANGUAGES.OCG)}</optgroup>
+                <optgroup label="${t("Idiomas occidentales")}">${options(LANGUAGES.TCG)}</optgroup>
+                <optgroup label="${t("Idiomas asiáticos")}">${options(LANGUAGES.OCG)}</optgroup>
             </select>
             <select id="wl-filter-edition" aria-label="${t("Edición")}">${options(EDITIONS, "", "Cualquier edición")}</select>
             <span class="cnt" id="wl-count"></span>

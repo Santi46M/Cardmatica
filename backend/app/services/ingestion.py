@@ -26,14 +26,19 @@ from app.models import (
 )
 from app.repositories.ingestion import ProvenanceRepository, aware, conflict, upsert
 from app.schemas.ingestion import CardRecord, PrintingInput, TextInput
-from app.services import card_types
+from app.services import card_types, rarities
 from app.services.reconciliation import resolve_card
 
 SOURCE_POLICIES = {
     "ygoprodeck": (80, "YGOPRODeck", "https://api.ygoprodeck.com/api-guide/"),
     "konami": (100, "Konami", "https://legal.konami.com/games/neuron/terms/tou/en/"),
     "yugipedia": (20, "Yugipedia", "https://yugipedia.com/wiki/Yugipedia:API"),
+    "scryfall": (80, "Scryfall", "https://scryfall.com/docs/api"),
+    "tcgdex": (80, "TCGdex", "https://tcgdex.dev/"),
 }
+# Providers whose card data (names, text, one general picture) the catalogue
+# uses as its own; Yugipedia only complements.
+PROVIDERS = {"ygoprodeck", "scryfall", "tcgdex"}
 
 
 # How sure each source is about the card it describes.
@@ -41,6 +46,8 @@ VALIDATION = {
     "konami": "official_identifier",
     "ygoprodeck": "provider_identifier",
     "yugipedia": "community_identifier",
+    "scryfall": "provider_identifier",
+    "tcgdex": "provider_identifier",
 }
 # Card fields a source may set; each is decided field by field.
 CARD_FIELDS = (
@@ -55,6 +62,10 @@ CARD_FIELDS = (
     "defense",
     "pendulum_scale",
     "available_markets",
+    "colors",
+    "mana_value",
+    "hp",
+    "details",
 )
 GROUP_MODELS = {
     "archetype": (Archetype, CardArchetype, "archetype_id"),
@@ -92,7 +103,7 @@ class IngestionService:
         self._names(card, record, provenance)
         for printing in record.printings:
             self._printing(card, printing, provenance, record.source)
-        if record.source == "ygoprodeck":
+        if record.source in PROVIDERS:
             self._artworks(card, record, provenance)
         self._groups(card, record, provenance)
         for text in record.texts:
@@ -144,7 +155,9 @@ class IngestionService:
             value = getattr(record, field)
             if provenance.select_value(key, field, value):
                 setattr(card, field, value)
-        card_types.apply(card)
+        # Monster frames, spell properties...: Yu-Gi-Oh!'s own type levels.
+        if card.game == "yugioh":
+            card_types.apply(card)
 
     def _names(self, card, record, provenance):
         """Every name in every language; one current name per language."""
@@ -312,7 +325,7 @@ class IngestionService:
                 row.status = entry.status
 
     def _limitations(self, card, record):
-        if record.source == "ygoprodeck":
+        if record.source in PROVIDERS:
             for previous in self.session.scalars(
                 select(DataConflict).where(
                     DataConflict.card_id == card.id,
@@ -353,8 +366,14 @@ class IngestionService:
 
     def _printing(self, card, incoming: PrintingInput, provenance, source):
         """A printing: its set, its rarity, the printing itself and its scans."""
-        card_set = self._set(incoming, provenance)
-        rarity = upsert(self.session, Rarity, {"name": rarity_name(incoming.rarity)}, ["name"])
+        card_set = self._set(incoming, provenance, card.game)
+        # Each game names its own rarities (app/services/rarities.py).
+        name = (
+            rarity_name(incoming.rarity)
+            if card.game == "yugioh"
+            else rarities.canonical(incoming.rarity, card.game)
+        )
+        rarity = upsert(self.session, Rarity, {"name": name}, ["name"])
         # What makes two printings different; the rest may change over time.
         identity = {
             "card_id": card.id,
@@ -382,6 +401,7 @@ class IngestionService:
             "set_id": (str(card_set.id), card_set.id),
             "market": (incoming.market, incoming.market),
             "release_date": (released.isoformat() if released else None, released),
+            "finishes": (incoming.finishes, incoming.finishes),
         }
         for field, (observed, value) in changes.items():
             if provenance.select_value(key, field, observed):
@@ -410,13 +430,14 @@ class IngestionService:
                 card.id,
             )
 
-    def _set(self, incoming: PrintingInput, provenance):
+    def _set(self, incoming: PrintingInput, provenance, game="yugioh"):
         """The set of a printing, by its key in the source, language and market."""
         release_date = incoming.set_release_date or incoming.release_date
         card_set = upsert(
             self.session,
             CardSet,
             {
+                "game": game,
                 "source_key": incoming.set_key,
                 "name": incoming.set_name,
                 "language": incoming.language,
@@ -491,7 +512,7 @@ class IngestionService:
         )
         if (
             incoming.current
-            and provenance.source.slug in {"konami", "ygoprodeck"}
+            and provenance.source.slug in {"konami", *PROVIDERS}
             and provenance.select_value(
                 f"card:{card.id}", f"official_text:{incoming.language}", value_hash
             )
@@ -501,7 +522,7 @@ class IngestionService:
                 .where(
                     CardTextVersion.card_id == card.id,
                     CardTextVersion.language == incoming.language,
-                    CardTextVersion.source_slug.in_(["konami", "ygoprodeck"]),
+                    CardTextVersion.source_slug.in_(["konami", *PROVIDERS]),
                     CardTextVersion.id != row.id,
                 )
                 .values(is_current=False)

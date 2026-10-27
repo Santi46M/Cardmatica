@@ -36,6 +36,27 @@ históricos válidos ya almacenados conservan su precedencia; Yugipedia no puede
 reemplazar información seleccionada de YGOPRODeck ni convertirla en reglas oficiales.
 No se importan precios ni existencias comerciales.
 
+## Scryfall — Magic: The Gathering
+
+Revisado: 2026-10-27. La [documentación de la API](https://scryfall.com/docs/api)
+es pública, pide 50–100 ms entre solicitudes y encabezados `User-Agent` y `Accept`.
+El cliente usa 0,1 s y `Accept: application/json`. Al ser una API documentada para
+este uso, no se consulta robots.txt del host de API (`robots=False`); sí se respetan
+el intervalo, los reintentos con espera y la caché compartida. Las condiciones de
+Scryfall piden no cobrar por acceder a sus datos, no recortar ni marcar sus imágenes
+y acreditar al artista; el material sigue siendo de Wizards of the Coast (política
+de contenido de fans). No se importan precios de Scryfall. Las imágenes de
+cards.scryfall.io quedan sin aprobar hasta tener evidencia de permiso por imagen.
+
+## TCGdex — Pokémon
+
+Revisado: 2026-10-27. [TCGdex](https://tcgdex.dev) es una base abierta y comunitaria
+con API REST pública. El cliente espera 0,5 s entre solicitudes, recorre los sets del
+más nuevo al más antiguo y omite TCG Pocket. Los códigos se toman del objeto en
+inglés y los nombres y textos del idioma pedido. Las imágenes de assets.tcgdex.net
+son de The Pokémon Company y quedan sin aprobar, igual que las demás. No se importan
+precios.
+
 ## Konami
 
 La web oficial enlaza consultas HTML card_search.action, card_list.action y

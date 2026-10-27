@@ -49,6 +49,7 @@ import { trendingHtml } from "./trending.js";
 import { forYouHtml, recentCards, rememberCard, syncRecentCards } from "./for-you.js";
 import { installTileTabs, showTileTabs } from "./tile-tabs.js";
 import { newsHtml } from "./news.js";
+import { portalCounts, portalHtml } from "./portal.js";
 import { cardWantsHtml, installWantlists, refreshAlerts, renderWantlists } from "./wantlists.js";
 
 const api = new CatalogApi();
@@ -78,8 +79,12 @@ let view = readJson("cm_view", "list") === "grid" ? "grid" : "list";
 let closingFromHistory = false;
 // Filter values from the URL wait here until their options exist.
 const wanted = {};
-const cardTypes = { Monstruo: "Monster", Magia: "Spell", Trampa: "Trap" };
+// What a card tab asks the API, per game (frontend/games.js).
+const tabParams = () => window.GAMES[window.game].params[window.tab] || {};
+const gameInfo = () => window.GAMES[window.game];
 const isCommerce = () => ["Productos", "Vendedores"].includes(window.tab);
+// The cover (/), with one box per game; it has no tabs of its own.
+const isPortal = () => window.tab === "Portada";
 // Panels stored in this browser only; they never query the catalogue list.
 const localPanels = {
     Deseados: "wlv",
@@ -98,7 +103,7 @@ const renderLocal = {
     Admin: renderAdmin
 };
 const isLocal = () => window.tab in localPanels;
-const isCatalog = () => !isCommerce() && !isLocal() && window.tab !== "Inicio";
+const isCatalog = () => !isCommerce() && !isLocal() && !isPortal() && window.tab !== "Inicio";
 const SORTS = [
     ["name", "Nombre: A–Z"],
     ["name_desc", "Nombre: Z–A"],
@@ -164,6 +169,14 @@ function updateFiltersToggle() {
     filtersToggle.textContent = used ? t("Filtros ({count})", { count: used }) : t("Filtros");
 }
 
+// The tabs of the game on screen (frontend/games.js).
+function renderTabs() {
+    element("tabs").innerHTML = window.TABS.map(
+        (tab) => `<button aria-pressed="${tab === window.tab}" data-g="${h(tab)}">${h(t(window.TAB_LABELS[tab]))}</button>`
+    ).join("");
+    showCurrentTab();
+}
+
 // On phones the tabs scroll sideways; the current one is brought into view.
 function showCurrentTab() {
     const nav = element("tabs");
@@ -206,7 +219,11 @@ const CARD_PATH = /^\/carta\/([0-9a-f-]{36})(?:\/|$)/i;
 
 function readUrl() {
     const params = new URLSearchParams(location.search);
+    const card = location.pathname.match(CARD_PATH)?.[1] || params.get("card");
     return {
+        game: window.gameFromPath(location.pathname),
+        // "/" alone is the cover; older links to "/?tab=…" still open Yu-Gi-Oh!.
+        portal: location.pathname === "/" && !card && !["tab", "q", "mk"].some((key) => params.has(key)),
         tab: params.get("tab"),
         mk: params.get("mk"),
         q: params.get("q") || "",
@@ -216,22 +233,24 @@ function readUrl() {
         srt: params.get("srt") || "name",
         page: Math.max(1, Number(params.get("page")) || 1),
         view: params.get("view"),
-        card: location.pathname.match(CARD_PATH)?.[1] || params.get("card"),
+        card,
         scope: scopeFromPath(location.pathname)
     };
 }
 
 function applyUrl(state) {
+    if (state.game && state.game !== window.game) window.setGame(state.game);
+    else if (location.pathname === "/" && !state.portal && window.game !== "yugioh") window.setGame("yugioh");
     // Profile, cart and account panels open from menus and popups, not from a tab.
     const tabs = [...window.TABS, ...Object.keys(localPanels)];
     // "Wantlists" is the tab's former name, still in shared links.
     const requested = state.tab === "Wantlists" ? "Deseados" : state.tab;
-    window.tab = tabs.includes(requested) ? requested : "Inicio";
+    window.tab = state.portal ? "Portada" : tabs.includes(requested) ? requested : "Inicio";
     // A set or archetype page is the list of all cards, limited to it.
     if (scope?.id !== state.scope?.id) scopeInfo = null;
     scope = state.scope;
     if (scope) window.tab = "Todas";
-    if (["TCG", "OCG"].includes(state.mk)) window.market = state.mk;
+    if (gameInfo().markets.some((market) => market.code === state.mk)) window.market = state.mk;
     element("q").value = state.q;
     Object.assign(wanted, state.types, { rar: state.rar, stp: state.stp, srt: state.srt });
     pendingPage = state.page;
@@ -262,8 +281,8 @@ function openCardId() {
 function writeUrl(mode = "replace") {
     const params = new URLSearchParams();
     // A set or archetype page already says where it is.
-    if (window.tab !== "Inicio" && !(scope && isCatalog())) params.set("tab", window.tab);
-    if (window.market !== "TCG") params.set("mk", window.market);
+    if (!isPortal() && window.tab !== "Inicio" && !(scope && isCatalog())) params.set("tab", window.tab);
+    if (!isPortal() && window.market !== gameInfo().markets[0].code) params.set("mk", window.market);
     const q = element("q").value.trim();
     if (q) params.set("q", q);
     if (isCatalog()) {
@@ -278,7 +297,13 @@ function writeUrl(mode = "replace") {
         if (view !== "list") params.set("view", view);
     }
     const card = openCardId();
-    const path = card ? `/carta/${card}` : scope && isCatalog() ? scopePath(scope) : "/";
+    const path = card
+        ? `/carta/${card}`
+        : scope && isCatalog()
+          ? scopePath(scope)
+          : isPortal()
+            ? "/"
+            : gameInfo().path;
     const url = `${path}${params.toString() ? `?${params}` : ""}${location.hash}`;
     if (url === `${location.pathname}${location.search}${location.hash}`) return;
     if (mode === "push") history.pushState({ card }, "", url);
@@ -341,7 +366,7 @@ function fillSelect(select, html) {
 
 function fillFacets(data) {
     facets = data;
-    fillSelect(element("rar"), rarityOptionsHtml(facets.rarity_groups));
+    fillSelect(element("rar"), rarityOptionsHtml(facets.rarity_groups, facets.game));
     fillSelect(
         element("stp"),
         `<option value="">${t("Cualquier producto")}</option>${facets.product_types
@@ -355,9 +380,10 @@ function fillFacets(data) {
 // new tab starts with its own filters empty.
 function renderTypeFilters() {
     const slot = element("type-filters");
-    if (slot.dataset.tab === window.tab) return;
-    slot.dataset.tab = window.tab;
-    slot.innerHTML = typeFiltersHtml(window.tab, facets.types);
+    const key = `${window.game}:${window.tab}`;
+    if (slot.dataset.tab === key) return;
+    slot.dataset.tab = key;
+    slot.innerHTML = typeFiltersHtml(window.tab, facets.types, window.game);
 }
 
 function renderDetail() {
@@ -408,7 +434,11 @@ function renderScopeHead() {
             if (asked !== scope) return;
             scopeInfo = info;
             scopeMeta(scope.kind, info.name);
-            // A set belongs to one market: the page follows it.
+            // A set belongs to one game and market: the page follows them.
+            if (info.game && info.game !== window.game) {
+                window.setGame(info.game);
+                renderTabs();
+            }
             if (info.market && info.market !== window.market) {
                 window.market = info.market;
                 window.updateMarketButtons();
@@ -444,7 +474,7 @@ function openScope(next) {
 // catalogue, not on the page of a set it shows, nor in the other panels.
 function renderPromo() {
     promo.render(window.market, {
-        visible: window.tab === "Inicio" || isCatalog(),
+        visible: !isPortal() && (window.tab === "Inicio" || isCatalog()),
         compact: isCatalog(),
         hideSetId: scope?.kind === "set" ? scope.id : null
     });
@@ -499,7 +529,7 @@ function showHome(current) {
     const { market } = window;
     const language = window.I18N.lang;
     const still = () => current === generation && window.tab === "Inicio";
-    element("home").innerHTML = homeHtml({ signedIn: Boolean(currentUser()) });
+    element("home").innerHTML = homeHtml({ signedIn: Boolean(currentUser()), game: window.game });
     status("");
     writeUrl();
     api.get("trending", { market, language, limit: CATALOG.homeTiles }).then((data) => {
@@ -516,12 +546,57 @@ function showHome(current) {
             learn([...data.recent, ...data.archetypes, ...data.sets]);
             showTileTabs(homeSlot("for-you"), forYouHtml(data, tileHtml));
         }, () => {});
-    showHomeBanlist(api.get("banlists"));
+    if (gameInfo().banlist) showHomeBanlist(api.get("banlists"));
     api.get("news", { limit: CATALOG.newsSize, lang: language }).then((data) => {
-        if (still()) homeSlot("news").innerHTML = newsHtml(data);
+        if (still()) homeSlot("news").innerHTML = newsHtml(data, gameInfo().news);
     }, () => {});
     loadFacets().catch(() => {});
 }
+
+// The cover: drawn at once; the number of cards of each game when it arrives.
+function showPortal(current) {
+    element("portal").innerHTML = portalHtml();
+    status("");
+    writeUrl();
+    portalCounts(api).then((counts) => {
+        if (current === generation && isPortal()) element("portal").innerHTML = portalHtml(counts);
+    });
+}
+
+// Into a game's marketplace, from the cover or the game selector.
+function goGame(code) {
+    if (!window.GAMES[code]) return;
+    if (openCardId()) {
+        closingFromHistory = true;
+        element("md").classList.remove("on");
+    }
+    scope = null;
+    scopeInfo = null;
+    element("q").value = "";
+    window.setGame(code);
+    window.tab = "Inicio";
+    facetsMarket = undefined;
+    writeUrl("push");
+    window.showTab();
+    window.scrollTo(0, 0);
+}
+
+document.addEventListener("click", (event) => {
+    const link = event.target.closest("[data-game-go]");
+    // A modified click opens the marketplace in a new tab, as any link.
+    if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.button) return;
+    event.preventDefault();
+    goGame(link.dataset.gameGo);
+});
+element("game").addEventListener("change", (event) => goGame(event.target.value));
+// The phone's list of games and markets: another game, or a market of this one.
+element("game-mk").addEventListener("change", (event) => {
+    const [code, market] = event.target.value.split(":");
+    if (code !== window.game) {
+        goGame(code);
+        if (market !== window.market) document.querySelector(`[data-mk="${market}"]`)?.click();
+    } else document.querySelector(`[data-mk="${market}"]`)?.click();
+});
 
 async function showHomeBanlist(request) {
     const slot = element("home-banlist");
@@ -573,6 +648,7 @@ async function loadCards(reset = false) {
     controller?.abort();
     controller = new AbortController();
     const current = ++generation;
+    if (isPortal()) return showPortal(current);
     if (window.tab === "Inicio") return showHome(current);
     status(t("Consultando catálogo…"), { quiet: true });
     element("cat").setAttribute("aria-busy", "true");
@@ -592,9 +668,10 @@ async function loadCards(reset = false) {
                 page,
                 page_size: CATALOG.pageSize,
                 market: scope?.kind === "set" ? undefined : window.market,
+                game: window.game,
                 ...scopeParams(scope),
                 q: element("q").value.trim(),
-                card_type: cardTypes[window.tab],
+                ...tabParams(),
                 ...typeParams(),
                 ...rarityParams(element("rar").value),
                 product_type: element("stp").value,
@@ -641,11 +718,9 @@ window.showTab = function () {
     ++generation;
     controller?.abort();
     clearTimeout(timer);
-    try {
-        localStorage.setItem("cm_market", window.market);
-    } catch {
-        /* Preference is optional. */
-    }
+    window.saveMarket();
+    document.documentElement.dataset.screen = isPortal() ? "portal" : "market";
+    element("portal").style.display = isPortal() ? "" : "none";
     element("commercial-notice").hidden = !isCommerce();
     for (const id of Object.values(localPanels)) element(id).style.display = "none";
     if (isCommerce()) {
@@ -656,15 +731,17 @@ window.showTab = function () {
         renderPromo();
         return;
     }
-    element("tabs").innerHTML = window.TABS.map(
-        (tab) => `<button aria-pressed="${tab === window.tab}" data-g="${h(tab)}">${h(t(window.TAB_LABELS[tab]))}</button>`
-    ).join("");
-    showCurrentTab();
+    renderTabs();
     renderPromo();
     renderScopeHead();
-    const panel = localPanels[window.tab] || (window.tab === "Inicio" ? "home" : "cat");
-    for (const id of ["home", "cat", "prod", "vend", ...Object.values(localPanels)])
+    const panel = isPortal() ? "portal" : localPanels[window.tab] || (window.tab === "Inicio" ? "home" : "cat");
+    for (const id of ["home", "cat", "prod", "vend", "portal", ...Object.values(localPanels)])
         element(id).style.display = id === panel ? "" : "none";
+    if (isPortal()) {
+        status("");
+        loadCards(true);
+        return;
+    }
     if (isLocal()) {
         status("");
         renderLocal[window.tab](element(localPanels[window.tab]));
@@ -718,6 +795,14 @@ async function openCard(id, { push = true } = {}) {
             !element("md").classList.contains("on")
         )
             return;
+        // A card of another game (a shared link): the site moves to its game,
+        // then asks again for the printings of that game's market.
+        if (card.game && card.game !== window.game) {
+            window.setGame(card.game);
+            if (isPortal()) window.tab = "Inicio";
+            window.showTab();
+            return;
+        }
         detail = card;
         cardMeta(card.name);
         track("carta");
@@ -802,6 +887,7 @@ installSearchSuggest({
     input: element("q"),
     api,
     market: () => window.market,
+    game: () => window.game,
     onPick: (id) => openCard(id)
 });
 document.addEventListener("change", (event) => {
@@ -907,12 +993,8 @@ window.TAB_LABELS.Vendedores = "Vendedores (demo)";
 if (!window.TABS.includes("Deseados")) window.TABS.push("Deseados");
 window.TAB_LABELS.Deseados = "Lista de deseados";
 window.TAB_LABELS.Perfil = "Perfil";
-try {
-    const market = localStorage.getItem("cm_market");
-    if (["TCG", "OCG"].includes(market)) window.market = market;
-} catch {
-    /* Storage can be disabled by the browser. */
-}
+// The market last chosen in this game (frontend/demo/store.js keeps one per game).
+window.market = window.savedMarket(window.game) || gameInfo().markets[0].code;
 // "Vista del catálogo" in Personalización.
 document.addEventListener("cm:view", (event) => {
     view = event.detail;
@@ -939,6 +1021,7 @@ document.addEventListener("cm:account", async () => {
 });
 loadAccount();
 const initial = readUrl();
+window.setGame(window.game);
 applyUrl(initial);
 // Links from account emails (/verificar, /restablecer) open the Acceso panel.
 if (openAccountLink(location.pathname)) window.tab = "Acceso";

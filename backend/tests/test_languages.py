@@ -46,20 +46,26 @@ def test_browser_languages_in_the_sites_order():
 
 
 def test_pages_come_in_the_visitors_language(client):
-    page = client.get("/", headers={"Accept-Language": "pt-BR,pt;q=0.9"})
+    page = client.get("/yugioh", headers={"Accept-Language": "pt-BR,pt;q=0.9"})
     assert '<html lang="pt-BR">' in page.text
     assert "<title>Cardmática · Cartas de Yu-Gi-Oh! no Mercosul</title>" in page.text
     assert 'placeholder="Nome, código, coleção ou arquétipo"' in page.text
     assert "/frontend/i18n/pt.js?v=" in page.text
     assert page.headers["Vary"].startswith("Accept-Language, Cookie")
     # Each language has its own address for search engines.
-    assert 'hreflang="en" href="http://testserver/?lang=en"' in page.text
-    assert 'rel="canonical" href="http://testserver/?lang=pt"' in page.text
+    assert 'hreflang="en" href="http://testserver/yugioh?lang=en"' in page.text
+    assert 'rel="canonical" href="http://testserver/yugioh?lang=pt"' in page.text
+    # The cover has its own title, in each language, and no marketplace in its header.
+    cover = client.get("/", headers={"Accept-Language": "pt-BR,pt;q=0.9"})
+    assert (
+        "<title>Cardmática · Marketplace de cartas colecionáveis do Mercosul</title>" in cover.text
+    )
+    assert '<html lang="pt-BR" data-screen="portal">' in cover.text
     # ?lang= chooses, and the choice is kept.
-    english = client.get("/?lang=en", headers={"Accept-Language": "pt-BR"})
+    english = client.get("/yugioh?lang=en", headers={"Accept-Language": "pt-BR"})
     assert '<html lang="en">' in english.text and english.cookies.get("cm_lang") == "en"
-    assert '<html lang="en">' in client.get("/").text
-    spanish = client.get("/?lang=es")
+    assert '<html lang="en">' in client.get("/yugioh").text
+    spanish = client.get("/yugioh?lang=es")
     assert '<html lang="es">' in spanish.text and "/frontend/i18n/" not in spanish.text
 
 

@@ -118,6 +118,7 @@ def preview_images(max_cards: int, runner=None):
     is never served in production (see docs/source-policies.md).
     """
     from sqlalchemy import exists
+    from sqlalchemy.orm import aliased
 
     settings = get_settings()
     if not settings.local_image_preview:
@@ -127,18 +128,43 @@ def preview_images(max_cards: int, runner=None):
     runner = runner or SyncRunner()
     downloaded = exists().where(CardArtwork.card_id == Card.id, CardArtwork.local_path.is_not(None))
     with runner.factory() as session:
-        identifiers = list(
-            session.scalars(
+        # Yu-Gi-Oh!: by YGOPRODeck's id. Magic and Pokémon: by the printing
+        # their artwork comes from ("en:me03-001" for TCGdex, with its language).
+        identifiers = [
+            ("ygoprodeck", str(value), "en")
+            for value in session.scalars(
                 select(Card.ygoprodeck_id)
                 .where(Card.ygoprodeck_id.is_not(None), ~downloaded)
                 .order_by(Card.display_name)
                 .limit(max_cards)
             )
+        ]
+        stored = aliased(CardArtwork)
+        has_picture = (
+            exists()
+            .where(stored.card_id == Card.id, stored.local_path.is_not(None))
+            .correlate(Card)
         )
+        pending = session.execute(
+            select(Card.id, CardArtwork.source_slug, CardArtwork.external_id)
+            .join(Card, Card.id == CardArtwork.card_id)
+            .where(CardArtwork.source_slug.in_(["scryfall", "tcgdex"]), ~has_picture)
+            .order_by(Card.display_name, CardArtwork.external_id)
+        )
+        # One picture per card is enough for the preview.
+        cards = set()
+        for card_id, source, external in pending:
+            if len(identifiers) >= max_cards:
+                break
+            if card_id in cards:
+                continue
+            cards.add(card_id)
+            language, _, identifier = external.rpartition(":")
+            identifiers.append((source, identifier, language or "en"))
     failed = 0
-    for identifier in identifiers:
+    for source, identifier, language in identifiers:
         job_id = runner.enqueue(
-            JobRequest(source="ygoprodeck", mode="images", identifier=str(identifier))
+            JobRequest(source=source, mode="images", identifier=identifier, language=language)
         )
         asyncio.run(runner.run(job_id))
         with runner.factory() as session:
@@ -209,7 +235,7 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
 
     sync = commands.add_parser("sync", help="Importar o actualizar cartas desde una fuente")
-    sync.add_argument("source", choices=["ygoprodeck", "yugipedia"])
+    sync.add_argument("source", choices=["ygoprodeck", "yugipedia", "scryfall", "tcgdex"])
     sync.add_argument(
         "mode", choices=["initial", "incremental", "card", "images", "errata", "retry", "banlist"]
     )
@@ -225,6 +251,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sync.add_argument("--banlist-format", choices=["TCG", "OCG"])
     sync.add_argument("--effective-date", type=date.fromisoformat)
+    sync.add_argument(
+        "--query", help="Scryfall: búsqueda que acota el recorrido, p. ej. «e:ecl» para un set"
+    )
     sync.add_argument("--enqueue-only", action="store_true")
 
     resume = commands.add_parser("resume", help="Seguir un trabajo pausado o fallido")
@@ -378,6 +407,7 @@ def run_sync(args, parser):
             max_printings=args.max_printings,
             banlist_format=args.banlist_format,
             effective_date=args.effective_date,
+            query=args.query,
         )
         job_id = runner.enqueue(request)
         if args.enqueue_only:

@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
+from app.core.games import GAME_MARKETS, Game, Market
+
 
 class NameInput(BaseModel):
     language: str = Field(min_length=2, max_length=12)
@@ -32,13 +34,15 @@ class PrintingInput(BaseModel):
     set_name: str = Field(min_length=1, max_length=300)
     rarity: str = "Unknown"
     language: str
-    market: Literal["TCG", "OCG"]
+    market: Market
     edition: str = "unknown"
     artwork: str = "unknown"
     release_date: date | None = None
     set_release_date: date | None = None
     set_source_url: HttpUrl | None = None
     product_type: str | None = None
+    # Finishes sold as this one printing (Magic foil, Pokémon reverse holo...).
+    finishes: list[str] = []
     images: list[ImageInput] = []
 
     @field_validator("code")
@@ -89,8 +93,19 @@ class BanlistInput(BaseModel):
     source_url: HttpUrl | None = None
 
 
+# Each source and the game it describes, its API host and its image host.
+SOURCE_HOSTS = {
+    "scryfall": ("magic", "api.scryfall.com", {"cards.scryfall.io"}),
+    "tcgdex": ("pokemon", "api.tcgdex.net", {"assets.tcgdex.net"}),
+}
+
+
 class CardRecord(BaseModel):
-    source: Literal["konami", "ygoprodeck", "yugipedia"]
+    source: Literal["konami", "ygoprodeck", "yugipedia", "scryfall", "tcgdex"]
+    game: Game = "yugioh"
+    # Magic and Pokémon: the source's own identity of the card (Scryfall's
+    # oracle id, TCGdex's card id), unique in the catalogue.
+    game_key: str | None = Field(default=None, max_length=120)
     external_id: str = Field(min_length=1, max_length=200)
     url: HttpUrl
     language: str
@@ -98,7 +113,7 @@ class CardRecord(BaseModel):
     revision: str | None = None
     konami_id: int | None = Field(default=None, gt=0)
     ygoprodeck_id: int | None = Field(default=None, gt=0)
-    available_markets: list[Literal["TCG", "OCG"]] = []
+    available_markets: list[Market] = []
     passcode: str | None = Field(default=None, pattern=r"^\d{8}$")
     names: list[NameInput] = Field(min_length=1)
     card_type: str | None = None
@@ -110,6 +125,10 @@ class CardRecord(BaseModel):
     atk: str | None = None
     defense: str | None = None
     pendulum_scale: int | None = Field(default=None, ge=0, le=13)
+    colors: list[str] = []
+    mana_value: int | None = Field(default=None, ge=0, le=100)
+    hp: int | None = Field(default=None, ge=0, le=1000)
+    details: dict = {}
     printings: list[PrintingInput] = []
     artworks: list[ArtworkInput] = []
     groups: list[GroupInput] = []
@@ -130,6 +149,25 @@ class CardRecord(BaseModel):
     @model_validator(mode="after")
     def source_identity(self):
         host = self.url.host
+        if self.source in SOURCE_HOSTS:
+            game, api_host, image_hosts = SOURCE_HOSTS[self.source]
+            if self.game != game or host != api_host or not self.game_key:
+                raise ValueError(f"{self.source} describe cartas de {game} con su URL de API e id")
+            for image in self.artworks:
+                hosts = {image.source_url.host}
+                if image.small_source_url:
+                    hosts.add(image.small_source_url.host)
+                if not hosts <= image_hosts:
+                    raise ValueError(f"Imagen fuera del servidor de imágenes de {self.source}")
+        elif self.game != "yugioh":
+            raise ValueError("Las fuentes de Yu-Gi-Oh! solo describen cartas de Yu-Gi-Oh!")
+        markets = GAME_MARKETS[self.game]
+        if any(printing.market not in markets for printing in self.printings) or any(
+            market not in markets for market in self.available_markets
+        ):
+            raise ValueError("Mercado que no pertenece al juego de la carta")
+        if self.source in SOURCE_HOSTS:
+            return self
         if self.source == "konami":
             if host != "www.db.yugioh-card.com" or not self.konami_id:
                 raise ValueError("Registro oficial sin identificador o URL de Konami")

@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     local_preview_host_suffixes: list[str] = []
     konami_enabled: bool = False
     konami_authorization_reference: str = ""
+    # Magic: The Gathering (Scryfall) and Pokémon (TCGdex); see docs/source-policies.md.
+    scryfall_enabled: bool = True
+    # Scryfall asks for 50 to 100 ms between requests.
+    scryfall_request_interval: float = Field(default=0.1, ge=0.05)
+    tcgdex_enabled: bool = True
+    tcgdex_request_interval: float = Field(default=0.5, ge=0.2)
     yugipedia_enabled: bool = False
     yugipedia_request_interval: float = Field(default=1.0, ge=1.0)
     konami_request_interval: float = Field(default=2.0, ge=1.0)

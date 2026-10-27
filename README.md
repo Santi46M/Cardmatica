@@ -221,10 +221,19 @@ cardmatica sync yugipedia initial --max-cards 3
 cardmatica sync yugipedia incremental --since 2026-10-01T00:00:00+00:00 --max-cards 20
 cardmatica sync yugipedia errata --identifier "TITULO_EXACTO_DE_LA_CARTA"
 cardmatica sync yugipedia images --identifier "TITULO_EXACTO_DE_LA_CARTA" --max-cards 20
+cardmatica sync scryfall initial --language en --max-cards 50
+cardmatica sync scryfall initial --language es --query "set:ecl" --max-cards 50
+cardmatica sync tcgdex initial --language es --max-cards 50
+cardmatica sync tcgdex initial --language ja --max-cards 50
 cardmatica resume UUID_DEL_TRABAJO --max-cards 20
 cardmatica sync yugipedia retry --retry-job UUID_DEL_TRABAJO
 cardmatica worker --once
 ```
+
+Magic (Scryfall) y Pokémon (TCGdex) usan el mismo worker. Scryfall admite
+en/es/pt/ja y `--query` con su sintaxis de búsqueda; cada carta es un oracle_id y
+cada impresión un set+número+idioma. TCGdex admite en/es/pt/ja; el japonés crea
+cartas del mercado PKMJ, con sus propios sets. Ninguna importa precios.
 
 En PowerShell sin activar el entorno: reemplazar `cardmatica` por
 `.\.venv\Scripts\cardmatica.exe`. `--enqueue-only` registra el trabajo sin ejecutarlo;

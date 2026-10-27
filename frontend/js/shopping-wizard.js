@@ -170,9 +170,8 @@ function demoCandidates(items, { condition, country, rating }) {
     const { CARDS: cards, LISTINGS: listings, SELLERS: sellers, cart = {} } = window;
     return items.map((item) => {
         const want = { id: item.id, name: item.name, quantity: item.quantity, code: item.code, rarity: item.rarity };
-        const ocg = item.market === "OCG";
         const ids = new Set(
-            cards.filter((card) => card.ocg === ocg && comparable(card.name) === comparable(item.name)).map((card) => card.id)
+            cards.filter((card) => card.market === item.market && comparable(card.name) === comparable(item.name)).map((card) => card.id)
         );
         if (!ids.size) return { want, offers: [], reason: "La tienda de demostración no tiene esta carta" };
         const inStock = listings.filter((listing) => ids.has(listing.card) && listing.quantity > 0);

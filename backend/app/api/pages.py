@@ -121,7 +121,10 @@ def render(
     page = _BUSINESS.sub(_business_detail, page)
     if lang != languages.DEFAULT:
         page = translate_static(page, lang)
-    page = page.replace('<html lang="es">', f'<html lang="{languages.HTML_LANG[lang]}">', 1)
+    # The cover (/) shows no marketplace: its header is drawn without one, from
+    # the start (styles.css, [data-screen="portal"]).
+    view = ' data-screen="portal"' if path == "/" else ""
+    page = page.replace('<html lang="es">', f'<html lang="{languages.HTML_LANG[lang]}"{view}>', 1)
     page = _meta(page, "property", "og:locale", languages.OG_LOCALE[lang])
     # The dictionary for what the scripts write, right after the code that uses
     # it; only the catalogue page has scripts that write text.
@@ -168,9 +171,55 @@ def not_found_page(request: Request) -> HTMLResponse:
     return render(PAGES / "404.html", request, path=request.url.path, status_code=404)
 
 
+# Each game has its own marketplace under its own address; "/" is the cover
+# that leads to them (frontend/js/portal.js).
+GAME_PAGES = {
+    "yugioh": (
+        "Cardmática · Cartas de Yu-Gi-Oh! en el Mercosur",
+        "Catálogo de cartas de Yu-Gi-Oh! TCG y OCG con banlist, impresiones e historial de "
+        "precios, para compradores y vendedores del Mercosur.",
+    ),
+    "magic": (
+        "Cardmática · Cartas de Magic: The Gathering en el Mercosur",
+        "Cartas sueltas, sobres y accesorios de Magic: The Gathering: impresiones, rarezas, "
+        "acabados foil y formatos, para compradores y vendedores del Mercosur.",
+    ),
+    "pokemon": (
+        "Cardmática · Cartas de Pokémon en el Mercosur",
+        "Cartas sueltas, sobres y accesorios de Pokémon TCG, internacionales y japonesas: "
+        "rarezas, variantes holo y formatos, para compradores y vendedores del Mercosur.",
+    ),
+}
+GAME_NAMES = {"yugioh": "Yu-Gi-Oh!", "magic": "Magic: The Gathering", "pokemon": "Pokémon"}
+
+
 @router.get("/")
 def index(request: Request):
-    return render(INDEX, request, path="/")
+    return render(
+        INDEX,
+        request,
+        path="/",
+        title=tr(request, "Cardmática · Marketplace de cartas coleccionables del Mercosur"),
+        description=tr(
+            request,
+            "Compra y vende cartas de Yu-Gi-Oh!, Magic: The Gathering y Pokémon en el Mercosur: impresiones, rarezas, historial de precios y vendedores de la región.",
+        ),
+    )
+
+
+@router.get("/yugioh")
+@router.get("/magic")
+@router.get("/pokemon")
+def game_page(request: Request):
+    game = request.url.path.strip("/")
+    title, description = GAME_PAGES[game]
+    return render(
+        INDEX,
+        request,
+        path=f"/{game}",
+        title=tr(request, title),
+        description=tr(request, description),
+    )
 
 
 @router.get("/styles.css")
@@ -217,16 +266,23 @@ def set_page(set_id: UUID, request: Request, session: SessionDep, slug: str | No
     row = session.get(CardSet, set_id)
     if not row:
         return not_found_page(request)
-    return render(
-        INDEX,
-        request,
-        path=f"/set/{set_id}",
-        title=tr(
+    title = (
+        tr(
             request,
             "{name} · Set de Yu-Gi-Oh! {market} · Cardmática",
             name=row.name,
             market=row.market,
-        ),
+        )
+        if row.game == "yugioh"
+        else tr(
+            request, "{name} · Set de {game} · Cardmática", name=row.name, game=GAME_NAMES[row.game]
+        )
+    )
+    return render(
+        INDEX,
+        request,
+        path=f"/set/{set_id}",
+        title=title,
         description=tr(
             request, "{name}: cartas sueltas, cajas y sobres del set en Cardmática.", name=row.name
         ),
@@ -262,7 +318,8 @@ def robots(request: Request):
 @router.get("/sitemap.xml")
 def sitemap(request: Request, session: SessionDep):
     base = site_url(request)
-    entries = [(f"{base}/", None)] + [(f"{base}/{name}", None) for name in sorted(LEGAL_PAGES)]
+    entries = [(f"{base}/", None)] + [(f"{base}/{name}", None) for name in GAME_PAGES]
+    entries += [(f"{base}/{name}", None) for name in sorted(LEGAL_PAGES)]
     cards = session.execute(
         select(Card.id, Card.updated_at)
         .order_by(Card.display_name)

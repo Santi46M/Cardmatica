@@ -11,6 +11,8 @@ from app.db.base import utcnow
 from app.db.session import session_factory
 from app.ingestion.selection import pick_printings
 from app.integrations.http import AccessDenied, PoliteHttpClient
+from app.integrations.scryfall.client import ScryfallClient
+from app.integrations.tcgdex.client import TcgdexClient
 from app.integrations.ygoprodeck.client import YgoprodeckClient
 from app.integrations.yugipedia.client import YugipediaClient
 from app.models import CardArtwork, CardImage, SyncError, SyncJob
@@ -18,10 +20,21 @@ from app.repositories.ingestion import conflict
 from app.schemas.catalog import JobRequest
 from app.schemas.ingestion import BanlistInput
 from app.services.images import ImageService, eligible_images
-from app.services.ingestion import IngestionService
+from app.services.ingestion import PROVIDERS, IngestionService
 from app.services.reconciliation import IdentityConflict
 
 logger = logging.getLogger(__name__)
+
+
+def make_client(source, http, request):
+    """The client of each source; Scryfall's walk may be narrowed by a query."""
+    if source == "ygoprodeck":
+        return YgoprodeckClient(http)
+    if source == "scryfall":
+        return ScryfallClient(http, request.query)
+    if source == "tcgdex":
+        return TcgdexClient(http)
+    return YugipediaClient(http)
 
 
 class SyncRunner:
@@ -89,7 +102,7 @@ class SyncRunner:
             if client is None:
                 http = PoliteHttpClient(source, self.settings)
                 http.check_policy()
-                client = YgoprodeckClient(http) if source == "ygoprodeck" else YugipediaClient(http)
+                client = make_client(source, http, request)
             await self._process(job_id, request, client)
             return True
         except Exception as exc:
@@ -238,8 +251,8 @@ class SyncRunner:
             card = IngestionService(session).ingest(record)
             if mode != "images_metadata":
                 return []
-            # YGOPRODeck has one artwork per card; Yugipedia, scans per printing.
-            if request.source == "ygoprodeck":
+            # Providers have general artworks; Yugipedia, scans per printing.
+            if request.source in PROVIDERS:
                 rows = session.scalars(select(CardArtwork).where(CardArtwork.card_id == card.id))
                 return [{"identifier": str(row.id), "mode": "artwork"} for row in rows]
             rows = session.scalars(eligible_images(session, card.konami_id))

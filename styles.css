@@ -103,6 +103,7 @@
 :root[data-theme="light"] .rr[data-tone="gold"] { color: #634700; }
 :root[data-theme="light"] .rr[data-tone="parallel"] { color: #0a6458; }
 :root[data-theme="light"] .rr[data-tone="special"] { color: #82287a; }
+:root[data-theme="light"] .rr[data-tone="mythic"] { color: #8a3a06; }
 
 * {
     box-sizing: border-box;
@@ -172,7 +173,7 @@ header {
 .bar {
     padding: 12px 16px;
     display: flex;
-    gap: 14px;
+    gap: 10px;
     align-items: center;
     flex-wrap: wrap;
 }
@@ -192,7 +193,7 @@ header {
 
 .search {
     flex: 1;
-    min-width: 200px;
+    min-width: 170px;
     display: flex;
     position: relative;
 }
@@ -330,6 +331,20 @@ nav button {
     padding: 11px 14px;
     cursor: pointer;
     border-bottom: 2px solid transparent;
+}
+
+/* Magic tiene más pestañas que caben en una línea: se deslizan de lado, como
+   en el teléfono, en lugar de partirse en dos filas. */
+[data-game="magic"] #tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+[data-game="magic"] #tabs button {
+    padding: 11px 11px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 nav button[aria-pressed=true] {
@@ -594,6 +609,221 @@ small {
     z-index: 20;
     background: var(--tip);
     border: 1px solid var(--bd);
+}
+
+/* Selector de juego junto al logo; en el teléfono, uno de juego y mercado juntos. */
+.game-select,
+.game-market {
+    font-weight: 600;
+    max-width: 210px;
+}
+
+.game-market {
+    display: none;
+}
+
+/* La moneda dice su código y su nombre; con el selector de juego, un poco más angosta. */
+#cur {
+    max-width: 160px;
+}
+
+.seg[hidden] {
+    display: none;
+}
+
+/* Portada (/): una caja por juego. La cabecera no muestra controles de mercado. */
+[data-screen="portal"] .game-select,
+[data-screen="portal"] .game-market,
+[data-screen="portal"] #mk,
+[data-screen="portal"] .search,
+[data-screen="portal"] #tabs,
+[data-screen="portal"] #promo {
+    display: none;
+}
+
+.portal-hero {
+    text-align: center;
+    margin: 22px auto 18px;
+    max-width: 720px;
+}
+
+.portal-hero h1 {
+    margin: 0 0 8px;
+    font-size: 34px;
+    font-weight: 300;
+    line-height: 1.15;
+}
+
+.portal-hero h1 b {
+    color: var(--ac);
+    font-weight: 700;
+}
+
+.portal-hero p {
+    color: var(--mu);
+    margin: 0;
+}
+
+.portal-games {
+    /* A list of links, not the tab bar: none of nav's own look. */
+    border: 0;
+    border-radius: 0;
+    background: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.portal-game {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 18px;
+    border-radius: 16px;
+    color: inherit;
+    text-decoration: none;
+    overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease;
+}
+
+/* Los colores de cada juego, como un brillo detrás de sus cartas. */
+.portal-game::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(260px 160px at 85% 0%, color-mix(in srgb, var(--g1) 45%, transparent), transparent),
+        radial-gradient(220px 140px at 0% 100%, color-mix(in srgb, var(--g2) 30%, transparent), transparent);
+    opacity: .55;
+    pointer-events: none;
+}
+
+.portal-game > * {
+    position: relative;
+}
+
+a.portal-game:hover,
+a.portal-game:focus-visible {
+    transform: translateY(-3px);
+    box-shadow:
+        0 14px 34px rgba(var(--shade), .45),
+        inset 0 1px 0 rgba(255, 255, 255, .18);
+}
+
+.portal-art {
+    width: 120px;
+    height: 90px;
+    align-self: center;
+}
+
+.portal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.portal-name {
+    font-size: 21px;
+    font-weight: 700;
+}
+
+.portal-line {
+    color: var(--mu);
+    font-size: 14px;
+}
+
+.portal-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    font-size: 12px;
+    color: var(--mu);
+}
+
+.portal-count {
+    color: var(--price);
+}
+
+.portal-go {
+    align-self: flex-start;
+}
+
+.portal-game.soon {
+    opacity: .7;
+}
+
+.portal-soon {
+    align-self: flex-start;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--warn);
+    border: 1px solid rgba(255, 217, 138, .4);
+    border-radius: 999px;
+    padding: 2px 10px;
+}
+
+.portal-points {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    padding: 16px 18px;
+    border-radius: 16px;
+    margin-bottom: 18px;
+}
+
+.portal-points b {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.portal-points p {
+    margin: 0;
+    color: var(--mu);
+    font-size: 14px;
+}
+
+@media (max-width: 640px) {
+    .portal-hero h1 {
+        font-size: 26px;
+    }
+
+    /* En el teléfono cada juego es una fila: sus cartas a la izquierda. */
+    .portal-game {
+        display: grid;
+        grid-template-columns: 76px 1fr;
+        align-items: center;
+        gap: 6px 12px;
+        padding: 14px;
+    }
+
+    .portal-art {
+        width: 76px;
+        height: 58px;
+    }
+
+    .portal-go,
+    .portal-soon {
+        grid-column: 2;
+    }
+
+    .game-select {
+        max-width: 140px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .portal-game {
+        transition: none;
+    }
+
+    a.portal-game:hover,
+    a.portal-game:focus-visible {
+        transform: none;
+    }
 }
 
 /* Selectores y etiquetas adicionales */
@@ -1905,6 +2135,63 @@ button:disabled {
     color: var(--mu);
 }
 
+/* Magic: la rareza mítica, naranja como su símbolo de expansión. */
+.rr[data-tone="mythic"] {
+    background: linear-gradient(90deg, rgba(235, 110, 40, .4), rgba(255, 170, 70, .28));
+    color: #ffc08a;
+}
+
+/* Magic: coste de maná como símbolos de color, y formatos donde la carta es legal. */
+.mana-cost {
+    display: inline-flex;
+    gap: 2px;
+    vertical-align: -2px;
+}
+
+.mana {
+    display: inline-grid;
+    place-items: center;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    font-size: 10px;
+    font-weight: 700;
+    color: #111;
+    background: #c9c4b8;
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .25);
+}
+
+.mana[data-c="W"] { background: #f4eccd; }
+.mana[data-c="U"] { background: #8fc3ea; }
+.mana[data-c="B"] { background: #b3a8a6; }
+.mana[data-c="R"] { background: #f09b80; }
+.mana[data-c="G"] { background: #9bd3ae; }
+
+.fmts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.fmt {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: rgba(var(--tint), .06);
+    color: var(--mu);
+}
+
+.fmt[data-legal="legal"] {
+    background: rgba(90, 200, 120, .2);
+    color: var(--good);
+}
+
+.fmt[data-legal="banned"],
+.fmt[data-legal="restricted"] {
+    background: rgba(255, 110, 100, .2);
+    color: var(--bad);
+}
+
 /* Menú de cuenta: avatar redondo arriba a la derecha y su desplegable */
 .acc {
     position: relative;
@@ -2878,11 +3165,29 @@ button.acc-avatar:hover,
         position: relative;
         display: grid;
         grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
+        /* Fila 1: logo, juego y mercado (una sola lista), carrito y cuenta.
+           Fila 2: búsqueda, tema, moneda e idioma. */
         grid-template-areas:
-            "logo market market market cart account"
+            "logo game game game cart account"
             "search search theme currency currency lang";
         gap: 8px 6px;
         padding: 8px 10px;
+    }
+
+    /* En el teléfono el juego y el mercado se eligen en una sola lista. */
+    .bar > .seg,
+    .game-select {
+        display: none;
+    }
+
+    .game-market {
+        display: block;
+        grid-area: game;
+        justify-self: start;
+        max-width: 100%;
+        min-width: 0;
+        padding: 6px 8px;
+        font-size: 14px;
     }
 
     .logo {

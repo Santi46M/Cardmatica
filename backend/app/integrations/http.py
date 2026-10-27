@@ -96,6 +96,8 @@ class PoliteHttpClient:
             "konami": settings.konami_request_interval,
             "news": settings.news_request_interval,
             "products": settings.product_request_interval,
+            "scryfall": settings.scryfall_request_interval,
+            "tcgdex": settings.tcgdex_request_interval,
         }[source]
         self.allowed_hosts = {
             "ygoprodeck": {"db.ygoprodeck.com", "images.ygoprodeck.com"},
@@ -109,12 +111,19 @@ class PoliteHttpClient:
             # Pages from app/data/product_pages.json; the service adds each
             # page's own image host once it has checked it.
             "products": set(),
+            # The API and its image server (cards.scryfall.io: no rate limit).
+            "scryfall": {"api.scryfall.com", "cards.scryfall.io"},
+            "tcgdex": {"api.tcgdex.net", "assets.tcgdex.net"},
         }[source]
+        headers = {"User-Agent": settings.user_agent, "Accept-Encoding": "gzip, deflate"}
+        # Scryfall asks every program to say what it accepts.
+        if source == "scryfall":
+            headers["Accept"] = "application/json;q=0.9,*/*;q=0.8"
         self.client = httpx.AsyncClient(
             timeout=settings.http_timeout,
             follow_redirects=False,
             transport=transport,
-            headers={"User-Agent": settings.user_agent, "Accept-Encoding": "gzip, deflate"},
+            headers=headers,
         )
 
     def check_policy(self):
@@ -133,6 +142,10 @@ class PoliteHttpClient:
                 "Las fotos de productos son solo para la vista local: activar "
                 "DEPLOYMENT_MODE=local y ALLOW_LOCAL_IMAGE_PREVIEW=true"
             )
+        if self.source == "scryfall" and not self.settings.scryfall_enabled:
+            raise AccessDenied("Scryfall deshabilitado en la configuración")
+        if self.source == "tcgdex" and not self.settings.tcgdex_enabled:
+            raise AccessDenied("TCGdex deshabilitado en la configuración")
         if self.source == "yugipedia" and not self.settings.yugipedia_enabled:
             raise AccessDenied(
                 "Yugipedia deshabilitada: revisar políticas y configurar el servicio"

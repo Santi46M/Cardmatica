@@ -2,7 +2,7 @@
 // the card window. Every value from the API goes through h() (escapeHtml).
 import { badgeHtml, banlistSectionHtml, statusFor } from "./banlist.js";
 import { formatDate, money } from "./format.js";
-import { typeLine } from "./card-types.js";
+import { MAGIC_COLORS, MAGIC_TYPES, pokemonWord, typeLine } from "./card-types.js";
 import { escapeHtml, html } from "./html.js";
 import { lang, locale, t } from "./lang.js";
 import { scopeLink } from "./collections.js";
@@ -261,14 +261,31 @@ export function previewHtml(card) {
 
 // The top of the home page: its one <h1> and the calls to action, visible
 // without scrolling; the sections under it arrive on their own (catalog.js).
-export function homeHtml({ signedIn = false } = {}) {
+// Each marketplace's own welcome; the rest of its home page is the same.
+const HEROES = {
+    yugioh: [
+        "Cartas de <b>Yu-Gi-Oh!</b> para el Mercosur",
+        "Busca cualquier carta TCG u OCG, compara sus impresiones y rarezas, revisa la banlist y arma tus listas de deseados con avisos de precio."
+    ],
+    magic: [
+        "Cartas de <b>Magic: The Gathering</b> para el Mercosur",
+        "Busca cualquier carta por nombre o set, compara sus impresiones, rarezas y acabados foil, revisa en qué formatos es legal y arma tus listas de deseados."
+    ],
+    pokemon: [
+        "Cartas de <b>Pokémon</b> para el Mercosur",
+        "Busca cartas internacionales o japonesas, compara sus rarezas y variantes holo, revisa si son legales en Standard y arma tus listas de deseados."
+    ]
+};
+
+export function homeHtml({ signedIn = false, game = "yugioh" } = {}) {
     const second = signedIn
         ? `<button class="ghost" data-go="Deseados">${t("Mi lista de deseados")}</button>`
         : `<button class="ghost" data-go="Acceso" data-auth-mode="register">${t("Crear cuenta gratis")}</button>`;
+    const [title, text] = HEROES[game] || HEROES.yugioh;
     return html`
         <section class="hero2 gl">
-            <h1>${t("Cartas de <b>Yu-Gi-Oh!</b> para el Mercosur")}</h1>
-            <p>${t("Busca cualquier carta TCG u OCG, compara sus impresiones y rarezas, revisa la banlist y arma tus listas de deseados con avisos de precio.")}</p>
+            <h1>${t(title)}</h1>
+            <p>${t(text)}</p>
             <p class="hero-actions">
                 <button class="btn" data-go="Todas">${t("Explorar cartas")}</button>
                 ${second}
@@ -282,7 +299,7 @@ export function homeHtml({ signedIn = false } = {}) {
 
 // ---- The card window ----------------------------------------------------------
 
-const SOURCE_HOSTS = ["www.db.yugioh-card.com", "yugipedia.com", "db.ygoprodeck.com"];
+const SOURCE_HOSTS = ["www.db.yugioh-card.com", "yugipedia.com", "db.ygoprodeck.com", "api.scryfall.com", "api.tcgdex.net"];
 
 function sourceLinksHtml(card) {
     return card.sources
@@ -381,8 +398,71 @@ function creditHtml(image) {
         </figcaption>`;
 }
 
+// Finishes a printing is sold in (Scryfall, TCGdex), in words.
+const FINISHES = {
+    nonfoil: "Normal",
+    foil: "Foil",
+    etched: "Foil grabado",
+    normal: "Normal",
+    holo: "Holo",
+    reverse: "Reverso holo",
+    firstEdition: "1.ª edición"
+};
+const finishesText = (printing) => (printing.finishes || []).map((finish) => t(FINISHES[finish] || finish)).join(", ");
+
+// Formats where a Magic card may be played, as Scryfall says.
+const FORMATS = {
+    standard: "Standard",
+    pioneer: "Pioneer",
+    modern: "Modern",
+    legacy: "Legacy",
+    vintage: "Vintage",
+    commander: "Commander",
+    pauper: "Pauper"
+};
+const LEGALITY = { legal: "Legal", not_legal: "No legal", banned: "Prohibida", restricted: "Restringida" };
+
+function legalityHtml(card) {
+    if (card.game === "magic") {
+        const formats = card.details?.legalities || {};
+        const items = Object.entries(FORMATS)
+            .filter(([key]) => formats[key])
+            .map(([key, name]) => `<span class="fmt" data-legal="${h(formats[key])}">${h(name)} · ${h(t(LEGALITY[formats[key]] || formats[key]))}</span>`)
+            .join("");
+        return items ? `<span class="fmts">${items}</span>` : "";
+    }
+    if (card.game === "pokemon") {
+        const legal = card.details?.legal || {};
+        const items = [
+            ["standard", "Standard"],
+            ["expanded", "Expanded"]
+        ]
+            .filter(([key]) => key in legal)
+            .map(([key, name]) => `<span class="fmt" data-legal="${legal[key] ? "legal" : "not_legal"}">${name} · ${h(t(legal[key] ? "Legal" : "No legal"))}</span>`)
+            .join("");
+        const mark = card.details?.regulation_mark ? ` <small>${h(t("Marca de regulación {mark}", { mark: card.details.regulation_mark }))}</small>` : "";
+        return items ? `<span class="fmts">${items}</span>${mark}` : "";
+    }
+    return "";
+}
+
+// Magic's mana cost as small coloured symbols ({2}{G} → ②🟢), with the cost in words for readers.
+export function manaHtml(cost) {
+    if (!cost) return "";
+    const symbols = cost.match(/\{[^}]+\}/g) || [];
+    const marks = symbols
+        .map((symbol) => {
+            const value = symbol.slice(1, -1);
+            const color = MAGIC_COLORS[value] ? value : /^\d+$/.test(value) || value === "X" ? "N" : "H";
+            return `<span class="mana" data-c="${color}" aria-hidden="true">${h(value)}</span>`;
+        })
+        .join("");
+    return `<span class="mana-cost" role="img" aria-label="${h(t("Coste de maná {cost}", { cost }))}">${marks}</span>`;
+}
+
 function factsHtml(card, printings, printing, market) {
     if (!printing) return `<p class="empty">${t("No hay impresiones documentadas para este mercado.")}</p>`;
+    if (card.game !== "yugioh") return gameFactsHtml(card, printings, printing);
     // Several printings: a list to pick one, with pages when they do not fit.
     const pages = printings.total > printings.page_size ? pager(printings, "printing") : "";
     const choice =
@@ -402,8 +482,59 @@ function factsHtml(card, printings, printing, market) {
     ].join("");
 }
 
+// Magic and Pokémon: the printing's rarity, number, set, language and finishes,
+// then where the card may be played.
+function gameFactsHtml(card, printings, printing) {
+    const pages = printings.total > printings.page_size ? pager(printings, "printing") : "";
+    const choice =
+        printings.items.length > 1
+            ? `<select id="catalog-printing" aria-label="${t("Impresión")}">${printingOptionsHtml(printings.items, printing.id)}</select>${pages}`
+            : "";
+    const number = card.game === "pokemon" && card.details?.number ? card.details.number : printing.code;
+    return [
+        factRow("Rareza", rarityBadge(printing)),
+        factRow("Número", h(number)),
+        factRow("Impreso en", scopeLink("set", printing.set_id, printing.set_name)),
+        choice ? factRow("Impresión", choice) : "",
+        factRow("Idioma", h(languageName(printing.language))),
+        factRow("Acabados", h(finishesText(printing))),
+        factRow("Lanzamiento", printing.release_date ? h(formatDate(printing.release_date)) : ""),
+        factRow("Formatos", legalityHtml(card))
+    ].join("");
+}
+
+// What is printed on a Magic or Pokémon card, as one line under its facts.
+function gameStatsHtml(card) {
+    const details = card.details || {};
+    if (card.game === "magic") {
+        const types = (card.subtypes || []).filter((word) => MAGIC_TYPES[word]);
+        return [
+            h(details.type_line || types.join(" ")),
+            manaHtml(details.mana_cost),
+            details.power != null ? h(`${details.power}/${details.toughness}`) : "",
+            details.loyalty != null ? h(t("Lealtad {number}", { number: details.loyalty })) : "",
+            details.defense != null ? h(t("Defensa {number}", { number: details.defense })) : ""
+        ]
+            .filter(Boolean)
+            .join(" · ");
+    }
+    const weakness = (details.weaknesses || []).map(pokemonWord).join(", ");
+    const resistance = (details.resistances || []).map(pokemonWord).join(", ");
+    return [
+        h(typeLine(card)),
+        details.evolves_from ? h(t("Evoluciona de {name}", { name: details.evolves_from })) : "",
+        weakness ? h(t("Debilidad: {types}", { types: weakness })) : "",
+        resistance ? h(t("Resistencia: {types}", { types: resistance })) : "",
+        details.retreat != null ? h(t("Retirada {number}", { number: details.retreat })) : "",
+        details.illustrator ? h(t("Ilustración: {name}", { name: details.illustrator })) : ""
+    ]
+        .filter(Boolean)
+        .join(" · ");
+}
+
 // The type line (card-types.js), then the numbers printed on the card.
 function statsLine(card) {
+    if (card.game && card.game !== "yugioh") return gameStatsHtml(card);
     const defense = card.defense != null ? ` / DEF ${card.defense}` : "";
     return [
         typeLine(card),

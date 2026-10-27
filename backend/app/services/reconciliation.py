@@ -24,7 +24,32 @@ def different_cid(card: Card, record: CardRecord) -> bool:
     return bool(card.konami_id and record.konami_id and card.konami_id != record.konami_id)
 
 
+def by_game_key(session: Session, record: CardRecord) -> Card:
+    """Magic and Pokémon: the card with the source's identity, or a new one.
+
+    Scryfall's oracle id joins every printing of a Magic card; TCGdex's card id
+    is one Pokémon card in one set. Neither is ever matched by name.
+    """
+    card = session.scalar(select(Card).where(Card.game_key == record.game_key))
+    if card and card.game != record.game:
+        raise IdentityConflict("La identidad de la fuente pertenece a otro juego")
+    if not card:
+        card = upsert(
+            session,
+            Card,
+            {
+                "game": record.game,
+                "game_key": record.game_key,
+                "display_name": record.names[0].name,
+            },
+            ["game_key"],
+        )
+    return session.scalar(select(Card).where(Card.id == card.id).with_for_update())
+
+
 def resolve_card(session: Session, record: CardRecord, source: DataSource) -> Card:
+    if record.game != "yugioh":
+        return by_game_key(session, record)
     existing = by_identifiers(session, record, source)
     if not existing and record.passcode:
         existing = by_passcode(session, record)

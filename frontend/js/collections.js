@@ -86,8 +86,12 @@ export function scopeHeadHtml(scope, info) {
             ${close}
         </div>`;
     if (scope.kind === "archetype") return head("Arquetipo", inCatalogue);
+    // "OCG", "Japonés"; for a game with one market, the game's name.
+    const market = window.marketTagText(info.market)
+        ? t(window.marketInfo(info.market).name)
+        : window.GAMES[info.game]?.name || info.market;
     const facts = [
-        info.market,
+        market,
         info.release_date ? t("lanzado el {date}", { date: formatDate(info.release_date) }) : "",
         info.product_type,
         inCatalogue

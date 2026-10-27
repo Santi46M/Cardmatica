@@ -80,8 +80,12 @@ def artwork_view(image):
     )
 
 
+# What the list shows on a card's type line; the card window shows all its details.
+SUMMARY_DETAILS = ("type_line", "mana_cost", "stage", "suffix", "trainer_type", "energy_type")
+
+
 def printing_view(printing):
-    rarity = rarities.info(printing.rarity.name)
+    rarity = rarities.info(printing.rarity.name, printing.card_set.game)
     return PrintingView(
         id=printing.id,
         card_id=printing.card_id,
@@ -96,10 +100,23 @@ def printing_view(printing):
         edition=printing.edition,
         artwork=printing.artwork,
         release_date=printing.release_date,
+        finishes=printing.finishes or [],
         images=[
             image_view(image) for image in sorted(printing.images, key=lambda value: str(value.id))
         ],
     )
+
+
+def summary_details(card, details, printings):
+    """The few details a list shows. A Pokémon card is one card of one set, so
+    reprints share a name: its number and rarity tell them apart, as on
+    Cardmarket and TCGplayer."""
+    shown = {key: details[key] for key in SUMMARY_DETAILS if key in details}
+    if card.game == "pokemon" and printings:
+        first = min(printings, key=lambda row: (row.language != "en", row.code))
+        shown["printing"] = first.code
+        shown["rarity"] = rarities.canonical(first.rarity.name, "pokemon")
+    return shown
 
 
 def card_summary(card, language="es", market=None):
@@ -127,8 +144,10 @@ def card_summary(card, language="es", market=None):
             ),
             None,
         )
+    details = card.details or {}
     return CardSummary(
         id=card.id,
+        game=card.game,
         konami_id=card.konami_id,
         ygoprodeck_id=card.ygoprodeck_id,
         name_source=name.source_slug if name else None,
@@ -137,7 +156,13 @@ def card_summary(card, language="es", market=None):
         card_type=card.card_type,
         subtypes=card.subtypes,
         attribute=card.attribute,
-        types=CardTypesView(
+        colors=card.colors or [],
+        mana_value=card.mana_value,
+        hp=card.hp,
+        details=summary_details(card, details, printings),
+        types=None
+        if card.game != "yugioh"
+        else CardTypesView(
             kind=normalize_kind(card.card_type),
             frame=card.monster_frame,
             pendulum=bool(card.is_pendulum),
@@ -216,7 +241,8 @@ def card_detail(session, card, language="es"):
         .where(SourceReference.card_id == card.id, FieldObservation.selected.is_(True))
     ).all()
     return CardDetail(
-        **card_summary(card, language).model_dump(),
+        **card_summary(card, language).model_dump(exclude={"details"}),
+        details=card.details or {},
         artworks=[artwork_view(image) for image in card.artworks],
         passcode=card.passcode,
         names=[NameView.model_validate(name) for name in card.names],

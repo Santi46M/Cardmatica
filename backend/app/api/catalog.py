@@ -9,6 +9,9 @@ from sqlalchemy import func, select
 
 from app.api.dependencies import SessionDep
 from app.core.config import get_settings
+from app.core.games import Game, Market, game_of
+from app.integrations.scryfall import parser as scryfall
+from app.integrations.tcgdex import parser as tcgdex
 from app.models import (
     Archetype,
     Card,
@@ -45,7 +48,6 @@ from app.services.trending import trending
 router = APIRouter(prefix="/api/v1", tags=["Catálogo"])
 PageNumber = Annotated[int, Query(ge=1, le=1000000)]
 PageSize = Annotated[int, Query(ge=1, le=100)]
-Market = Literal["TCG", "OCG"]
 
 
 @router.get("/cards", response_model=Page[CardSummary])
@@ -55,8 +57,13 @@ def cards(
     page_size: PageSize = 24,
     q: Annotated[str | None, Query(max_length=200)] = None,
     market: Market | None = None,
-    card_type: Literal["Monster", "Spell", "Trap", "Skill"] | None = None,
+    game: Game | None = None,
+    # Monster, Spell, Trap (Yu-Gi-Oh!); Pokemon, Trainer, Energy; a Magic main type.
+    card_type: Annotated[str | None, Query(max_length=30)] = None,
     subtype: Annotated[str | None, Query(max_length=60)] = None,
+    # Magic colour (W, U, B, R, G) or Pokémon energy type; Magic mana value.
+    color: Annotated[str | None, Query(max_length=20)] = None,
+    mana_value: Annotated[int | None, Query(ge=0, le=100)] = None,
     frame: Annotated[str | None, Query(max_length=20)] = None,
     ability: Annotated[str | None, Query(max_length=20)] = None,
     race: Annotated[str | None, Query(max_length=40)] = None,
@@ -73,13 +80,17 @@ def cards(
     sort: Literal["name", "name_desc", "newest", "oldest", "updated"] = "name",
     language: Annotated[str, Query(min_length=2, max_length=12)] = "es",
 ):
+    game = game or game_of(market)
     rows, total = CatalogRepository(session).cards(
         page=page,
         page_size=page_size,
         q=q.strip() if q else None,
         market=market,
+        game=game,
         card_type=card_type,
         subtype=subtype,
+        color=color,
+        mana_value=mana_value,
         frame=frame,
         ability=ability,
         race=race,
@@ -88,7 +99,7 @@ def cards(
         rank=rank,
         link_rating=link_rating,
         card_property=card_property,
-        rarity_names=rarity_names(session, rarity, rarity_family),
+        rarity_names=rarity_names(session, rarity, rarity_family, game),
         set_id=set_id,
         archetype_id=archetype_id,
         product_type=product_type,
@@ -111,11 +122,14 @@ def suggest(
     session: SessionDep,
     q: Annotated[str, Query(min_length=2, max_length=100)],
     market: Market | None = None,
+    game: Game | None = None,
     language: Annotated[str, Query(min_length=2, max_length=12)] = "es",
     limit: Annotated[int, Query(ge=1, le=10)] = 6,
 ):
     """Suggestions while typing in the search box."""
-    rows = CatalogRepository(session).suggestions(q.strip(), market=market, limit=limit)
+    rows = CatalogRepository(session).suggestions(
+        q.strip(), market=market, game=game or game_of(market), limit=limit
+    )
     suggestions = []
     for row in rows:
         summary = card_summary(row, language, market)
@@ -124,6 +138,10 @@ def suggest(
             CardSuggestion(
                 id=summary.id,
                 name=summary.name,
+                game=summary.game,
+                card_type=summary.card_type,
+                subtypes=summary.subtypes,
+                details=summary.details,
                 types=summary.types,
                 thumbnail_url=image and (image.thumbnail_url or image.url),
             )
@@ -131,12 +149,14 @@ def suggest(
     return suggestions
 
 
-def rarity_names(session, rarity, family):
+def rarity_names(session, rarity, family, game=None):
     """Stored spellings for a rarity or a family; None when neither is asked."""
     if not rarity and not family:
         return None
     stored = session.scalars(select(Rarity.name))
-    return rarities.stored_names(stored, rarity=rarity or None, family=family)
+    return rarities.stored_names(
+        stored, rarity=rarity or None, family=family, game=game or "yugioh"
+    )
 
 
 @router.get("/trending")
@@ -364,12 +384,15 @@ def sets(
     page_size: PageSize = 24,
     q: Annotated[str | None, Query(max_length=200)] = None,
     market: Market | None = None,
+    game: Game | None = None,
 ):
     query = select(CardSet)
     if q:
         query = query.where(CardSet.name.icontains(q, autoescape=True))
     if market:
         query = query.where(CardSet.market == market)
+    if game:
+        query = query.where(CardSet.game == game)
     total = session.scalar(select(func.count()).select_from(query.subquery()))
     rows = session.scalars(
         query.order_by(CardSet.release_date.desc().nullslast(), CardSet.name, CardSet.id)
@@ -449,8 +472,10 @@ def present(session, column):
     return set(session.scalars(select(column).where(column.is_not(None)).distinct()))
 
 
-def types_present(session):
+def types_present(session, game="yugioh"):
     """What the catalogue has, so the filters never offer an empty choice."""
+    if game != "yugioh":
+        return game_types_present(session, game)
     races, attributes = present(session, Card.monster_race), present(session, Card.attribute)
     return {
         "races_present": [race for race in RACES if race in races],
@@ -461,22 +486,88 @@ def types_present(session):
     }
 
 
+def game_types_present(session, game):
+    """Magic and Pokémon: the type words, colours and numbers their cards have.
+
+    Read from the cards of that game only; the lists are short (a few thousand
+    distinct values at most), so they are gathered here rather than indexed.
+    """
+    rows = session.execute(
+        select(Card.card_type, Card.subtypes, Card.colors, Card.mana_value).where(Card.game == game)
+    )
+    kinds, words, colors, values = set(), set(), set(), set()
+    for kind, subtypes, card_colors, mana_value in rows:
+        if kind:
+            kinds.add(kind)
+        words.update(subtypes or [])
+        colors.update(card_colors or [])
+        if mana_value is not None:
+            values.add(mana_value)
+    order = game_taxonomy(game)
+    return {
+        "kinds_present": [value for value in order["kinds"] if value in kinds],
+        "subtypes_present": sorted(words),
+        "colors_present": [value for value in order["colors"] if value in colors],
+        "mana_values": sorted(values),
+    }
+
+
+def game_taxonomy(game):
+    """Kinds and colours of Magic and Pokémon in the order their filters show them."""
+    if game == "magic":
+        return {"kinds": scryfall.MAIN_TYPES, "colors": scryfall.COLORS}
+    return {
+        "kinds": ["Pokemon", "Trainer", "Energy"],
+        "colors": tcgdex.ENERGY_TYPES,
+        "stages": POKEMON_STAGES,
+        "trainer_types": ["Item", "Supporter", "Stadium", "Tool"],
+        "energy_types": ["Normal", "Special"],
+    }
+
+
+# Evolution stages and other card kinds of Pokémon, in the order of a deck list.
+POKEMON_STAGES = [
+    "Basic",
+    "Stage1",
+    "Stage2",
+    "MEGA",
+    "VMAX",
+    "VSTAR",
+    "V-UNION",
+    "BREAK",
+    "LEVEL-UP",
+    "RESTORED",
+    "Baby",
+]
+
+
 @router.get("/facets")
-def facets(session: SessionDep, market: Market | None = None):
+def facets(session: SessionDep, market: Market | None = None, game: Game | None = None):
     """Filter options. Only what the catalogue has for this market is listed."""
+    game = game or game_of(market) or "yugioh"
     printings = select(CardPrinting.rarity_id)
-    sets = select(CardSet.product_type).where(CardSet.product_type.is_not(None))
+    sets = select(CardSet.product_type).where(
+        CardSet.product_type.is_not(None), CardSet.game == game
+    )
     if market:
         printings = printings.where(CardPrinting.market == market)
         sets = sets.where(CardSet.market == market)
+    else:
+        printings = printings.join(CardSet).where(CardSet.game == game)
     names = session.scalars(select(Rarity.name).where(Rarity.id.in_(printings.distinct())))
-    groups = rarities.groups(names)
+    groups = rarities.groups(names, game)
+    types = (
+        {**taxonomy(), **types_present(session)}
+        if game == "yugioh"
+        else {**game_taxonomy(game), **types_present(session, game)}
+    )
     return {
+        "game": game,
         "rarities": [name for group in groups for name in group["names"]],
         "rarity_groups": groups,
         "product_types": list(session.scalars(sets.distinct().order_by(CardSet.product_type))),
         # Ordered type levels, and the values the catalogue actually has.
-        "types": {**taxonomy(), **types_present(session)},
+        "types": types,
     }
 
 

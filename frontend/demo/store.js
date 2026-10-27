@@ -18,7 +18,7 @@
 // frontend/js/catalog.js sustituye showTab y refreshList para las pestañas del
 // catálogo real y llama a las versiones de aquí solo para la tienda demo.
 
-/* global DEMO, I18N, t */
+/* global DEMO, I18N, t, GAMES, GAME_TAB_LABELS, gameFromPath, gameOfMarket, marketTagText */
 // Los textos van en español y pasan por t() (frontend/i18n.js), que devuelve
 // la versión del idioma de la página.
 
@@ -26,16 +26,9 @@
 // Configuración de la interfaz
 // ---------------------------------------------------------------------------
 
-var TABS = ["Inicio", "Todas", "Monstruo", "Magia", "Trampa", "Productos", "Vendedores"];
-var TAB_LABELS = {
-    Inicio: "Inicio",
-    Todas: "Todas las cartas",
-    Monstruo: "Monstruos",
-    Magia: "Magias",
-    Trampa: "Trampas",
-    Productos: "Cajas y accesorios",
-    Vendedores: "Vendedores"
-};
+// Tabs of the game on screen (frontend/games.js); setGame() changes them.
+var TABS = GAMES.yugioh.tabs.slice();
+var TAB_LABELS = Object.assign({}, GAME_TAB_LABELS);
 var CURRENCIES = DEMO.currencies;
 var SHIPPING = DEMO.shipping;
 
@@ -131,9 +124,10 @@ function formatDate(time) {
 // ---------------------------------------------------------------------------
 
 // "LOB-EN001:UR" → impresión LOB-EN001, Ultra Rare, del set LOB, en inglés.
-// Los códigos sin idioma (SDK-001) son de la primera edición en inglés.
+// Los códigos sin idioma (SDK-001, ECL-4) son de la impresión en inglés; un
+// tercer campo da el idioma cuando el código no lo dice ("M2-013:PRR:JP").
 function parsePrinting(text) {
-    const [code, rarityCode] = text.split(":");
+    const [code, rarityKey, language] = text.split(":");
     const [prefix, number] = code.split("-");
     const set = DEMO.sets[prefix];
     return {
@@ -141,31 +135,50 @@ function parsePrinting(text) {
         prefix,
         set: set.name,
         setType: set.type,
-        rarity: DEMO.rarities[rarityCode].name,
-        language: number.match(/^[A-Z]{2}/)?.[0] || "EN"
+        rarityKey,
+        rarity: DEMO.rarities[rarityKey].name,
+        language: language || number.match(/^[A-Z]{2}/)?.[0] || "EN"
     };
 }
 
-function demoCard(card, id, ocg) {
+// Kinds of card as a buyer reads them; the tab keys have no accents.
+const KIND_NAMES = { Instantaneo: "Instantáneo", Pokemon: "Pokémon", Energia: "Energía" };
+const kindName = (kind) => t(KIND_NAMES[kind] || kind);
+
+// second: the card of the game's second market (OCG, Japanese Pokémon).
+function demoCard(card, id, second) {
+    const game = card.game || "yugioh";
+    const markets = GAMES[game].markets;
+    const extra = game === "pokemon" ? card.jp : card.ocg;
     return {
         id,
+        game,
+        market: markets[second ? 1 : 0].code,
         name: card.name,
         kind: card.kind,
-        subtypes: card.subtypes,
+        subtypes: card.subtypes || [],
         attribute: card.attribute || "",
         level: card.level || 0,
         atk: card.atk || 0,
         def: card.def || 0,
+        typeLine: card.typeLine || "",
+        cost: card.cost || "",
+        colors: card.colors || [],
+        types: card.types || [],
+        pt: card.pt || "",
+        loyalty: card.loyalty,
+        hp: card.hp,
         basePrice: card.basePrice,
-        ocg,
-        printings: (ocg ? card.ocg : card.printings).map(parsePrinting)
+        ocg: second,
+        printings: (second ? extra : card.printings).map(parsePrinting)
     };
 }
 
-// Cada carta es TCG; las que tienen impresiones japonesas también tienen su
-// versión OCG.
+// Cada carta es del primer mercado de su juego (TCG, Magic, Pokémon
+// internacional); las que tienen impresiones japonesas tienen también su
+// versión OCG o japonesa.
 var CARDS = DEMO.cards.map((card, index) => demoCard(card, index, false));
-for (const card of DEMO.cards) if (card.ocg) CARDS.push(demoCard(card, CARDS.length, true));
+for (const card of DEMO.cards) if (card.ocg || card.jp) CARDS.push(demoCard(card, CARDS.length, true));
 
 // El orden de las llamadas a random() importa: decide qué datos salen.
 const random = seededRandom(DEMO_STOCK.seed);
@@ -185,8 +198,8 @@ var LISTINGS = [];
 // Precio de referencia de una impresión en euros: precio base de la carta por
 // el factor de su rareza y, en OCG, por el de su idioma.
 function referencePrice(card, printing) {
-    const rarity = Object.values(DEMO.rarities).find((item) => item.name === printing.rarity);
-    const language = card.ocg ? DEMO.languages[printing.language].priceFactor : 1;
+    const rarity = DEMO.rarities[printing.rarityKey];
+    const language = card.ocg ? DEMO.languages[printing.language].priceFactor || 1 : 1;
     return card.basePrice * rarity.priceFactor * language;
 }
 
@@ -223,17 +236,19 @@ for (const card of CARDS) {
         addCardListings(SELLERS[pickIndex(random, SELLERS.length)], card);
 }
 
-// market: "TCG", "OCG" o null para los accesorios, que valen para ambos.
+// market: el de lo sellado, o null para los accesorios, que valen para los
+// mercados de los juegos que dice "games" (todos si no lo dice).
 var PRODUCTS = DEMO.products.map((product, index) => ({
     ...product,
     id: index,
     market: product.market || null,
+    games: product.market ? [gameOfMarket(product.market)] : product.games || Object.keys(GAMES),
     released: product.released || DEMO.sets[product.set]?.released || ""
 }));
 
 function productLanguage(product) {
     if (!product.market) return "";
-    const languages = product.market === "OCG" ? DEMO.ocgLanguages : DEMO.tcgLanguages;
+    const languages = DEMO.marketLanguages[product.market];
     return languages[pickIndex(random, languages.length)];
 }
 
@@ -288,7 +303,18 @@ function listingName(listing) {
 // ---------------------------------------------------------------------------
 
 var tab = "Inicio";
-var market = "TCG";
+// The game on screen: its address (/magic), else the last one chosen.
+const GAME_STORAGE_KEY = "cm_game";
+var game = gameFromPath(location.pathname);
+if (!game) {
+    try {
+        game = GAMES[localStorage.getItem(GAME_STORAGE_KEY)] ? localStorage.getItem(GAME_STORAGE_KEY) : null;
+    } catch {
+        /* Preference is optional. */
+    }
+}
+game = game || "yugioh";
+var market = GAMES[game].markets[0].code;
 // Carrito: id de oferta → unidades.
 var cart = {};
 var currency = "EUR";
@@ -325,12 +351,14 @@ function flag(country) {
 
 // "Nivel 8", "Rango 4" o "LINK-3"; vacío para magias y trampas.
 function levelText(card) {
-    if (card.kind !== "Monstruo") return "";
+    if (card.game !== "yugioh" || card.kind !== "Monstruo") return "";
     if (card.subtypes.includes("Link")) return `LINK-${card.level}`;
     return t(card.subtypes.includes("Xyz") ? "Rango {number}" : "Nivel {number}", { number: card.level });
 }
 
 function frameColor(card) {
+    if (card.game === "magic") return DEMO.manaColors[card.colors.length > 1 ? "multi" : card.colors[0] || "colorless"];
+    if (card.game === "pokemon") return DEMO.energyColors[card.types[0] || card.kind];
     if (card.kind === "Magia") return DEMO.spellColor;
     if (card.kind === "Trampa") return DEMO.trapColor;
     for (const subtype in DEMO.frameColors)
@@ -339,32 +367,57 @@ function frameColor(card) {
     return card.subtypes.includes("Efecto") ? DEMO.frameColors.Efecto : DEMO.frameColors.Normal;
 }
 
+const KIND_ICONS = {
+    Magia: "✦",
+    Trampa: "⟲",
+    Instantaneo: "⚡",
+    Conjuro: "✺",
+    Artefacto: "⚙",
+    Encantamiento: "✧",
+    Planeswalker: "✪",
+    Tierra: "⛰",
+    Entrenador: "☗",
+    Energia: "✹",
+    Pokemon: "◓"
+};
+
 function thumbnail(card, className) {
-    const icon = card.kind === "Magia" ? "✦" : card.kind === "Trampa" ? "⟲" : "⚔";
+    const icon = KIND_ICONS[card.kind] || "⚔";
     return `<div class="${className}" style="background:${frameColor(card)}"><i>${icon}</i></div>`;
 }
 
-function rarityBadge(name) {
-    const rarity = Object.values(DEMO.rarities).find((item) => item.name === name);
-    return `<span class="rr" data-tone="${rarity.tone}">${name}</span>`;
+function rarityBadge(printing) {
+    const rarity = DEMO.rarities[printing.rarityKey];
+    return `<span class="rr" data-tone="${rarity.tone}">${rarity.name}</span>`;
 }
 
+// "TCG", "OCG", "JP": the market of a card or product; a game with one market shows none.
 function marketTag(item) {
-    return `<span class="tag ${item.ocg ? "o" : "t"}">${item.ocg ? "OCG" : "TCG"}</span>`;
+    const text = marketTagText(item.market);
+    if (!text) return "";
+    return `<span class="tag ${item.ocg ? "o" : "t"}">${text}</span>`;
 }
 
 function productTag(product) {
     return product.market
-        ? marketTag({ ocg: product.market === "OCG" })
+        ? marketTag({ market: product.market, ocg: GAMES[product.games[0]].markets[1]?.code === product.market })
         : `<span class="tag a">${t("Accesorio")}</span>`;
 }
 
+// What the card is, in the words of its game.
+function cardKinds(card) {
+    if (card.game === "magic") return [card.typeLine];
+    if (card.game === "pokemon") return [kindName(card.kind), ...card.subtypes.map(pokemonWord), ...card.types.map(pokemonWord)];
+    return [kindName(card.kind), ...card.subtypes.map((subtype) => t(subtype))];
+}
+
+// Pokémon's own words (stages, energy types) as the catalogue names them.
+function pokemonWord(word) {
+    return t(DEMO.pokemonWords[word] || word);
+}
+
 function cardChips(card) {
-    return (
-        marketTag(card) +
-        `<span class="chip">${t(card.kind)}</span>` +
-        card.subtypes.map((subtype) => `<span class="chip">${t(subtype)}</span>`).join("")
-    );
+    return marketTag(card) + cardKinds(card).map((kind) => `<span class="chip">${escapeText(kind)}</span>`).join("");
 }
 
 function languageName(code) {
@@ -400,7 +453,7 @@ function sellerCell(listing) {
 function printingCell(card, listing) {
     const printing = card.printings[listing.printing];
     const origin = `${printing.set} · ${t(DEMO.setTypes[printing.setType])}`;
-    return `<b>${printing.code}</b> ${rarityBadge(printing.rarity)}<small>${origin}</small>`;
+    return `<b>${printing.code}</b> ${rarityBadge(printing)}<small>${origin}</small>`;
 }
 
 function conditionCell(listing) {
@@ -421,8 +474,13 @@ function openDialog(mode, id) {
 // Vendedores
 // ---------------------------------------------------------------------------
 
+// A listing of the game on screen: a card of its markets, a product for it.
+function ofGame(listing) {
+    return listing.card === null ? PRODUCTS[listing.product].games.includes(game) : CARDS[listing.card].game === game;
+}
+
 function inventoryOf(sellerId) {
-    const listings = inStock((listing) => listing.seller === sellerId);
+    const listings = inStock((listing) => listing.seller === sellerId && ofGame(listing));
     let units = 0;
     let value = 0;
     for (const listing of listings) {
@@ -453,8 +511,8 @@ function renderSellers() {
 function openSeller(id) {
     const seller = SELLERS[id];
     const inventory = inventoryOf(id);
-    const kinds = ["Monstruo", "Magia", "Trampa", "Producto"]
-        .map((kind) => `<option value="${kind}">${t(kind)}</option>`)
+    const kinds = [...new Set(CARDS.filter((card) => card.game === game).map((card) => card.kind)), "Producto"]
+        .map((kind) => `<option value="${kind}">${kindName(kind)}</option>`)
         .join("");
     const since = t("vendedor desde {year}", { year: seller.since });
     byId("mb").innerHTML = markup`
@@ -525,7 +583,7 @@ function renderInventory() {
     const kind = byId("vk").value;
     const worstCondition = Number(byId("vc").value);
     const listings = inStock((listing) => {
-        if (listing.seller !== sellerId) return false;
+        if (listing.seller !== sellerId || !ofGame(listing)) return false;
         if (listing.card === null)
             return (!kind || kind === "Producto") && productName(PRODUCTS[listing.product]).toLowerCase().includes(search);
         const card = CARDS[listing.card];
@@ -561,12 +619,11 @@ function inventoryRow(listing) {
                 ${tail}`;
     }
     const card = CARDS[listing.card];
-    const subtypes = card.subtypes.map((subtype) => t(subtype)).join(" / ");
     return markup`
         <tr>
             <td>
                 <button class="lk" data-card="${card.id}">${escapeText(card.name)}</button>
-                <small>${marketTag(card)}${t(card.kind)} · ${subtypes}</small>
+                <small>${marketTag(card)}${escapeText(cardKinds(card).join(" · "))}</small>
             </td>
             <td>${printingCell(card, listing)}</td>
             <td>${conditionCell(listing)}</td>
@@ -583,16 +640,7 @@ function inventoryRow(listing) {
 function openDemoCard(id) {
     const card = CARDS[id];
     const languages = [...new Set(card.printings.map((printing) => printing.language))];
-    const defense = card.subtypes.includes("Link") ? "—" : card.def;
-    const stats = [
-        t(card.kind),
-        card.subtypes.map((subtype) => t(subtype)).join(" / "),
-        card.attribute ? t(card.attribute) : "",
-        levelText(card),
-        card.kind === "Monstruo" ? `ATK ${card.atk} / DEF ${defense}` : ""
-    ]
-        .filter(Boolean)
-        .join(" · ");
+    const stats = demoStats(card);
     const printingOptions = card.printings
         .map((printing, index) => `<option value="${index}">${printing.code} · ${printing.rarity}</option>`)
         .join("");
@@ -670,6 +718,27 @@ function openDemoCard(id) {
     byId("md").classList.add("on");
 }
 
+// The line of numbers under the card, as each game prints them.
+function demoStats(card) {
+    if (card.game === "magic")
+        return [card.typeLine, card.cost, card.pt, card.loyalty != null ? t("Lealtad {number}", { number: card.loyalty }) : ""]
+            .filter(Boolean)
+            .map(escapeText)
+            .join(" · ");
+    if (card.game === "pokemon")
+        return [...cardKinds(card), card.hp ? t("{hp} PS", { hp: card.hp }) : ""].filter(Boolean).map(escapeText).join(" · ");
+    const defense = card.subtypes.includes("Link") ? "—" : card.def;
+    return [
+        t(card.kind),
+        card.subtypes.map((subtype) => t(subtype)).join(" / "),
+        card.attribute ? t(card.attribute) : "",
+        levelText(card),
+        card.kind === "Monstruo" ? `ATK ${card.atk} / DEF ${defense}` : ""
+    ]
+        .filter(Boolean)
+        .join(" · ");
+}
+
 function factRow(label, value) {
     return `<div><dt>${t(label)}</dt><dd>${value}</dd></div>`;
 }
@@ -688,7 +757,7 @@ function renderDemoFacts(card, selected, summary) {
     const rising = summary.change >= 0;
     byId("cd-sub").textContent = `${printing.set} · ${t("Cartas sueltas")}`;
     byId("cd-facts").innerHTML =
-        factRow("Rareza", rarityBadge(printing.rarity)) +
+        factRow("Rareza", rarityBadge(printing)) +
         factRow("Número", printing.code) +
         factRow("Impreso en", `${printing.set} <small>${t(DEMO.setTypes[printing.setType])}</small>`) +
         factRow("Disponibles", units) +
@@ -985,7 +1054,7 @@ document.addEventListener(
 );
 
 function inMarket(product) {
-    return !product.market || product.market === market;
+    return product.market ? product.market === market : product.games.includes(game);
 }
 
 function openProduct(id) {
@@ -1058,12 +1127,18 @@ function byReleaseThenName(a, b) {
 
 function renderProducts() {
     const categorySelect = byId("pc");
-    // Producto sellado y accesorios, cada uno en su grupo.
-    if (!categorySelect.options.length) {
+    // Producto sellado y accesorios, cada uno en su grupo, con las categorías
+    // que tiene el juego en pantalla.
+    if (categorySelect.dataset.game !== game) {
+        categorySelect.dataset.game = game;
+        const present = new Set(PRODUCTS.filter((product) => product.games.includes(game)).map((product) => product.category));
         const groups = Object.entries(DEMO.productCategories)
             .map(([group, names]) => {
-                const options = names.map((name) => `<option value="${name}">${t(name)}</option>`).join("");
-                return `<optgroup label="${t(group)}">${options}</optgroup>`;
+                const options = names
+                    .filter((name) => present.has(name))
+                    .map((name) => `<option value="${name}">${t(name)}</option>`)
+                    .join("");
+                return options ? `<optgroup label="${t(group)}">${options}</optgroup>` : "";
             })
             .join("");
         categorySelect.innerHTML = `<option value="">${t("Todas las categorías")}</option>${groups}`;
@@ -1150,7 +1225,7 @@ function cartLine(key) {
     const condition = DEMO.conditions[listing.condition].code;
     return {
         name: card.name,
-        tag: marketTag(card),
+        tag: marketTag(card) || `<span class="tag t">${escapeText(GAMES[card.game].short || GAMES[card.game].name)}</span>`,
         meta: `${printing.code} · ${printing.rarity} · ${condition} · ${languageName(listing.language)}`
     };
 }
@@ -1284,10 +1359,93 @@ function alignDialogs() {
     byId("cart").style.paddingTop = offset;
 }
 
+// The market buttons of the game on screen (hidden for a game with one market).
+function renderMarketButtons() {
+    const group = byId("mk");
+    if (!group) return;
+    const markets = GAMES[game].markets;
+    group.hidden = markets.length < 2;
+    group.innerHTML = markets
+        .map(
+            (item) =>
+                `<button data-mk="${item.code}" aria-pressed="${item.code === market}" title="${escapeText(t(item.title))}">${escapeText(t(item.label))}</button>`
+        )
+        .join("");
+}
+
 function updateMarketButtons() {
+    if (!document.querySelector(`[data-mk="${market}"]`)) renderMarketButtons();
     document.querySelectorAll("[data-mk]").forEach((button) => {
         button.setAttribute("aria-pressed", button.dataset.mk === market);
     });
+    renderGameMarket();
+}
+
+// On the phone, game and market share one list ("Pokémon · JP"), so the
+// header keeps two rows (styles.css, "Teléfono").
+function renderGameMarket() {
+    const select = byId("game-mk");
+    if (!select) return;
+    if (!select.options.length)
+        select.innerHTML = Object.entries(GAMES)
+            .map(([code, info]) => {
+                const name = escapeText(info.short || info.name);
+                if (info.markets.length < 2) return `<option value="${code}:${info.markets[0].code}">${name}</option>`;
+                const options = info.markets
+                    .map((item) => `<option value="${code}:${item.code}">${name} · ${escapeText(t(item.label))}</option>`)
+                    .join("");
+                return `<optgroup label="${escapeText(info.name)}">${options}</optgroup>`;
+            })
+            .join("");
+    select.value = `${game}:${market}`;
+}
+
+// Moves the site to another game: its tabs, its markets (the one saved for
+// it, or its first) and the game selector in the header.
+function setGame(code) {
+    if (!GAMES[code]) return;
+    game = code;
+    try {
+        localStorage.setItem(GAME_STORAGE_KEY, code);
+    } catch {
+        /* Preference is optional. */
+    }
+    const saved = savedMarket(code);
+    market = saved || GAMES[code].markets[0].code;
+    TABS = GAMES[code].tabs.slice();
+    // A card tab of another game becomes this game's home; the cover and the
+    // account panels (profile, cart...) stay as they are.
+    if (tab in GAME_TAB_LABELS && !TABS.includes(tab)) tab = "Inicio";
+    renderMarketButtons();
+    renderGameMarket();
+    const select = byId("game");
+    if (select) select.value = code;
+    const search = byId("q");
+    if (search) {
+        search.placeholder = t(GAMES[code].search);
+        search.setAttribute("aria-label", t("Buscar cartas de {game}", { game: GAMES[code].name }));
+    }
+    document.documentElement.dataset.game = code;
+}
+
+// The market last chosen in a game, if it is one of its markets.
+function savedMarket(code) {
+    try {
+        const saved = JSON.parse(localStorage.getItem("cm_markets") || "{}")[code];
+        return GAMES[code].markets.some((item) => item.code === saved) ? saved : null;
+    } catch {
+        return null;
+    }
+}
+
+function saveMarket() {
+    try {
+        const saved = JSON.parse(localStorage.getItem("cm_markets") || "{}");
+        saved[game] = market;
+        localStorage.setItem("cm_markets", JSON.stringify(saved));
+    } catch {
+        /* Preference is optional. */
+    }
 }
 
 // Tras cambiar de moneda, vuelve a pintar lo que esté a la vista.
@@ -1344,6 +1502,7 @@ byId("cur").addEventListener("change", (event) => {
 const CLICK_ACTIONS = [
     ["[data-mk]", (button) => {
         market = button.dataset.mk;
+        saveMarket();
         updateMarketButtons();
         showTab();
     }],

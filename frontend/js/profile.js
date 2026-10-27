@@ -43,7 +43,10 @@ function preferencesHtml() {
     const option = (value, label, current) =>
         `<option value="${value}"${value === current ? " selected" : ""}>${label}</option>`;
     const languages = window.I18N.languages.map(([code, name]) => option(code, name, lang)).join("");
-    const markets = option("TCG", t("TCG (cartas occidentales)"), window.market) + option("OCG", t("OCG (cartas asiáticas)"), window.market);
+    // The markets of the game on screen (frontend/games.js).
+    const markets = window.GAMES[window.game].markets
+        .map((item) => option(item.code, `${t(item.name)} (${t(item.title)})`, window.market))
+        .join("");
     const views = option("list", t("Lista"), view) + option("grid", t("Cuadrícula"), view);
     const where = currentUser()
         ? "Se aplican al instante y se guardan en tu cuenta."

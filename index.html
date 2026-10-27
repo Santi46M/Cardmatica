@@ -3,18 +3,18 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Cardmática · Cartas de Yu-Gi-Oh! en el Mercosur</title>
-    <meta name="description" content="Catálogo de cartas de Yu-Gi-Oh! TCG y OCG con banlist, impresiones e historial de precios, para compradores y vendedores del Mercosur.">
+    <title>Cardmática · Marketplace de cartas coleccionables del Mercosur</title>
+    <meta name="description" content="Compra y vende cartas de Yu-Gi-Oh!, Magic: The Gathering y Pokémon en el Mercosur: impresiones, rarezas, historial de precios y vendedores de la región.">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Cardmática">
     <meta property="og:locale" content="es_ES">
-    <meta property="og:title" content="Cardmática · Cartas de Yu-Gi-Oh! en el Mercosur">
-    <meta property="og:description" content="Catálogo de cartas de Yu-Gi-Oh! TCG y OCG con banlist, impresiones e historial de precios, para compradores y vendedores del Mercosur.">
+    <meta property="og:title" content="Cardmática · Marketplace de cartas coleccionables del Mercosur">
+    <meta property="og:description" content="Compra y vende cartas de Yu-Gi-Oh!, Magic: The Gathering y Pokémon en el Mercosur: impresiones, rarezas, historial de precios y vendedores de la región.">
     <meta property="og:url" content="/">
     <meta property="og:image" content="/frontend/assets/og-image.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="Cardmática: cartas de Yu-Gi-Oh! TCG y OCG para el Mercosur">
+    <meta property="og:image:alt" content="Cardmática: cartas coleccionables para el Mercosur">
     <meta name="twitter:card" content="summary_large_image">
     <link rel="canonical" href="/">
     <link rel="icon" href="/favicon.ico" sizes="48x48">
@@ -46,6 +46,7 @@
     <link rel="modulepreload" href="/frontend/js/language-menu.js">
     <link rel="modulepreload" href="/frontend/js/news.js">
     <link rel="modulepreload" href="/frontend/js/page-meta.js">
+    <link rel="modulepreload" href="/frontend/js/portal.js">
     <link rel="modulepreload" href="/frontend/js/price-chart.js">
     <link rel="modulepreload" href="/frontend/js/printings.js">
     <link rel="modulepreload" href="/frontend/js/profile.js">
@@ -62,9 +63,9 @@
 <body>
 <header class="gl">
     <div class="bar">
-        <a href="/" class="logo" aria-label="Ir al inicio">
+        <a href="/" class="logo" aria-label="Ir a la portada">
             Card<b>mática</b>
-        </a><div class="seg" role="group" aria-label="Mercado"><button data-mk="TCG" aria-pressed="true" title="Cartas occidentales">TCG</button><button data-mk="OCG" aria-pressed="false" title="Cartas asiáticas">OCG</button></div>
+        </a><select id="game" class="game-select" aria-label="Juego"><option value="yugioh">Yu-Gi-Oh!</option><option value="magic">Magic</option><option value="pokemon">Pokémon</option></select><select id="game-mk" class="game-market" aria-label="Juego y mercado"></select><div class="seg" id="mk" role="group" aria-label="Mercado"><button data-mk="TCG" aria-pressed="true" title="Cartas occidentales">TCG</button><button data-mk="OCG" aria-pressed="false" title="Cartas asiáticas">OCG</button></div>
         <label class="search"><input id="q" type="search" placeholder="Nombre, código, set o arquetipo" aria-label="Buscar cartas"></label>
         <select id="cur" aria-label="Moneda"></select><button class="btn" id="cb"><span class="cb-label">Carrito </span><span class="cb-paren">(</span><span id="cc">0</span><span class="cb-paren">)</span></button><!-- PROVISIONAL: modo claro / oscuro (frontend/theme.js) --><button class="ghost theme-toggle" id="theme" type="button" aria-pressed="false" aria-label="Modo claro">☀</button>
     </div>
@@ -72,7 +73,7 @@
 </header>
 <main>
     <h1 id="view-title" class="sr-only" hidden></h1>
-    <div id="home"></div><div id="prod" style="display:none"><div class="tools"><select id="pc" aria-label="Categoría"></select><span class="cnt" id="pcnt"></span></div><div class="pn gl wrap"><table><thead><tr><th>Producto</th><th>Categoría</th><th class="hide">Lanzamiento</th><th class="num">Desde</th><th class="num hide">Ofertas</th></tr></thead><tbody id="pl"></tbody></table></div></div><div id="cat" style="display:none">
+    <div id="portal"></div><div id="home"></div><div id="prod" style="display:none"><div class="tools"><select id="pc" aria-label="Categoría"></select><span class="cnt" id="pcnt"></span></div><div class="pn gl wrap"><table><thead><tr><th>Producto</th><th>Categoría</th><th class="hide">Lanzamiento</th><th class="num">Desde</th><th class="num hide">Ofertas</th></tr></thead><tbody id="pl"></tbody></table></div></div><div id="cat" style="display:none">
     <div class="tools" id="cat-tools">
         <span id="type-filters" class="type-filters"></span><select id="rar" aria-label="Rareza"></select><select id="stp" aria-label="Tipo de producto"></select>
         <select id="srt" aria-label="Ordenar"></select>
@@ -91,6 +92,7 @@
 <div class="toast" id="ts"></div>
 <script src="/frontend/i18n.js"></script>
 <script src="/frontend/cookie-notice.js" defer></script>
+<script src="/frontend/games.js"></script>
 <script src="/frontend/demo/data.js"></script>
 <script src="/frontend/demo/store.js"></script>
 <script type="module" src="/frontend/js/catalog.js"></script>

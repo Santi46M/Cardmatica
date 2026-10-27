@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.core.games import Market
+
 T = TypeVar("T")
 
 
@@ -46,6 +48,8 @@ class PrintingView(BaseModel):
     edition: str
     artwork: str
     release_date: date | None
+    # Magic nonfoil/foil/etched; Pokémon normal/holo/reverse/firstEdition.
+    finishes: list[str] = []
     images: list[ImageView]
 
 
@@ -66,6 +70,7 @@ class CardTypesView(BaseModel):
 
 class CardSummary(BaseModel):
     id: UUID
+    game: str = "yugioh"
     konami_id: int | None
     ygoprodeck_id: int | None = None
     name_source: str | None = None
@@ -75,6 +80,12 @@ class CardSummary(BaseModel):
     subtypes: list[str]
     attribute: str | None
     types: CardTypesView | None = None
+    # Magic colours and mana value; Pokémon energy types and HP.
+    colors: list[str] = []
+    mana_value: int | None = None
+    hp: int | None = None
+    # For the type line of a list: Magic's type line and mana cost, Pokémon's stage.
+    details: dict = {}
     markets: list[str]
     printing_count: int
     image: ImageView | None
@@ -90,6 +101,10 @@ class CardSuggestion(BaseModel):
 
     id: UUID
     name: str
+    game: str = "yugioh"
+    card_type: str | None = None
+    subtypes: list[str] = []
+    details: dict = {}
     types: CardTypesView | None = None
     thumbnail_url: str | None = None
 
@@ -192,7 +207,7 @@ class PricePoint(BaseModel):
 
 class PriceHistoryView(BaseModel):
     card_id: UUID
-    market: Literal["TCG", "OCG"] | None
+    market: Market | None
     printing_id: UUID | None
     days: int
     points: list[PricePoint]
@@ -245,6 +260,7 @@ class NamedView(BaseModel):
 
 
 class SetView(NamedView):
+    game: str = "yugioh"
     language: str
     market: str
     release_date: date | None
@@ -260,7 +276,7 @@ class ArchetypeView(NamedView):
 
 
 class JobRequest(BaseModel):
-    source: Literal["ygoprodeck", "yugipedia"]
+    source: Literal["ygoprodeck", "yugipedia", "scryfall", "tcgdex"]
     mode: Literal["initial", "incremental", "card", "images", "errata", "retry", "banlist"]
     identifier: str | None = Field(default=None, max_length=200)
     language: Literal["en", "es", "fr", "de", "it", "pt", "ja", "ko", "ae"] = "en"
@@ -272,11 +288,17 @@ class JobRequest(BaseModel):
     max_printings: int | None = Field(default=None, ge=1, le=50)
     banlist_format: Literal["TCG", "OCG"] | None = None
     effective_date: date | None = None
+    # Scryfall only: narrows the walk with its search syntax ("e:ecl" for one set).
+    query: str | None = Field(default=None, max_length=300)
 
     @model_validator(mode="after")
     def validate_mode(self):
         if self.source == "ygoprodeck" and self.language not in {"en", "fr", "de", "it", "pt"}:
             raise ValueError("YGOPRODeck admite en, fr, de, it y pt; no inventar traducciones")
+        if self.source in {"scryfall", "tcgdex"} and self.language not in {"en", "es", "pt", "ja"}:
+            raise ValueError(f"{self.source}: se importan en, es, pt y ja")
+        if self.query and self.source != "scryfall":
+            raise ValueError("query solo se usa con Scryfall")
         if self.mode == "banlist":
             raise ValueError("La nueva fuente no documenta vigencia de banlists oficiales")
         if self.mode in {"card", "errata", "images"} and not self.identifier:

@@ -27,8 +27,10 @@ function itemHtml(item) {
     </li>`;
 }
 
-export function newsHtml(data) {
-    const columns = SECTIONS.filter(([key]) => data?.[key]?.length);
+// game: the news section of the game on screen; Magic and Pokémon have none
+// yet, so their home page shows only the site's own news.
+export function newsHtml(data, game = "yugioh") {
+    const columns = SECTIONS.filter(([key]) => (key === "site" || key === game) && data?.[key]?.length);
     if (!columns.length) return "";
     return `<section class="news" aria-label="${t("Noticias")}">${columns
         .map(

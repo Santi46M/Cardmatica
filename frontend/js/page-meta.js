@@ -40,14 +40,45 @@ function set(title, description) {
     document.querySelector('meta[property="og:title"]')?.setAttribute("content", title);
 }
 
+// Magic and Pokémon: their marketplace's title, and each tab named in their words.
+const GAME_META = {
+    magic: [
+        "Cardmática · Cartas de Magic: The Gathering en el Mercosur",
+        "Cartas sueltas, sobres y accesorios de Magic: The Gathering: impresiones, rarezas, acabados foil y formatos, para compradores y vendedores del Mercosur."
+    ],
+    pokemon: [
+        "Cardmática · Cartas de Pokémon en el Mercosur",
+        "Cartas sueltas, sobres y accesorios de Pokémon TCG, internacionales y japonesas: rarezas, variantes holo y formatos, para compradores y vendedores del Mercosur."
+    ]
+};
+const PORTAL = [
+    "Cardmática · Marketplace de cartas coleccionables del Mercosur",
+    "Compra y vende cartas de Yu-Gi-Oh!, Magic: The Gathering y Pokémon en el Mercosur: impresiones, rarezas, historial de precios y vendedores de la región."
+];
+
+function metaFor(tab) {
+    const game = window.game;
+    if (tab === "Portada") return PORTAL;
+    if (game === "yugioh" || !GAME_META[game]) return TABS[tab] || TABS.Inicio;
+    if (tab === "Inicio") return GAME_META[game];
+    // The account's own pages are the same in every game.
+    if (["Deseados", "Perfil", "Carrito", "Acceso", "Seguridad", "Admin"].includes(tab)) return TABS[tab];
+    // "Criaturas · Magic: The Gathering · Cardmática"
+    const label = t(window.TAB_LABELS[tab] || tab).replace(/ \(demo\)$/, "");
+    const name = window.GAMES[game].name;
+    // "Pokémon · Pokémon" would say it twice.
+    const title = label === name ? t("{tab} · Cardmática", { tab: label }) : t("{tab} · {game} · Cardmática", { tab: label, game: name });
+    return [title, GAME_META[game][1]];
+}
+
 export function tabMeta(tab) {
-    const [title, description] = TABS[tab] || TABS.Inicio;
+    const [title, description] = metaFor(tab);
     set(t(title), t(description));
     // Every view has one <h1>: the home page draws its own; the others name
     // the tab for screen readers (index.html, #view-title).
     const heading = document.getElementById("view-title");
     if (heading) {
-        heading.hidden = tab === "Inicio";
+        heading.hidden = tab === "Inicio" || tab === "Portada";
         heading.textContent = t(title).replace(/ · Cardmática$/, "");
     }
 }
@@ -60,7 +91,12 @@ export function cardMeta(name) {
 }
 
 export function scopeMeta(kind, name) {
-    if (kind === "set")
+    if (kind === "set" && window.game !== "yugioh")
+        set(
+            t("{name} · Set de {game} · Cardmática", { name, game: window.GAMES[window.game].name }),
+            t("{name}: cartas sueltas, cajas y sobres del set en Cardmática.", { name })
+        );
+    else if (kind === "set")
         set(
             t("{name} · Set de Yu-Gi-Oh! · Cardmática", { name }),
             t("{name}: cartas sueltas, cajas y sobres del set en Cardmática.", { name })

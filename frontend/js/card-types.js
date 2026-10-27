@@ -141,6 +141,8 @@ const KIND_PHRASES = {
 // "Monstruo de Efecto / Péndulo · Lanzador de Conjuros · OSCURIDAD · Nivel 4"
 // "Magia de Campo" · "Trampa de Contraefecto"
 export function typeLine(card) {
+    if (card.game === "magic") return magicLine(card);
+    if (card.game === "pokemon") return pokemonLine(card);
     const types = card.types;
     if (!types?.kind) return t(KIND_LABELS[card.card_type] || card.card_type || "Sin clasificar");
     if (types.kind !== "Monster")
@@ -169,23 +171,122 @@ function starsLabel({ link_rating, rank, level }) {
     return "";
 }
 
+// ---- Magic: The Gathering and Pokémon ------------------------------------------
+
+// Magic's main types (Scryfall's words) as the Spanish cards print them.
+export const MAGIC_TYPES = {
+    Creature: "Criatura",
+    Planeswalker: "Planeswalker",
+    Battle: "Batalla",
+    Instant: "Instantáneo",
+    Sorcery: "Conjuro",
+    Artifact: "Artefacto",
+    Enchantment: "Encantamiento",
+    Land: "Tierra",
+    Kindred: "Tribal"
+};
+export const MAGIC_COLORS = { W: "Blanco", U: "Azul", B: "Negro", R: "Rojo", G: "Verde" };
+
+// "Criatura · {1}{U}{R}"; the whole type line, in English as Oracle writes it, is in the card window.
+function magicLine(card) {
+    const kind = MAGIC_TYPES[card.card_type] ? t(MAGIC_TYPES[card.card_type]) : card.details?.type_line || "";
+    const legendary = card.subtypes?.includes("Legendary") ? ` ${t("legendaria")}` : "";
+    return [kind + legendary, card.details?.mana_cost].filter(Boolean).join(" · ");
+}
+
+// Pokémon's words as the Spanish cards print them (TCGdex's translations).
+export const POKEMON_WORDS = {
+    Pokemon: "Pokémon",
+    Trainer: "Entrenador",
+    Energy: "Energía",
+    Basic: "Básico",
+    Stage1: "Fase 1",
+    Stage2: "Fase 2",
+    MEGA: "MEGA",
+    VMAX: "VMAX",
+    VSTAR: "V-ASTRO",
+    "V-UNION": "V-UNIÓN",
+    BREAK: "TURBO",
+    "LEVEL-UP": "LEVEL-UP",
+    RESTORED: "Recreado",
+    Baby: "Bebé",
+    Supporter: "Partidario",
+    Item: "Objeto",
+    Stadium: "Estadio",
+    Tool: "Herramienta",
+    Normal: "Básica",
+    Special: "Especial",
+    Grass: "Planta",
+    Fire: "Fuego",
+    Water: "Agua",
+    Lightning: "Rayo",
+    Psychic: "Psíquico",
+    Fighting: "Lucha",
+    Darkness: "Oscura",
+    Metal: "Metálica",
+    Dragon: "Dragón",
+    Fairy: "Hada",
+    Colorless: "Incolora"
+};
+export const pokemonWord = (word) => (POKEMON_WORDS[word] ? t(POKEMON_WORDS[word]) : word);
+
+// "Pokémon · Fase 2 · ex · Fuego · 360 PS" · "Entrenador · Partidario" · "Energía · Básica"
+function pokemonLine(card) {
+    // Reprints share a name: the number and rarity say which one it is.
+    const printing = [card.details?.printing, card.details?.rarity !== "Unknown" ? card.details?.rarity : ""]
+        .filter(Boolean)
+        .join(" ");
+    return [
+        printing,
+        pokemonWord(card.card_type),
+        ...(card.subtypes || []).map(pokemonWord),
+        ...(card.colors || []).map(pokemonWord),
+        card.hp ? t("{hp} PS", { hp: card.hp }) : ""
+    ]
+        .filter(Boolean)
+        .join(" · ");
+}
+
 // ---- Filters ---------------------------------------------------------------
 
-// Each filter: element id, URL parameter, API parameter, label, tabs.
+// Each filter: element id, URL parameter, API parameter, label, game and tabs.
 export const TYPE_FILTERS = [
-    { id: "f-type", param: "tipo", label: "Tipo de carta", tabs: ["Todas"] },
-    { id: "f-frame", param: "clase", api: "frame", label: "Clase", tabs: ["Monstruo"] },
-    { id: "f-ability", param: "hab", api: "ability", label: "Habilidad", tabs: ["Monstruo"] },
-    { id: "f-race", param: "raza", api: "race", label: "Tipo de monstruo", tabs: ["Monstruo"] },
-    { id: "f-attribute", param: "atr", api: "attribute", label: "Atributo", tabs: ["Monstruo"] },
-    { id: "f-level", param: "nivel", label: "Nivel, Rango o Link", tabs: ["Monstruo"] },
+    { id: "f-type", param: "tipo", label: "Tipo de carta", game: "yugioh", tabs: ["Todas"] },
+    { id: "f-frame", param: "clase", api: "frame", label: "Clase", game: "yugioh", tabs: ["Monstruo"] },
+    { id: "f-ability", param: "hab", api: "ability", label: "Habilidad", game: "yugioh", tabs: ["Monstruo"] },
+    { id: "f-race", param: "raza", api: "race", label: "Tipo de monstruo", game: "yugioh", tabs: ["Monstruo"] },
+    { id: "f-attribute", param: "atr", api: "attribute", label: "Atributo", game: "yugioh", tabs: ["Monstruo"] },
+    { id: "f-level", param: "nivel", label: "Nivel, Rango o Link", game: "yugioh", tabs: ["Monstruo"] },
     {
         id: "f-property",
         param: "prop",
         api: "property",
         label: { Magia: "Tipo de magia", Trampa: "Tipo de trampa" },
+        game: "yugioh",
         tabs: ["Magia", "Trampa"]
-    }
+    },
+    { id: "f-mtype", param: "mtipo", api: "subtype", label: "Tipo de carta", game: "magic", tabs: ["Todas"] },
+    {
+        id: "f-color",
+        param: "color",
+        api: "color",
+        label: "Color",
+        game: "magic",
+        tabs: ["Todas", "Criatura", "Instantaneo", "Conjuro", "Artefacto", "Encantamiento"]
+    },
+    {
+        id: "f-mana",
+        param: "mana",
+        api: "mana_value",
+        label: "Valor de maná",
+        game: "magic",
+        tabs: ["Todas", "Criatura", "Instantaneo", "Conjuro", "Artefacto", "Encantamiento"]
+    },
+    { id: "f-pkind", param: "pclase", api: "card_type", label: "Tipo de carta", game: "pokemon", tabs: ["Todas"] },
+    { id: "f-ptype", param: "ptipo", api: "color", label: "Tipo", game: "pokemon", tabs: ["Todas", "Pokemon"] },
+    { id: "f-stage", param: "fase", api: "subtype", label: "Fase", game: "pokemon", tabs: ["Pokemon"] },
+    { id: "f-trainer", param: "entr", api: "subtype", label: "Tipo de Entrenador", game: "pokemon", tabs: ["Entrenador"] },
+    { id: "f-energy", param: "ener", api: "subtype", label: "Tipo de Energía", game: "pokemon", tabs: ["Energia"] }
 ];
 
 // The three numbers of a monster, each with its own API parameter.
@@ -225,8 +326,47 @@ function starOptions(types) {
     );
 }
 
+// The values of a list the catalogue has, in the order of `order`.
+const present = (order, values) => (order || []).filter((value) => (values || []).includes(value));
+
 function optionsFor(filter, tab, types) {
     switch (filter.id) {
+        case "f-mtype":
+            return (
+                option("", "Todos los tipos") +
+                present(Object.keys(MAGIC_TYPES), types.kinds_present).map((value) => option(value, MAGIC_TYPES[value])).join("")
+            );
+        case "f-color":
+            return (
+                option("", "Todos los colores") +
+                present(types.colors, types.colors_present).map((value) => option(value, MAGIC_COLORS[value])).join("")
+            );
+        case "f-mana":
+            return (
+                option("", "Cualquier valor de maná") +
+                (types.mana_values || [])
+                    .map((value) => `<option value="${h(value)}">${h(t("Valor {number}", { number: value }))}</option>`)
+                    .join("")
+            );
+        case "f-pkind":
+            return option("", "Todos los tipos") + present(types.kinds, types.kinds_present).map((value) => option(value, POKEMON_WORDS[value])).join("");
+        case "f-ptype":
+            return (
+                option("", "Todos los tipos de energía") +
+                present(types.colors, types.colors_present).map((value) => option(value, POKEMON_WORDS[value])).join("")
+            );
+        case "f-stage":
+            return option("", "Todas las fases") + present(types.stages, types.subtypes_present).map((value) => option(value, POKEMON_WORDS[value] || value)).join("");
+        case "f-trainer":
+            return (
+                option("", "Todos los Entrenadores") +
+                present(types.trainer_types, types.subtypes_present).map((value) => option(value, POKEMON_WORDS[value])).join("")
+            );
+        case "f-energy":
+            return (
+                option("", "Todas las Energías") +
+                present(types.energy_types, types.subtypes_present).map((value) => option(value, POKEMON_WORDS[value])).join("")
+            );
         case "f-type":
             return cardTypeOptions(types);
         case "f-frame":
@@ -281,8 +421,8 @@ function optionsFor(filter, tab, types) {
 }
 
 // The filters of a tab, as <select> elements (labels kept for screen readers).
-export function typeFiltersHtml(tab, types) {
-    return TYPE_FILTERS.filter((filter) => filter.tabs.includes(tab))
+export function typeFiltersHtml(tab, types, game = "yugioh") {
+    return TYPE_FILTERS.filter((filter) => filter.game === game && filter.tabs.includes(tab))
         .map((filter) => {
             const label = labelOf(filter, tab);
             return `<select id="${filter.id}" aria-label="${h(label)}" title="${h(label)}">${optionsFor(filter, tab, types)}</select>`;

@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.core.games import Market
+
 # A simple shape check. Proving the address needs confirmation emails (not built yet).
 Email = Annotated[str, Field(max_length=254, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")]
 
@@ -102,7 +104,7 @@ class ProfileData(BaseModel):
 
 class Preferences(BaseModel):
     currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
-    market: Literal["TCG", "OCG"] | None = None
+    market: Market | None = None
     view: Literal["list", "grid"] | None = None
 
 
@@ -125,7 +127,7 @@ class WantlistItemData(BaseModel):
     id: ClientId
     cardId: UUID
     printingId: UUID | None = None
-    market: Literal["TCG", "OCG"]
+    market: Market
     language: str = Field(default="", max_length=4)
     edition: str = Field(default="", max_length=20)
     quantity: int = Field(default=1, ge=1, le=99)

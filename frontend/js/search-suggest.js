@@ -21,7 +21,7 @@ function optionHtml(card, index, active) {
         </li>`;
 }
 
-export function installSearchSuggest({ input, api, market, onPick }) {
+export function installSearchSuggest({ input, api, market, game = () => undefined, onPick }) {
     const list = document.createElement("ul");
     list.id = "q-suggest";
     list.className = "suggest";
@@ -63,18 +63,20 @@ export function installSearchSuggest({ input, api, market, onPick }) {
         const text = input.value.trim();
         controller?.abort();
         if (text.length < SUGGEST.minLength) return close();
-        if (text === shownFor && cards.length) return render();
+        // The same text in another game is another search.
+        const key = `${game() || ""}:${text}`;
+        if (key === shownFor && cards.length) return render();
         controller = new AbortController();
         try {
             const found = await api.get(
                 "suggest",
-                { q: text, market: market(), limit: SUGGEST.limit, language: window.I18N.lang },
+                { q: text, market: market(), game: game(), limit: SUGGEST.limit, language: window.I18N.lang },
                 { signal: controller.signal }
             );
             // Typing went on meanwhile: a newer request will answer.
             if (input.value.trim() !== text) return;
             cards = found;
-            shownFor = text;
+            shownFor = key;
             active = -1;
             if (document.activeElement === input) render();
         } catch {
@@ -87,7 +89,7 @@ export function installSearchSuggest({ input, api, market, onPick }) {
         timer = setTimeout(suggest, SUGGEST.delayMs);
     });
     input.addEventListener("focus", () => {
-        if (input.value.trim() === shownFor && cards.length) render();
+        if (`${game() || ""}:${input.value.trim()}` === shownFor && cards.length) render();
     });
     input.addEventListener("blur", () => {
         list.hidden = true;

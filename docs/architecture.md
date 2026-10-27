@@ -80,3 +80,17 @@ El worker conserva sus checkpoints, lotes, reintentos y transacciones por carta.
 La paginación de YGOPRODeck utiliza num/offset y reutiliza la respuesta del lote.
 El incremental revalida páginas e identifica cambios por hash; no existe un feed
 documentado de cartas modificadas ni se usan fechas de lanzamiento como sustituto.
+
+## Varios juegos (multijuego, octubre de 2026)
+
+La portada (/) muestra un recuadro por juego; cada uno abre su mercado
+(/yugioh, /magic, /pokemon) con el mismo diseño. backend/app/core/games.py define
+juegos y mercados: TCG y OCG (Yu-Gi-Oh!), MTG (Magic), PKM y PKMJ (Pokémon). Cada
+mercado pertenece a un solo juego, así que filtrar por mercado filtra por juego.
+
+La migración 018 agrega cards.game, cards.game_key (único), colors, mana_value, hp,
+details, sets.game y card_printings.finishes. La identidad de Magic es el
+oracle_id de Scryfall (`mtg:<oracle>`), con una impresión por set+número+idioma;
+la de Pokémon es el id de TCGdex (`pkm:<id>`, `pkm:ja:<id>` para japonés), con los
+idiomas como impresiones. Las rarezas y sus familias son propias de cada juego
+(services/rarities.py). One Piece figura en la portada como «Próximamente».

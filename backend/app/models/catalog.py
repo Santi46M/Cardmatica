@@ -15,6 +15,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.games import DEFAULT_GAME, GAMES, MARKETS, sql_list
 from app.db.base import Base, Entity
 
 
@@ -27,7 +28,13 @@ class Card(Entity, Base):
         Index("ix_cards_property", "card_type", "card_property"),
         Index("ix_cards_race", "monster_race"),
         Index("ix_cards_attribute", "attribute"),
+        Index("ix_cards_game_name", "game", "display_name"),
+        CheckConstraint(f"game IN ({sql_list(GAMES)})", name="valid_game"),
     )
+    # Which card game (app/core/games.py). Magic and Pokémon cards are known by
+    # their source's own identity (game_key): Scryfall's oracle id, TCGdex's card id.
+    game: Mapped[str] = mapped_column(String(20), default=DEFAULT_GAME, server_default=DEFAULT_GAME)
+    game_key: Mapped[str | None] = mapped_column(String(120), unique=True)
     konami_id: Mapped[int | None] = mapped_column(Integer, unique=True)
     ygoprodeck_id: Mapped[int | None] = mapped_column(Integer, unique=True)
     available_markets: Mapped[list] = mapped_column(JSON, default=list)
@@ -49,6 +56,13 @@ class Card(Entity, Base):
     monster_abilities: Mapped[list | None] = mapped_column(JSON, default=list)
     monster_race: Mapped[str | None] = mapped_column(String(40))
     card_property: Mapped[str | None] = mapped_column(String(20))
+    # Magic: colours (W, U, B, R, G) and mana value. Pokémon: energy types and HP.
+    colors: Mapped[list | None] = mapped_column(JSON, default=list)
+    mana_value: Mapped[int | None] = mapped_column(Integer)
+    hp: Mapped[int | None] = mapped_column(Integer)
+    # What the card window shows for that game: mana cost, power and toughness,
+    # attacks, weakness, retreat, regulation mark, legal formats (shown, never filtered).
+    details: Mapped[dict | None] = mapped_column(JSON, default=dict)
     names: Mapped[list["CardName"]] = relationship(
         back_populates="card", cascade="all, delete-orphan"
     )
@@ -98,6 +112,9 @@ class CardSeries(Entity, Base):
 class CardSet(Entity, Base):
     __tablename__ = "sets"
     __table_args__ = (UniqueConstraint("source_key", "language", "market"),)
+    game: Mapped[str] = mapped_column(
+        String(20), default=DEFAULT_GAME, server_default=DEFAULT_GAME, index=True
+    )
     source_key: Mapped[str] = mapped_column(String(200))
     name: Mapped[str] = mapped_column(String(300), index=True)
     language: Mapped[str] = mapped_column(String(12))
@@ -115,7 +132,7 @@ class CardPrinting(Entity, Base):
     __tablename__ = "card_printings"
     __table_args__ = (
         UniqueConstraint("card_id", "code", "rarity_id", "language", "edition", "artwork"),
-        CheckConstraint("market IN ('TCG', 'OCG')", name="valid_market"),
+        CheckConstraint(f"market IN ({sql_list(MARKETS)})", name="valid_market"),
         Index("ix_printings_market_code", "market", "code"),
     )
     card_id: Mapped[UUID] = mapped_column(ForeignKey("cards.id", ondelete="CASCADE"), index=True)
@@ -127,6 +144,9 @@ class CardPrinting(Entity, Base):
     edition: Mapped[str] = mapped_column(String(80), default="unknown")
     artwork: Mapped[str] = mapped_column(String(120), default="unknown")
     release_date: Mapped[date | None] = mapped_column(Date)
+    # Finishes the printing exists in, sold as one product: Magic nonfoil, foil,
+    # etched; Pokémon normal, holo, reverse, firstEdition. Empty for Yu-Gi-Oh!.
+    finishes: Mapped[list | None] = mapped_column(JSON, default=list)
     card: Mapped[Card] = relationship(back_populates="printings")
     card_set: Mapped[CardSet] = relationship()
     rarity: Mapped[Rarity] = relationship()

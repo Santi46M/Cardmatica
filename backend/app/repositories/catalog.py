@@ -114,8 +114,11 @@ class CatalogRepository:
         page_size=24,
         q=None,
         market=None,
+        game=None,
         card_type=None,
         subtype=None,
+        color=None,
+        mana_value=None,
         frame=None,
         ability=None,
         race=None,
@@ -145,6 +148,8 @@ class CatalogRepository:
             printing_filters.append(CardSet.product_type == product_type)
 
         query = select(Card)
+        if game:
+            query = query.where(Card.game == game)
         if market:
             query = query.where(in_market(market))
         if rarity_names is not None or set_id or product_type:
@@ -161,7 +166,12 @@ class CatalogRepository:
             Card.attribute: attribute,
             Card.card_property: card_property,
         }
-        numbers = {Card.level: level, Card.rank: rank, Card.link_rating: link_rating}
+        numbers = {
+            Card.level: level,
+            Card.rank: rank,
+            Card.link_rating: link_rating,
+            Card.mana_value: mana_value,
+        }
         query = query.where(
             *(column == value for column, value in equal.items() if value),
             *(column == value for column, value in numbers.items() if value is not None),
@@ -169,6 +179,8 @@ class CatalogRepository:
         # Lists stored as JSON: the value must be one of their items.
         if subtype:
             query = query.where(listed(Card.subtypes, subtype))
+        if color:
+            query = query.where(listed(Card.colors, color))
         if ability:
             query = query.where(listed(Card.monster_abilities, ability))
         # Type levels (app/services/card_types.py). "Pendulum" is a flag on top
@@ -205,7 +217,7 @@ class CatalogRepository:
         ).all()
         return cards, total
 
-    def suggestions(self, q, *, market=None, limit=6):
+    def suggestions(self, q, *, market=None, game=None, limit=6):
         """Cards for the search box. Every word typed must appear in the name, in
         any order ("dragón azul" finds "Dragón Blanco de Ojos Azules"). Names that
         start with the text come first, then names with a word that starts with
@@ -243,6 +255,8 @@ class CatalogRepository:
             )
         matches = matches.subquery()
         query = select(Card).join(matches, matches.c.card_id == Card.id)
+        if game:
+            query = query.where(Card.game == game)
         if market:
             query = query.where(in_market(market))
         return self.session.scalars(

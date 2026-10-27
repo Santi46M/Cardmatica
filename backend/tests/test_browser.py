@@ -90,7 +90,7 @@ def test_catalog_printing_switch_currency_and_market(live_server, browser_page):
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
 
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     expect(page.locator("#home h1")).to_be_visible()
     page.locator('[data-go="Todas"]').click()
     expect(page.locator("#list")).to_contain_text("Synthetic Test Dragon")
@@ -117,7 +117,7 @@ def test_existing_product_cart_add_remove_checkout(live_server, browser_page):
     page = browser_page
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     page.locator('[data-g="Productos"]').click()
     page.locator("#pl tr[data-pd]").first.click()
     button = page.locator("#pt [data-add]").first
@@ -142,7 +142,7 @@ def test_demo_seller_inventory_card_and_currency(live_server, browser_page):
     page = browser_page
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     page.locator('[data-g="Vendedores"]').click()
     expect(page.locator("#vl tr[data-v]")).to_have_count(8)
     page.locator("#vl tr[data-v]").first.click()
@@ -200,7 +200,7 @@ def test_banlist_price_history_wantlists_and_profile(live_server, browser_page, 
     page = browser_page
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     expect(page.locator("#home-banlist")).to_contain_text("Sin fecha anunciada")
     expect(page.locator("#home-banlist [data-countdown]")).to_contain_text("días")
     page.locator('[data-go="Todas"]').click()
@@ -275,7 +275,7 @@ def test_cart_page_from_popup(live_server, browser_page):
     page = browser_page
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     page.locator('[data-g="Productos"]').click()
     page.locator("#pl tr[data-pd]").first.click()
     button = page.locator("#pt [data-add]").first
@@ -331,7 +331,7 @@ def test_list_url_state_grid_preview_shortcut_and_price_alerts(live_server, brow
     page = browser_page
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     # "/" jumps to the search box from anywhere outside a form field.
     page.locator("body").press("/")
     expect(page.locator("#q")).to_be_focused()
@@ -467,7 +467,7 @@ def test_register_sign_out_and_sign_in_from_the_account_menu(live_server, browse
     page = browser_page
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     page.locator("#account-button").click()
     expect(page.locator("#account-menu")).to_contain_text("Invitado")
     page.locator('#account-menu [data-auth-mode="register"]').click()
@@ -529,7 +529,7 @@ def test_browser_data_moves_into_the_account(live_server, browser_page):
     # A fresh browser profile: the lists and the currency come from the account.
     page.context.clear_cookies()
     page.evaluate("localStorage.clear()")
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     page.locator("#account-button").click()
     page.locator('#account-menu [data-auth-mode="login"]').click()
     page.locator("#auth-email").fill("lucia@example.com")
@@ -575,7 +575,7 @@ def test_admin_panel_for_admin_accounts(live_server, browser_page, factory):
     page = browser_page
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     page.locator("#account-button").click()
     page.locator('#account-menu [data-auth-mode="register"]').click()
     page.locator("#auth-name").fill("Admin")
@@ -606,7 +606,7 @@ def test_email_links_confirm_and_reset(live_server, browser_page, monkeypatch):
     page = browser_page
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     page.locator("#account-button").click()
     page.locator('#account-menu [data-auth-mode="register"]').click()
     page.locator("#auth-name").fill("Sofía")
@@ -652,7 +652,7 @@ def test_launch_checklist(live_server, browser_page, factory):
     page = browser_page
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     # The call to action is visible without scrolling, on a laptop and a phone.
     for width, height in [(1280, 720), (390, 740)]:
         page.set_viewport_size({"width": width, "height": height})
@@ -697,7 +697,7 @@ def test_dialog_keeps_and_returns_focus(live_server, browser_page):
 
 def test_search_suggestions_open_a_card(live_server, browser_page):
     page = browser_page
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     search = page.locator("#q")
     search.press_sequentially("dragon synth", delay=20)
     option = page.locator("#q-suggest [role=option]").first
@@ -863,7 +863,7 @@ def test_latest_set_banner_and_set_page(live_server, browser_page, factory, reco
     page = browser_page
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     current = page.locator(".promo-slide.current")
     expect(current.locator("h2")).to_have_text("Beyond the Brave")
     expect(page.locator(".promo [data-promo-close]")).to_have_count(0)
@@ -898,7 +898,7 @@ def test_latest_set_banner_and_set_page(live_server, browser_page, factory, reco
     expect(page.locator(".scope-head h2")).to_have_text("Beyond the Brave")
     # A tab leaves the set page, and the banner is back for good.
     page.locator('[data-g="Inicio"]').click()
-    expect(page).to_have_url(re.compile(r"/$"))
+    expect(page).to_have_url(re.compile(r"/yugioh$"))
     page.reload()
     expect(page.locator("#home h1")).to_be_visible()
     expect(page.locator(".promo-slide.current h2")).to_have_text("Beyond the Brave")
@@ -910,7 +910,7 @@ def test_latest_set_banner_and_set_page(live_server, browser_page, factory, reco
 
 def test_language_menu_with_flags(live_server, browser_page):
     page = browser_page
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     button = page.locator("#lang-button")
     expect(button).to_have_text("ES")
     # At the far right of the header, after the account.
@@ -950,7 +950,7 @@ def test_home_news_columns(live_server, browser_page, factory):
         ]
         news_feeds.store(session, "yugioh", "Konami Europa", game, "es")
     page = browser_page
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     columns = page.locator(".news > div")
     expect(columns).to_have_count(2)
     expect(page.locator(".news-title")).to_have_text(
@@ -964,7 +964,7 @@ def test_home_news_columns(live_server, browser_page, factory):
 
 def test_provisional_theme_toggle(live_server, browser_page):
     page = browser_page
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     root = page.locator("html")
     expect(root).to_have_attribute("data-theme", "dark")
     page.locator("#theme").click()
@@ -981,7 +981,7 @@ def test_the_site_in_portuguese_and_english(live_server, browser_page):
     page = browser_page
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.goto(f"{live_server}/?lang=pt")
+    page.goto(f"{live_server}/yugioh?lang=pt")
     expect(page.locator("html")).to_have_attribute("lang", "pt-BR")
     expect(page.locator('[data-g="Todas"]')).to_have_text("Todas as cartas")
     expect(page.locator("#q")).to_have_attribute(
@@ -1023,7 +1023,7 @@ def test_delete_my_account_from_security(live_server, browser_page):
 
 def test_for_you_shows_the_cards_this_person_opened(live_server, browser_page):
     page = browser_page
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     # Nothing opened yet: no section of one's own.
     expect(page.locator("#home h1")).to_be_visible()
     expect(page.locator("#home-for-you section")).to_have_count(0)
@@ -1031,7 +1031,7 @@ def test_for_you_shows_the_cards_this_person_opened(live_server, browser_page):
     page.locator("#list [data-catalog-card]").first.click()
     expect(page.locator("#mb")).to_contain_text("Synthetic official test text.")
     assert len(page.evaluate("JSON.parse(localStorage.getItem('cm_recent_cards'))")) == 1
-    page.goto(live_server)
+    page.goto(f"{live_server}/yugioh")
     section = page.locator("#home-for-you section")
     expect(section).to_contain_text("Para ti")
     expect(section.locator('[role="tab"]').first).to_have_text("Vistas recientemente")
@@ -1048,3 +1048,25 @@ def test_for_you_shows_the_cards_this_person_opened(live_server, browser_page):
     preview = page.locator("#card-preview")
     expect(preview).to_be_visible()
     assert page.evaluate("document.getElementById('card-preview').matches(':popover-open')")
+
+
+def test_cover_opens_each_marketplace(live_server, browser_page):
+    page = browser_page
+    page.goto(live_server)
+    expect(page.locator("html")).to_have_attribute("data-screen", "portal")
+    expect(page.locator(".portal-game[data-game-go]")).to_have_count(3)
+    expect(page.locator(".portal-game.soon")).to_contain_text("One Piece")
+    # The search and the game's tabs wait for a game.
+    expect(page.locator("#tabs")).to_be_hidden()
+    page.locator('[data-game-go="magic"]').click()
+    expect(page).to_have_url(re.compile(r"/magic$"))
+    expect(page.locator('[data-g="Criatura"]')).to_be_visible()
+    expect(page.locator("#mk")).to_be_hidden()
+    # The header switches game without going back to the cover.
+    page.locator("#game").select_option("pokemon")
+    expect(page).to_have_url(re.compile(r"/pokemon$"))
+    expect(page.locator('[data-g="Entrenador"]')).to_be_visible()
+    expect(page.locator("#mk [data-mk]")).to_have_count(2)
+    # The logo goes back to the cover.
+    page.locator(".logo").first.click()
+    expect(page.locator("html")).to_have_attribute("data-screen", "portal")

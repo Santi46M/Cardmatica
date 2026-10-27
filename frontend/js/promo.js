@@ -83,7 +83,15 @@ export function promoSlides(sets, market, hidden = []) {
 }
 
 function slideHtml(slide, index, count, market) {
-    const label = index === 0 ? t("Último set {market}", { market }) : t("Set {market}", { market });
+    // "Último set OCG", "Último set Japonés"; a game with one market says only "Último set".
+    const name = window.marketTagText(market) ? t(window.marketInfo(market).name) : "";
+    const label = name
+        ? index === 0
+            ? t("Último set {market}", { market: name })
+            : t("Set {market}", { market: name })
+        : index === 0
+          ? t("Último set")
+          : t("Set");
     const released = slide.released ? ` · ${h(formatDate(slide.released))}` : "";
     const warning = h(PHOTO_WARNING());
     // The same picture twice: faint and blurred behind, clear on the right.
