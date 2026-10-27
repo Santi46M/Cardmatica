@@ -3,37 +3,98 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Cardmática</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Cardmática · Marketplace de cartas coleccionables del Mercosur</title>
+    <meta name="description" content="Compra y vende cartas de Yu-Gi-Oh!, Magic: The Gathering y Pokémon en el Mercosur: impresiones, rarezas, historial de precios y vendedores de la región.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Cardmática">
+    <meta property="og:locale" content="es_ES">
+    <meta property="og:title" content="Cardmática · Marketplace de cartas coleccionables del Mercosur">
+    <meta property="og:description" content="Compra y vende cartas de Yu-Gi-Oh!, Magic: The Gathering y Pokémon en el Mercosur: impresiones, rarezas, historial de precios y vendedores de la región.">
+    <meta property="og:url" content="/">
+    <meta property="og:image" content="/frontend/assets/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Cardmática: cartas coleccionables para el Mercosur">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="canonical" href="/">
+    <link rel="icon" href="/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/frontend/assets/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/frontend/assets/apple-touch-icon.png">
+    <link rel="manifest" href="/frontend/assets/site.webmanifest">
+    <meta name="theme-color" content="#0a1626">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/frontend/theme.js"></script>
+    <!-- The page's modules, fetched in parallel instead of one import at a time. -->
+    <link rel="modulepreload" href="/frontend/js/account-menu.js">
+    <link rel="modulepreload" href="/frontend/js/admin.js">
+    <link rel="modulepreload" href="/frontend/js/analytics.js">
+    <link rel="modulepreload" href="/frontend/js/api.js">
+    <link rel="modulepreload" href="/frontend/js/auth.js">
+    <link rel="modulepreload" href="/frontend/js/back-to-top.js">
+    <link rel="modulepreload" href="/frontend/js/banlist.js">
+    <link rel="modulepreload" href="/frontend/js/card-preview.js">
+    <link rel="modulepreload" href="/frontend/js/card-types.js">
+    <link rel="modulepreload" href="/frontend/js/cart-page.js">
+    <link rel="modulepreload" href="/frontend/js/catalog-view.js">
+    <link rel="modulepreload" href="/frontend/js/collections.js">
+    <link rel="modulepreload" href="/frontend/js/config.js">
+    <link rel="modulepreload" href="/frontend/js/for-you.js">
+    <link rel="modulepreload" href="/frontend/js/format.js">
+    <link rel="modulepreload" href="/frontend/js/header-scroll.js">
+    <link rel="modulepreload" href="/frontend/js/html.js">
+    <link rel="modulepreload" href="/frontend/js/lang.js">
+    <link rel="modulepreload" href="/frontend/js/language-menu.js">
+    <link rel="modulepreload" href="/frontend/js/news.js">
+    <link rel="modulepreload" href="/frontend/js/page-meta.js">
+    <link rel="modulepreload" href="/frontend/js/portal.js">
+    <link rel="modulepreload" href="/frontend/js/price-chart.js">
+    <link rel="modulepreload" href="/frontend/js/printings.js">
+    <link rel="modulepreload" href="/frontend/js/profile.js">
+    <link rel="modulepreload" href="/frontend/js/promo.js">
+    <link rel="modulepreload" href="/frontend/js/rarities.js">
+    <link rel="modulepreload" href="/frontend/js/search-suggest.js">
+    <link rel="modulepreload" href="/frontend/js/session-api.js">
+    <link rel="modulepreload" href="/frontend/js/shopping-wizard.js">
+    <link rel="modulepreload" href="/frontend/js/storage.js">
+    <link rel="modulepreload" href="/frontend/js/tile-tabs.js">
+    <link rel="modulepreload" href="/frontend/js/trending.js">
+    <link rel="modulepreload" href="/frontend/js/wantlists.js">
 </head>
 <body>
 <header class="gl">
     <div class="bar">
-        <a href="/" class="logo" aria-label="Ir al inicio">
+        <a href="/" class="logo" aria-label="Ir a la portada">
             Card<b>mática</b>
-        </a><div class="seg" role="group" aria-label="Mercado"><button data-mk="TCG" aria-pressed="true" title="Cartas occidentales">TCG</button><button data-mk="OCG" aria-pressed="false" title="Cartas asiáticas">OCG</button></div>
+        </a><select id="game" class="game-select" aria-label="Juego"><option value="yugioh">Yu-Gi-Oh!</option><option value="magic">Magic</option><option value="pokemon">Pokémon</option></select><select id="game-mk" class="game-market" aria-label="Juego y mercado"></select><div class="seg" id="mk" role="group" aria-label="Mercado"><button data-mk="TCG" aria-pressed="true" title="Cartas occidentales">TCG</button><button data-mk="OCG" aria-pressed="false" title="Cartas asiáticas">OCG</button></div>
         <label class="search"><input id="q" type="search" placeholder="Nombre, código, set o arquetipo" aria-label="Buscar cartas"></label>
-        <select id="cur" aria-label="Moneda"></select><button class="btn" id="cb">Carrito (<span id="cc">0</span>)</button>
+        <select id="cur" aria-label="Moneda"></select><button class="btn" id="cb"><span class="cb-label">Carrito </span><span class="cb-paren">(</span><span id="cc">0</span><span class="cb-paren">)</span></button><!-- PROVISIONAL: modo claro / oscuro (frontend/theme.js) --><button class="ghost theme-toggle" id="theme" type="button" aria-pressed="false" aria-label="Modo claro">☀</button>
     </div>
     <nav id="tabs"></nav>
 </header>
 <main>
-    <div id="home"></div><div id="prod" style="display:none"><div class="tools"><select id="pc" aria-label="Categoría"></select><span class="cnt" id="pcnt"></span></div><div class="pn gl wrap"><table><thead><tr><th>Producto</th><th>Categoría</th><th class="hide">Lanzamiento</th><th class="num">Desde</th><th class="num hide">Ofertas</th></tr></thead><tbody id="pl"></tbody></table></div></div><div id="cat" style="display:none">
-    <div class="tools">
-        <select id="sub" aria-label="Subtipo"></select><select id="rar" aria-label="Rareza"></select><select id="stp" aria-label="Origen del set"></select>
-        <select id="srt" aria-label="Ordenar"><option value="n">Nombre</option><option value="pa">Precio: menor a mayor</option><option value="pd">Precio: mayor a menor</option></select>
+    <h1 id="view-title" class="sr-only" hidden></h1>
+    <div id="portal"></div><div id="home"></div><div id="prod" style="display:none"><div class="tools"><select id="pc" aria-label="Categoría"></select><span class="cnt" id="pcnt"></span></div><div class="pn gl wrap"><table><thead><tr><th>Producto</th><th>Categoría</th><th class="hide">Lanzamiento</th><th class="num">Desde</th><th class="num hide">Ofertas</th></tr></thead><tbody id="pl"></tbody></table></div></div><div id="cat" style="display:none">
+    <div class="tools" id="cat-tools">
+        <span id="type-filters" class="type-filters"></span><select id="rar" aria-label="Rareza"></select><select id="stp" aria-label="Tipo de producto"></select>
+        <select id="srt" aria-label="Ordenar"></select>
         <span class="cnt" id="cnt"></span>
     </div>
-    <div class="pn gl wrap"><table><thead><tr><th>Carta</th><th>Tipo</th><th class="hide">Impresiones</th><th class="num">Desde</th><th class="num hide">Ofertas</th></tr></thead><tbody id="list"></tbody></table></div>
+    <div class="pn gl wrap"><table><thead><tr><th>Carta</th><th class="num hide">Impresiones</th><th class="num">Última venta</th></tr></thead><tbody id="list"></tbody></table></div>
 </div>
-    <div id="vend" style="display:none"><div class="pn gl wrap"><table><thead><tr><th>Vendedor</th><th class="hide">País</th><th>Valoración</th><th class="num">Artículos</th><th class="num hide">Unidades</th><th class="num">Valor</th></tr></thead><tbody id="vl"></tbody></table></div></div>
+    <div id="wlv" style="display:none"></div><div id="pfv" style="display:none"></div><div id="cartv" style="display:none"></div><div id="authv" style="display:none"></div><div id="secv" style="display:none"></div><div id="admv" style="display:none"></div>
+    <div id="vend" style="display:none"><div class="pn gl wrap"><table><thead><tr><th>Vendedor</th><th class="hide">País</th><th>Valoración (ficticia)</th><th class="num">Artículos</th><th class="num hide">Unidades</th><th class="num">Valor</th></tr></thead><tbody id="vl"></tbody></table></div></div>
     <p id="catalog-status" class="catalog-status" role="status" aria-live="polite"></p>
     <p id="commercial-notice" class="catalog-status" hidden>Productos, vendedores, precios, tipos de cambio y carrito pertenecen al comercio de demostración original. No representan ofertas del catálogo importado.</p>
 </main>
+<footer class="site-footer"></footer>
 <div id="md" role="dialog" aria-modal="true"><div class="box" id="mb"></div></div>
 <div id="cart" role="dialog" aria-modal="true"><div class="box" id="cbx"></div></div>
 <div class="toast" id="ts"></div>
-<script src="script.js"></script>
-<script type="module" src="frontend/js/catalog.js"></script>
+<script src="/frontend/i18n.js"></script>
+<script src="/frontend/cookie-notice.js" defer></script>
+<script src="/frontend/games.js"></script>
+<script src="/frontend/demo/data.js"></script>
+<script src="/frontend/demo/store.js"></script>
+<script type="module" src="/frontend/js/catalog.js"></script>
 </body>
 </html>

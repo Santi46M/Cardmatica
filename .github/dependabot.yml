@@ -1,0 +1,13 @@
+# Weekly pull requests when GitHub Actions or Python packages have updates,
+# security fixes included. CI tests each one before it can be merged.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

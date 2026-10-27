@@ -1,8 +1,11 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Generic, Literal, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.core.games import Market
 
 T = TypeVar("T")
 
@@ -23,6 +26,8 @@ class ImageView(BaseModel):
     license: str | None = None
     license_url: str | None = None
     rights_status: str
+    # Where the picture comes from: the scan source of a printing, or the artwork provider.
+    source: str | None = None
     fallback_reason: str | None = None
     association: Literal["printing", "card_artwork"] = "printing"
     usage_scope: str = "commercial_permission_verified"
@@ -35,16 +40,37 @@ class PrintingView(BaseModel):
     set_id: UUID
     set_name: str
     rarity: str
+    # Yugipedia abbreviation and family (app/services/rarities.py).
+    rarity_code: str | None = None
+    rarity_family: str = "other"
     language: str
     market: str
     edition: str
     artwork: str
     release_date: date | None
+    # Magic nonfoil/foil/etched; Pokémon normal/holo/reverse/firstEdition.
+    finishes: list[str] = []
     images: list[ImageView]
+
+
+class CardTypesView(BaseModel):
+    """A card's type line split into levels (see app/services/card_types.py)."""
+
+    kind: str | None
+    frame: str | None = None
+    pendulum: bool = False
+    abilities: list[str] = []
+    race: str | None = None
+    property: str | None = None
+    attribute: str | None = None
+    level: int | None = None
+    rank: int | None = None
+    link_rating: int | None = None
 
 
 class CardSummary(BaseModel):
     id: UUID
+    game: str = "yugioh"
     konami_id: int | None
     ygoprodeck_id: int | None = None
     name_source: str | None = None
@@ -53,10 +79,34 @@ class CardSummary(BaseModel):
     card_type: str | None
     subtypes: list[str]
     attribute: str | None
+    types: CardTypesView | None = None
+    # Magic colours and mana value; Pokémon energy types and HP.
+    colors: list[str] = []
+    mana_value: int | None = None
+    hp: int | None = None
+    # For the type line of a list: Magic's type line and mana cost, Pokémon's stage.
+    details: dict = {}
     markets: list[str]
     printing_count: int
     image: ImageView | None
     updated_at: datetime
+    # Latest storefront sale for the requested market; only filled by the card list.
+    last_sale: "PricePoint | None" = None
+    # Banlist status for the requested market; only filled by the card list.
+    market_banlist: "BanlistStatusView | None" = None
+
+
+class CardSuggestion(BaseModel):
+    """One entry under the search box: enough to recognise the card and open it."""
+
+    id: UUID
+    name: str
+    game: str = "yugioh"
+    card_type: str | None = None
+    subtypes: list[str] = []
+    details: dict = {}
+    types: CardTypesView | None = None
+    thumbnail_url: str | None = None
 
 
 class NameView(BaseModel):
@@ -113,6 +163,75 @@ class ErratumView(BaseModel):
     new_text: TextView | None
 
 
+BanlistStatus = Literal["forbidden", "limited", "semi_limited", "unlimited", "unknown"]
+Currency = Literal["EUR", "USD", "ARS", "BRL", "PYG", "UYU", "BOB"]
+Condition = Literal["MT", "NM", "EX", "GD", "LP", "PL", "PO"]
+
+
+class BanlistStatusView(BaseModel):
+    """Status of one card on the list in force for a format, with its source."""
+
+    format: Literal["TCG", "OCG"]
+    effective_date: date
+    status: BanlistStatus
+    max_copies: int | None
+    complete: bool
+    source_name: str
+    source_url: str
+    scope_note: str | None = None
+
+
+class BanlistListView(BaseModel):
+    format: Literal["TCG", "OCG"]
+    effective_date: date
+    complete: bool
+    source_name: str
+    source_url: str
+    retrieved_on: date
+    scope_note: str | None
+    counts: dict[str, int]
+
+
+class PricePoint(BaseModel):
+    printing_id: UUID
+    code: str
+    rarity: str
+    language: str
+    edition: str
+    observed_at: datetime
+    price: Decimal
+    currency: Currency
+    quantity: int
+    condition: Condition | None
+
+
+class PriceHistoryView(BaseModel):
+    card_id: UUID
+    market: Market | None
+    printing_id: UUID | None
+    days: int
+    points: list[PricePoint]
+    last_sale: PricePoint | None
+
+
+class PriceObservationInput(BaseModel):
+    printing_id: UUID
+    price: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
+    currency: Currency
+    observed_at: datetime
+    quantity: int = Field(default=1, ge=1, le=999)
+    condition: Condition | None = None
+    source_reference: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_time(self):
+        if self.observed_at.tzinfo is None:
+            raise ValueError("observed_at debe incluir zona horaria")
+        if self.observed_at > datetime.now(timezone.utc):
+            raise ValueError("observed_at no puede estar en el futuro")
+        return self
+
+
 class CardDetail(CardSummary):
     artworks: list[ImageView] = []
     passcode: str | None
@@ -130,6 +249,7 @@ class CardDetail(CardSummary):
     provenance: list[FieldView]
     errata: list[ErratumView]
     banlist: list[dict]
+    banlist_status: list[BanlistStatusView] = []
     relations: list[dict]
 
 
@@ -140,27 +260,45 @@ class NamedView(BaseModel):
 
 
 class SetView(NamedView):
+    game: str = "yugioh"
     language: str
     market: str
     release_date: date | None
     product_type: str | None
+    # Cards of the catalogue printed in this set.
+    card_count: int | None = None
+    # The prefix of its printing codes ("BETB" in BETB-EN001), when one is common.
+    code: str | None = None
+
+
+class ArchetypeView(NamedView):
+    card_count: int
 
 
 class JobRequest(BaseModel):
-    source: Literal["ygoprodeck", "yugipedia"]
+    source: Literal["ygoprodeck", "yugipedia", "scryfall", "tcgdex"]
     mode: Literal["initial", "incremental", "card", "images", "errata", "retry", "banlist"]
     identifier: str | None = Field(default=None, max_length=200)
     language: Literal["en", "es", "fr", "de", "it", "pt", "ja", "ko", "ae"] = "en"
     since: datetime | None = None
     retry_job_id: UUID | None = None
     max_cards: int = Field(default=3, ge=1, le=100000)
+    # Keep only this many printings per card, each of a different rarity
+    # (see app/ingestion/selection.py). None imports every printing.
+    max_printings: int | None = Field(default=None, ge=1, le=50)
     banlist_format: Literal["TCG", "OCG"] | None = None
     effective_date: date | None = None
+    # Scryfall only: narrows the walk with its search syntax ("e:ecl" for one set).
+    query: str | None = Field(default=None, max_length=300)
 
     @model_validator(mode="after")
     def validate_mode(self):
         if self.source == "ygoprodeck" and self.language not in {"en", "fr", "de", "it", "pt"}:
             raise ValueError("YGOPRODeck admite en, fr, de, it y pt; no inventar traducciones")
+        if self.source in {"scryfall", "tcgdex"} and self.language not in {"en", "es", "pt", "ja"}:
+            raise ValueError(f"{self.source}: se importan en, es, pt y ja")
+        if self.query and self.source != "scryfall":
+            raise ValueError("query solo se usa con Scryfall")
         if self.mode == "banlist":
             raise ValueError("La nueva fuente no documenta vigencia de banlists oficiales")
         if self.mode in {"card", "errata", "images"} and not self.identifier:
@@ -187,3 +325,7 @@ class JobView(BaseModel):
     cursor: dict
     started_at: datetime | None
     finished_at: datetime | None
+
+
+CardSummary.model_rebuild()
+CardDetail.model_rebuild()

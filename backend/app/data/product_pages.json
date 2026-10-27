@@ -1,0 +1,33 @@
+{
+  "_about": "Official product page of each demo product (frontend/demo/data.js, field image). `cardmatica product-images` downloads the main picture of each page (og:image) for the local preview only: it has no licence and is never shown on a public site. Checked in October 2026.",
+  "image_hosts": ["cdn.shopify.com"],
+  "pages": {
+    "betb": "https://www.yugioh-card.com/en/products/betb/",
+    "mamo": "https://www.yugioh-card.com/eu/product/magnificent-monsters/",
+    "cori": "https://www.yugioh-card.com/en/products/cori/",
+    "blzd": "https://www.yugioh-card.com/en/products/blzd/",
+    "ra05": "https://www.yugioh-card.com/en/products/ra05/",
+    "bpro": "https://www.yugioh-card.com/en/products/bpro/",
+    "legendary-arc-v-decks": "https://www.yugioh-card.com/eu/product/legendary-arc-v-decks/",
+    "legendary-modern-decks-2026": "https://www.yugioh-card.com/en/products/l26d/",
+    "chronicles-spirit-charmers": "https://www.yugioh-card.com/en/products/ch02/",
+    "rc04": "https://yugipedia.com/wiki/Rarity_Collection_Quarter_Century_Edition",
+    "kacb": "https://yugipedia.com/wiki/Kaiba%27s_Collector_Box",
+    "sdk": "https://yugipedia.com/wiki/Starter_Deck:_Kaiba",
+    "sdy": "https://yugipedia.com/wiki/Starter_Deck:_Yugi",
+    "dragon-shield-matte-japanese": "https://www.dragonshield.com/p/jade-matte-sleeves/AT-11104",
+    "katana-japanese": "https://ultimateguard.com/en/Card-Sleeves/Katana-Sleeves-Japanese-Size-60-Black/UGD011054/",
+    "eclipse-matte-small": "https://ultrapro.com/products/eclipse-matte-small-deck-protector-sleeves-60ct-jet-black",
+    "jaden-yubel-sleeves": "https://www.yugioh-card.com/en/products/jy_card-sleeves/",
+    "nest-100": "https://www.dragonshield.com/p/nest-deck-box-100/AT-40211",
+    "deck-shell": "https://www.dragonshield.com/p/deck-shell-deck-box/AT-30705",
+    "yugi-kaiba-card-case": "https://www.yugioh-card.com/en/products/yk-25th_card-case/",
+    "zipster-small": "https://www.dragonshield.com/products/card-codex-zipster-binder-small-black",
+    "pro-binder-9": "https://ultrapro.com/products/vivid-9-pocket-zippered-pro-binder",
+    "gold-pride-portfolio": "https://www.yugioh-card.com/en/products/gp_portfolio/",
+    "dragon-shield-18-pocket-japanese": "https://www.dragonshield.com/products/18-pocket-pages-regular-japanese-size",
+    "jaden-yubel-game-mat": "https://www.yugioh-card.com/en/products/jy_game-mat/",
+    "gold-pride-game-mat": "https://www.yugioh-card.com/en/products/gp_game-mat/",
+    "chessex-12mm-d6": "https://www.chessex.com/opaque-12mm-dice-block-36-dice-d6-pips"
+  }
+}

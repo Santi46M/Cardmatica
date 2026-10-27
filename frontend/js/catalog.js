@@ -1,154 +1,793 @@
+import { installAccountMenu } from "./account-menu.js";
+import { installLanguageMenu } from "./language-menu.js";
+import { installPromo } from "./promo.js";
+import { track, trackPage } from "./analytics.js";
+import { installAdmin, renderAdmin } from "./admin.js";
+import {
+    currentUser,
+    installAuth,
+    loadAccount,
+    openAccountLink,
+    renderAuth,
+    renderSecurity
+} from "./auth.js";
 import { CatalogApi } from "./api.js";
-import { catalogRows, detailHtml, escapeHtml, homeHtml, pager } from "./catalog-view.js";
+import { homeBanlistHtml, startCountdowns } from "./banlist.js";
+import { installCart, renderCart } from "./cart-page.js";
+import {
+    catalogGrid,
+    catalogRows,
+    detailHtml,
+    homeHtml,
+    pager,
+    pricesHtml,
+    skeletonRows,
+    skeletonTiles,
+    tileHtml
+} from "./catalog-view.js";
+import { TYPE_FILTERS, typeFiltersHtml, typeParams } from "./card-types.js";
+import {
+    scopeFromPath,
+    scopeHeadHtml,
+    scopeInfoPath,
+    scopeParams,
+    scopePath
+} from "./collections.js";
+import { CATALOG } from "./config.js";
+import { escapeHtml, html } from "./html.js";
+import { t } from "./lang.js";
+import { installBackToTop } from "./back-to-top.js";
+import { installCardPreview } from "./card-preview.js";
+import { installHeaderScroll } from "./header-scroll.js";
+import { cardMeta, scopeMeta, tabMeta } from "./page-meta.js";
+import { priceChartHtml, priceSummary } from "./price-chart.js";
+import { installProfile, renderProfile } from "./profile.js";
+import { rarityOptionsHtml, rarityParams } from "./rarities.js";
+import { installSearchSuggest } from "./search-suggest.js";
+import { readJson, writeJson } from "./storage.js";
+import { trendingHtml } from "./trending.js";
+import { forYouHtml, recentCards, rememberCard, syncRecentCards } from "./for-you.js";
+import { installTileTabs, showTileTabs } from "./tile-tabs.js";
+import { newsHtml } from "./news.js";
+import { portalCounts, portalHtml } from "./portal.js";
+import { cardWantsHtml, installWantlists, refreshAlerts, renderWantlists } from "./wantlists.js";
 
 const api = new CatalogApi();
 const h = escapeHtml;
 const element = (id) => document.getElementById(id);
-const commerceList = window.list;
-const commerceInit = window.init;
+const demoRefreshList = window.refreshList;
+const demoShowTab = window.showTab;
 let page = 1;
+let pendingPage = null;
 let generation = 0;
 let detailGeneration = 0;
 let controller;
 let timer;
 let facets;
+let facetsRequest;
+let facetsMarket;
+// The set or archetype whose page is open ({ kind, id }), and what the API says of it.
+let scope = null;
+let scopeInfo = null;
+// The latest set of the market on screen, for the banner.
 let detail;
 let printingPage;
-const cardTypes = { Monstruo: "Monster", Magia: "Spell", Trampa: "Trap" };
+let selectedPrinting = "";
+let priceHistory;
+let chartDays = 365;
+let view = readJson("cm_view", "list") === "grid" ? "grid" : "list";
+let closingFromHistory = false;
+// Filter values from the URL wait here until their options exist.
+const wanted = {};
+// What a card tab asks the API, per game (frontend/games.js).
+const tabParams = () => window.GAMES[window.game].params[window.tab] || {};
+const gameInfo = () => window.GAMES[window.game];
 const isCommerce = () => ["Productos", "Vendedores"].includes(window.tab);
+// The cover (/), with one box per game; it has no tabs of its own.
+const isPortal = () => window.tab === "Portada";
+// Panels stored in this browser only; they never query the catalogue list.
+const localPanels = {
+    Deseados: "wlv",
+    Perfil: "pfv",
+    Carrito: "cartv",
+    Acceso: "authv",
+    Seguridad: "secv",
+    Admin: "admv"
+};
+const renderLocal = {
+    Deseados: renderWantlists,
+    Perfil: renderProfile,
+    Carrito: renderCart,
+    Acceso: renderAuth,
+    Seguridad: renderSecurity,
+    Admin: renderAdmin
+};
+const isLocal = () => window.tab in localPanels;
+const isCatalog = () => !isCommerce() && !isLocal() && !isPortal() && window.tab !== "Inicio";
+const SORTS = [
+    ["name", "Nombre: A–Z"],
+    ["name_desc", "Nombre: Z–A"],
+    ["newest", "Lanzamiento: más reciente"],
+    ["oldest", "Lanzamiento: más antiguo"]
+]
+    .map(([value, label]) => `<option value="${value}">${t(label)}</option>`)
+    .join("");
+
+// Layout pieces around the existing table: view toggle, top pager and the grid.
+const tableWrap = element("list").closest(".pn");
 const pagination = document.createElement("div");
 pagination.id = "catalog-pagination";
-element("cat").append(pagination);
+const topPagination = document.createElement("div");
+topPagination.id = "catalog-pagination-top";
+const grid = document.createElement("div");
+grid.id = "catalog-grid";
+grid.className = "card-grid";
+grid.hidden = true;
+tableWrap.before(topPagination);
+tableWrap.after(grid);
+grid.after(pagination);
+const viewToggle = document.createElement("div");
+viewToggle.className = "seg m view-toggle";
+viewToggle.setAttribute("role", "group");
+viewToggle.setAttribute("aria-label", t("Vista"));
+element("cnt").before(viewToggle);
 
-function status(message) {
-    element("catalog-status").textContent = message;
+// The banner of the latest set, above every catalogue view, and the header
+// of a set or archetype page, above its filters.
+const promoSlot = document.createElement("div");
+promoSlot.id = "promo";
+element("home").before(promoSlot);
+const promo = installPromo({ slot: promoSlot, api });
+const scopeSlot = document.createElement("div");
+scopeSlot.id = "scope-head";
+
+// Phones show the filters behind one button that says how many are in use;
+// the order stays in view (styles.css, "Teléfono").
+const catalogTools = element("cat-tools");
+catalogTools.before(scopeSlot);
+const filtersToggle = document.createElement("button");
+filtersToggle.type = "button";
+filtersToggle.className = "ghost filters-toggle";
+filtersToggle.setAttribute("aria-controls", catalogTools.id);
+filtersToggle.setAttribute("aria-expanded", "false");
+catalogTools.prepend(filtersToggle);
+filtersToggle.addEventListener("click", () => {
+    const open = catalogTools.classList.toggle("open");
+    filtersToggle.setAttribute("aria-expanded", String(open));
+});
+
+// A filter with nothing to choose (an OCG catalogue without rarities, a set
+// type nobody filled) is not shown.
+function hideEmptyFilters() {
+    for (const select of catalogTools.querySelectorAll("select"))
+        select.hidden = select.id !== "srt" && select.options.length < 2;
 }
 
-async function loadFacets() {
-    if (facets) return;
-    facets = await api.get("facets");
-    for (const [id, items, label] of [
-        ["sub", facets.subtypes, "Todos los subtipos"],
-        ["rar", facets.rarities, "Todas las rarezas"],
-        ["stp", facets.product_types, "Cualquier origen"]
-    ]) {
+function updateFiltersToggle() {
+    const ids = ["rar", "stp", ...TYPE_FILTERS.map((filter) => filter.id)];
+    const used = ids.filter((id) => element(id)?.value).length;
+    filtersToggle.textContent = used ? t("Filtros ({count})", { count: used }) : t("Filtros");
+}
+
+// The tabs of the game on screen (frontend/games.js).
+function renderTabs() {
+    element("tabs").innerHTML = window.TABS.map(
+        (tab) => `<button aria-pressed="${tab === window.tab}" data-g="${h(tab)}">${h(t(window.TAB_LABELS[tab]))}</button>`
+    ).join("");
+    showCurrentTab();
+}
+
+// On phones the tabs scroll sideways; the current one is brought into view.
+function showCurrentTab() {
+    const nav = element("tabs");
+    const current = nav.querySelector('[aria-pressed="true"]');
+    if (!current || nav.scrollWidth <= nav.clientWidth) return;
+    const left = current.getBoundingClientRect().left - nav.getBoundingClientRect().left;
+    nav.scrollLeft += left - (nav.clientWidth - current.offsetWidth) / 2;
+}
+
+// List and grid as icons (three bars, four squares); the name stays for
+// screen readers and as a tooltip.
+const VIEW_ICONS = {
+    list: '<rect x="3" y="4.5" width="14" height="2.4" rx="1.2"/><rect x="3" y="8.8" width="14" height="2.4" rx="1.2"/><rect x="3" y="13.1" width="14" height="2.4" rx="1.2"/>',
+    grid: '<rect x="3" y="3" width="6.2" height="6.2" rx="1.4"/><rect x="10.8" y="3" width="6.2" height="6.2" rx="1.4"/><rect x="3" y="10.8" width="6.2" height="6.2" rx="1.4"/><rect x="10.8" y="10.8" width="6.2" height="6.2" rx="1.4"/>'
+};
+const VIEWS = [
+    ["list", "Lista"],
+    ["grid", "Cuadrícula"]
+];
+
+function renderViewToggle() {
+    viewToggle.innerHTML = VIEWS.map(
+        ([value, label]) =>
+            `<button data-view="${value}" aria-pressed="${value === view}" aria-label="${t(label)}" title="${t(label)}"><svg viewBox="0 0 20 20" aria-hidden="true">${VIEW_ICONS[value]}</svg></button>`
+    ).join("");
+}
+
+function status(message, { quiet = false } = {}) {
+    const node = element("catalog-status");
+    node.textContent = message;
+    // While loading, the skeleton is the visible feedback; the text stays for screen readers.
+    node.classList.toggle("sr-only", quiet);
+}
+
+// ---- URL state: shareable searches and the browser's Back button -------------
+
+// A card has its own address, /carta/<id>, that can be shared and indexed.
+// Older links with ?card=<id> still open the card.
+const CARD_PATH = /^\/carta\/([0-9a-f-]{36})(?:\/|$)/i;
+
+function readUrl() {
+    const params = new URLSearchParams(location.search);
+    const card = location.pathname.match(CARD_PATH)?.[1] || params.get("card");
+    return {
+        game: window.gameFromPath(location.pathname),
+        // "/" alone is the cover; older links to "/?tab=…" still open Yu-Gi-Oh!.
+        portal: location.pathname === "/" && !card && !["tab", "q", "mk"].some((key) => params.has(key)),
+        tab: params.get("tab"),
+        mk: params.get("mk"),
+        q: params.get("q") || "",
+        types: Object.fromEntries(TYPE_FILTERS.map((filter) => [filter.id, params.get(filter.param) || ""])),
+        rar: params.get("rar") || "",
+        stp: params.get("stp") || "",
+        srt: params.get("srt") || "name",
+        page: Math.max(1, Number(params.get("page")) || 1),
+        view: params.get("view"),
+        card,
+        scope: scopeFromPath(location.pathname)
+    };
+}
+
+function applyUrl(state) {
+    if (state.game && state.game !== window.game) window.setGame(state.game);
+    else if (location.pathname === "/" && !state.portal && window.game !== "yugioh") window.setGame("yugioh");
+    // Profile, cart and account panels open from menus and popups, not from a tab.
+    const tabs = [...window.TABS, ...Object.keys(localPanels)];
+    // "Wantlists" is the tab's former name, still in shared links.
+    const requested = state.tab === "Wantlists" ? "Deseados" : state.tab;
+    window.tab = state.portal ? "Portada" : tabs.includes(requested) ? requested : "Inicio";
+    // A set or archetype page is the list of all cards, limited to it.
+    if (scope?.id !== state.scope?.id) scopeInfo = null;
+    scope = state.scope;
+    if (scope) window.tab = "Todas";
+    if (gameInfo().markets.some((market) => market.code === state.mk)) window.market = state.mk;
+    element("q").value = state.q;
+    Object.assign(wanted, state.types, { rar: state.rar, stp: state.stp, srt: state.srt });
+    pendingPage = state.page;
+    if (["list", "grid"].includes(state.view)) view = state.view;
+}
+
+// Filters whose options are drawn per tab; the others live in index.html.
+const FILTER_IDS = ["rar", "stp", "srt", ...TYPE_FILTERS.map((filter) => filter.id)];
+
+function applyWanted() {
+    for (const id of FILTER_IDS) {
+        if (!(id in wanted)) continue;
         const select = element(id);
-        const previous = select.value;
-        select.innerHTML =
-            `<option value="">${label}</option>` +
-            items.map((value) => `<option value="${h(value)}">${h(value)}</option>`).join("");
-        select.value = items.includes(previous) ? previous : "";
+        if (!select) continue;
+        if ([...select.options].some((option) => option.value === wanted[id])) {
+            select.value = wanted[id];
+            delete wanted[id];
+        }
     }
 }
+
+function openCardId() {
+    return element("md").classList.contains("on") && element("md").dataset.mode === "catalog"
+        ? element("md").dataset.catalogId
+        : null;
+}
+
+function writeUrl(mode = "replace") {
+    const params = new URLSearchParams();
+    // A set or archetype page already says where it is.
+    if (!isPortal() && window.tab !== "Inicio" && !(scope && isCatalog())) params.set("tab", window.tab);
+    if (!isPortal() && window.market !== gameInfo().markets[0].code) params.set("mk", window.market);
+    const q = element("q").value.trim();
+    if (q) params.set("q", q);
+    if (isCatalog()) {
+        for (const id of ["rar", "stp"]) if (element(id).value) params.set(id, element(id).value);
+        for (const filter of TYPE_FILTERS) {
+            const value = element(filter.id)?.value;
+            if (value) params.set(filter.param, value);
+        }
+        if (element("srt").value && element("srt").value !== "name")
+            params.set("srt", element("srt").value);
+        if (page > 1) params.set("page", page);
+        if (view !== "list") params.set("view", view);
+    }
+    const card = openCardId();
+    const path = card
+        ? `/carta/${card}`
+        : scope && isCatalog()
+          ? scopePath(scope)
+          : isPortal()
+            ? "/"
+            : gameInfo().path;
+    const url = `${path}${params.toString() ? `?${params}` : ""}${location.hash}`;
+    if (url === `${location.pathname}${location.search}${location.hash}`) return;
+    if (mode === "push") history.pushState({ card }, "", url);
+    else history.replaceState(history.state, "", url);
+}
+
+window.addEventListener("popstate", () => {
+    const state = readUrl();
+    applyUrl(state);
+    window.updateMarketButtons();
+    if (!state.card && openCardId()) {
+        closingFromHistory = true;
+        element("md").classList.remove("on");
+    }
+    window.showTab();
+    if (state.card && openCardId() !== state.card) openCard(state.card, { push: false });
+});
+
+// Closing the card returns to the list entry the card was opened from.
+new MutationObserver(() => {
+    if (element("md").classList.contains("on")) return;
+    pageMeta();
+    if (closingFromHistory) {
+        closingFromHistory = false;
+        return;
+    }
+    if (!CARD_PATH.test(location.pathname) && !new URLSearchParams(location.search).get("card"))
+        return;
+    if (history.state?.card) history.back();
+    else writeUrl();
+}).observe(element("md"), { attributes: true, attributeFilter: ["class"] });
+
+// ---- Catalogue list ---------------------------------------------------------
+
+// Filter options of the market on screen, asked once per market for every tab.
+// The home page asks for them in the background, so the first catalogue tab
+// does not wait for them.
+function loadFacets() {
+    if (facetsMarket !== window.market) {
+        const market = (facetsMarket = window.market);
+        facetsRequest = api.get("facets", { market }).then(
+            (data) => {
+                if (market === facetsMarket) fillFacets(data);
+            },
+            (error) => {
+                if (market === facetsMarket) facetsMarket = undefined;
+                throw error;
+            }
+        );
+    }
+    return facetsRequest;
+}
+
+// Options are redrawn keeping the choice when the new market has it too.
+function fillSelect(select, html) {
+    const previous = select.value;
+    select.innerHTML = html;
+    select.value = [...select.options].some((option) => option.value === previous) ? previous : "";
+}
+
+function fillFacets(data) {
+    facets = data;
+    fillSelect(element("rar"), rarityOptionsHtml(facets.rarity_groups, facets.game));
+    fillSelect(
+        element("stp"),
+        `<option value="">${t("Cualquier producto")}</option>${facets.product_types
+            .map((value) => `<option value="${h(value)}">${h(value)}</option>`)
+            .join("")}`
+    );
+}
+
+// Type filters depend on the tab (card-types.js). They are redrawn only when
+// the tab changes: a chosen value survives page changes and searches, and a
+// new tab starts with its own filters empty.
+function renderTypeFilters() {
+    const slot = element("type-filters");
+    const key = `${window.game}:${window.tab}`;
+    if (slot.dataset.tab === key) return;
+    slot.dataset.tab = key;
+    slot.innerHTML = typeFiltersHtml(window.tab, facets.types, window.game);
+}
+
+function renderDetail() {
+    element("mb").innerHTML = detailHtml(detail, printingPage, selectedPrinting, {
+        market: window.market
+    });
+    renderChart();
+}
+
+function renderChart() {
+    const slot = element("price-history");
+    if (!slot) return;
+    slot.innerHTML = priceChartHtml(priceHistory, {
+        printingId: selectedPrinting,
+        days: chartDays,
+        stats: false
+    });
+    const prices = element("cd-prices");
+    if (prices)
+        prices.innerHTML = pricesHtml(
+            priceHistory === undefined ? undefined : priceSummary(priceHistory, selectedPrinting)
+        );
+}
+
+// The "Deseados" tab is drawn when opened, so it reflects lists changed meanwhile.
+document.addEventListener("click", (event) => {
+    const tab = event.target.closest('[data-cd-tab="wants"]');
+    const panel = element("mb").querySelector('[data-cd-panel="wants"]');
+    if (tab && panel && detail) panel.innerHTML = cardWantsHtml(detail.id);
+});
+
+// ---- Set and archetype pages, and the banner of the latest set ---------------
+
+// Title and description of what is on screen.
+function pageMeta() {
+    if (scope && scopeInfo && isCatalog()) scopeMeta(scope.kind, scopeInfo.name);
+    else tabMeta(window.tab);
+}
+
+function renderScopeHead() {
+    scopeSlot.hidden = !scope || !isCatalog();
+    if (scopeSlot.hidden) return (scopeSlot.innerHTML = "");
+    scopeSlot.innerHTML = scopeHeadHtml(scope, scopeInfo);
+    if (scopeInfo) return;
+    const asked = scope;
+    api.get(scopeInfoPath(asked))
+        .then((info) => {
+            if (asked !== scope) return;
+            scopeInfo = info;
+            scopeMeta(scope.kind, info.name);
+            // A set belongs to one game and market: the page follows them.
+            if (info.game && info.game !== window.game) {
+                window.setGame(info.game);
+                renderTabs();
+            }
+            if (info.market && info.market !== window.market) {
+                window.market = info.market;
+                window.updateMarketButtons();
+            }
+            scopeSlot.innerHTML = scopeHeadHtml(scope, scopeInfo);
+            renderPromo();
+        })
+        .catch((error) => {
+            if (asked === scope)
+                scopeSlot.innerHTML = `<div class="scope-head gl"><p role="alert">${h(error.message)}</p></div>`;
+        });
+}
+
+function openScope(next) {
+    // From a card's detail: its page closes without going back in history.
+    if (openCardId()) {
+        closingFromHistory = true;
+        element("md").classList.remove("on");
+    }
+    scope = next;
+    scopeInfo = null;
+    window.tab = "Todas";
+    element("q").value = "";
+    for (const id of ["rar", "stp", ...TYPE_FILTERS.map((filter) => filter.id)])
+        if (element(id)) element(id).value = "";
+    pendingPage = 1;
+    writeUrl("push");
+    window.showTab();
+    window.scrollTo(0, 0);
+}
+
+// The banner of the newest sets (promo.js): on the home page and the
+// catalogue, not on the page of a set it shows, nor in the other panels.
+function renderPromo() {
+    promo.render(window.market, {
+        visible: !isPortal() && (window.tab === "Inicio" || isCatalog()),
+        compact: isCatalog(),
+        hideSetId: scope?.kind === "set" ? scope.id : null
+    });
+}
+
+document.addEventListener(
+    "click",
+    (event) => {
+        // Moving to a tab leaves the set or archetype page.
+        if (event.target.closest("[data-g], [data-go]")) scope = null;
+        if (event.target.closest("[data-scope-clear]")) {
+            event.preventDefault();
+            scope = null;
+            window.tab = "Todas";
+            window.showTab();
+            return;
+        }
+        const link = event.target.closest("[data-scope]");
+        // A modified click opens the page in a new tab, as any link.
+        if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.button) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        openScope({ kind: link.dataset.scope, id: link.dataset.scopeId });
+    },
+    true
+);
+
+// ---- The home page -------------------------------------------------------------
+
+// Every card drawn on the page, by id, for the preview on hover.
+const knownCards = new Map();
+function learn(cards) {
+    if (knownCards.size > 500) knownCards.clear();
+    for (const card of cards) knownCards.set(card.id, card);
+}
+
+let trendingData = null;
+let forYouData = null;
+const homeSlot = (name) => element(`home-${name}`);
+installTileTabs("trend", {
+    slot: () => homeSlot("trending"),
+    draw: (key) => trendingHtml(trendingData, tileHtml, key)
+});
+installTileTabs("for-you", {
+    slot: () => homeSlot("for-you"),
+    draw: (key) => forYouHtml(forYouData, tileHtml, key)
+});
+
+// The top of the page at once; each section under it when its answer
+// arrives. A section that fails, or has nothing to show, is left out.
+function showHome(current) {
+    const { market } = window;
+    const language = window.I18N.lang;
+    const still = () => current === generation && window.tab === "Inicio";
+    element("home").innerHTML = homeHtml({ signedIn: Boolean(currentUser()), game: window.game });
+    status("");
+    writeUrl();
+    api.get("trending", { market, language, limit: CATALOG.homeTiles }).then((data) => {
+        if (!still()) return;
+        trendingData = data;
+        learn(data.lists.flatMap((list) => list.items.map((item) => item.card)));
+        showTileTabs(homeSlot("trending"), trendingHtml(data, tileHtml));
+    }, () => {});
+    const seen = recentCards();
+    if (seen.length)
+        api.get("cards/for-you", { ids: seen.join(","), market, language, limit: CATALOG.homeTiles }).then((data) => {
+            if (!still()) return;
+            forYouData = data;
+            learn([...data.recent, ...data.archetypes, ...data.sets]);
+            showTileTabs(homeSlot("for-you"), forYouHtml(data, tileHtml));
+        }, () => {});
+    if (gameInfo().banlist) showHomeBanlist(api.get("banlists"));
+    api.get("news", { limit: CATALOG.newsSize, lang: language }).then((data) => {
+        if (still()) homeSlot("news").innerHTML = newsHtml(data, gameInfo().news);
+    }, () => {});
+    loadFacets().catch(() => {});
+}
+
+// The cover: drawn at once; the number of cards of each game when it arrives.
+function showPortal(current) {
+    element("portal").innerHTML = portalHtml();
+    status("");
+    writeUrl();
+    portalCounts(api).then((counts) => {
+        if (current === generation && isPortal()) element("portal").innerHTML = portalHtml(counts);
+    });
+}
+
+// Into a game's marketplace, from the cover or the game selector.
+function goGame(code) {
+    if (!window.GAMES[code]) return;
+    if (openCardId()) {
+        closingFromHistory = true;
+        element("md").classList.remove("on");
+    }
+    scope = null;
+    scopeInfo = null;
+    element("q").value = "";
+    window.setGame(code);
+    window.tab = "Inicio";
+    facetsMarket = undefined;
+    writeUrl("push");
+    window.showTab();
+    window.scrollTo(0, 0);
+}
+
+document.addEventListener("click", (event) => {
+    const link = event.target.closest("[data-game-go]");
+    // A modified click opens the marketplace in a new tab, as any link.
+    if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.button) return;
+    event.preventDefault();
+    goGame(link.dataset.gameGo);
+});
+element("game").addEventListener("change", (event) => goGame(event.target.value));
+// The phone's list of games and markets: another game, or a market of this one.
+element("game-mk").addEventListener("change", (event) => {
+    const [code, market] = event.target.value.split(":");
+    if (code !== window.game) {
+        goGame(code);
+        if (market !== window.market) document.querySelector(`[data-mk="${market}"]`)?.click();
+    } else document.querySelector(`[data-mk="${market}"]`)?.click();
+});
+
+async function showHomeBanlist(request) {
+    const slot = element("home-banlist");
+    if (!slot) return;
+    try {
+        slot.innerHTML = homeBanlistHtml(await request, window.market);
+        startCountdowns();
+    } catch (error) {
+        const message = t("No se pudo cargar la banlist: {error}", { error: error.message });
+        slot.innerHTML = `<p class="catalog-status" role="alert">${h(message)}</p>`;
+    }
+}
+
+function showViewContainers() {
+    tableWrap.hidden = view === "grid";
+    grid.hidden = view !== "grid";
+}
+
+function showSkeleton() {
+    showViewContainers();
+    if (view === "grid") grid.innerHTML = skeletonTiles(12);
+    else element("list").innerHTML = skeletonRows(8);
+}
+
+function renderResults(data) {
+    learn(data.items);
+    showViewContainers();
+    if (view === "grid") grid.innerHTML = catalogGrid(data);
+    else element("list").innerHTML = catalogRows(data);
+    element("cnt").textContent = `${data.total} cartas`;
+    const pages = Math.ceil(data.total / data.page_size);
+    pagination.innerHTML = pager(data);
+    topPagination.innerHTML = pages > 1 ? pager(data) : "";
+}
+
+let lastData = null;
+let lastSearch = "";
 
 async function loadCards(reset = false) {
     clearTimeout(timer);
-    if (isCommerce()) return commerceList();
-    if (window.tab === "Inicio" && element("q").value.trim()) {
+    if (isCommerce()) return demoRefreshList();
+    if ((window.tab === "Inicio" || isLocal()) && element("q").value.trim()) {
         window.tab = "Todas";
-        return window.init();
+        return window.showTab();
     }
-    if (reset) page = 1;
+    if (isLocal()) return;
+    if (reset) page = pendingPage || 1;
+    pendingPage = null;
     controller?.abort();
     controller = new AbortController();
     const current = ++generation;
-    const home = window.tab === "Inicio";
-    status("Consultando catálogo…");
+    if (isPortal()) return showPortal(current);
+    if (window.tab === "Inicio") return showHome(current);
+    status(t("Consultando catálogo…"), { quiet: true });
+    element("cat").setAttribute("aria-busy", "true");
+    // Cached answers arrive at once; only slower ones show placeholders.
+    const skeleton = setTimeout(() => current === generation && showSkeleton(), CATALOG.skeletonDelayMs);
     try {
+        renderScopeHead();
         await loadFacets();
+        renderTypeFilters();
+        applyWanted();
+        hideEmptyFilters();
+        updateFiltersToggle();
+        writeUrl();
         const data = await api.get(
             "cards",
             {
-                page: home ? 1 : page,
-                page_size: home ? 8 : 24,
-                market: window.mk,
+                page,
+                page_size: CATALOG.pageSize,
+                market: scope?.kind === "set" ? undefined : window.market,
+                game: window.game,
+                ...scopeParams(scope),
                 q: element("q").value.trim(),
-                card_type: cardTypes[window.tab],
-                subtype: home ? undefined : element("sub").value,
-                rarity: home ? undefined : element("rar").value,
-                product_type: home ? undefined : element("stp").value,
-                sort: home ? "updated" : element("srt").value,
-                language: "es"
+                ...tabParams(),
+                ...typeParams(),
+                ...rarityParams(element("rar").value),
+                product_type: element("stp").value,
+                sort: element("srt").value,
+                language: window.I18N.lang
             },
             { signal: controller.signal }
         );
         if (current !== generation || isCommerce()) return;
-        if (home) element("home").innerHTML = homeHtml(data);
-        else {
-            element("list").innerHTML = catalogRows(data);
-            element("cnt").textContent = `${data.total} cartas`;
-            pagination.innerHTML = pager(data);
-        }
-        status(
-            data.total
-                ? ""
-                : "El catálogo no contiene resultados para este mercado y estos filtros."
-        );
+        // A search counts once per different text, not on every page of results.
+        const query = element("q").value.trim();
+        if (query && query !== lastSearch) track("busqueda");
+        lastSearch = query;
+        lastData = data;
+        renderResults(data);
+        status(data.total ? "" : t("El catálogo no contiene resultados para este mercado y estos filtros."));
     } catch (error) {
         if (error.name === "AbortError" || current !== generation) return;
-        const message = `${h(
-            error.message
-        )} <button class="ghost" data-catalog-retry>Reintentar</button>`;
-        if (home) element("home").innerHTML = `<div class="empty gl" role="alert">${message}</div>`;
-        else {
-            element(
-                "list"
-            ).innerHTML = `<tr><td colspan="5" class="empty" role="alert">${message}</td></tr>`;
-            pagination.innerHTML = "";
-        }
-        status("No se pudo cargar el catálogo.");
+        const message = `${h(error.message)} <button class="ghost" data-catalog-retry>${t("Reintentar")}</button>`;
+        showViewContainers();
+        element("list").innerHTML = `<tr><td colspan="3" class="empty" role="alert">${message}</td></tr>`;
+        grid.innerHTML = `<p class="empty" role="alert">${message}</p>`;
+        pagination.innerHTML = "";
+        topPagination.innerHTML = "";
+        status(t("No se pudo cargar el catálogo."));
+    } finally {
+        clearTimeout(skeleton);
+        if (current === generation) element("cat").removeAttribute("aria-busy");
     }
 }
 
-window.list = function () {
-    if (isCommerce()) return commerceList();
+window.refreshList = function () {
+    if (isCommerce()) return demoRefreshList();
+    if (isLocal() && !element("q").value.trim()) return;
     clearTimeout(timer);
-    timer = setTimeout(() => loadCards(true), 250);
+    timer = setTimeout(() => loadCards(true), CATALOG.searchDelayMs);
 };
 
-window.init = function () {
+window.showTab = function () {
+    if (!openCardId()) {
+        pageMeta();
+        trackPage(`tab:${window.tab}`);
+    }
     ++generation;
     controller?.abort();
     clearTimeout(timer);
-    try {
-        localStorage.setItem("cm_market", window.mk);
-    } catch {
-        /* Preference is optional. */
-    }
+    window.saveMarket();
+    document.documentElement.dataset.screen = isPortal() ? "portal" : "market";
+    element("portal").style.display = isPortal() ? "" : "none";
     element("commercial-notice").hidden = !isCommerce();
+    for (const id of Object.values(localPanels)) element(id).style.display = "none";
     if (isCommerce()) {
         status("");
-        return commerceInit();
+        writeUrl();
+        demoShowTab();
+        showCurrentTab();
+        renderPromo();
+        return;
     }
-    element("tabs").innerHTML = window.TABS.map(
-        (tab) =>
-            `<button aria-pressed="${tab === window.tab}" data-g="${h(tab)}">${h(
-                window.TN[tab]
-            )}</button>`
-    ).join("");
-    const panel = window.tab === "Inicio" ? "home" : "cat";
-    for (const id of ["home", "cat", "prod", "vend"])
+    renderTabs();
+    renderPromo();
+    renderScopeHead();
+    const panel = isPortal() ? "portal" : localPanels[window.tab] || (window.tab === "Inicio" ? "home" : "cat");
+    for (const id of ["home", "cat", "prod", "vend", "portal", ...Object.values(localPanels)])
         element(id).style.display = id === panel ? "" : "none";
-    element("srt").innerHTML =
-        '<option value="name">Nombre</option><option value="name_desc">Nombre: Z–A</option><option value="updated">Actualizadas recientemente</option>';
-    loadCards(true);
-    if (element("md").classList.contains("on") && element("md").dataset.mode === "catalog") {
-        openCard(element("md").dataset.catalogId);
+    if (isPortal()) {
+        status("");
+        loadCards(true);
+        return;
     }
+    if (isLocal()) {
+        status("");
+        renderLocal[window.tab](element(localPanels[window.tab]));
+        writeUrl();
+        if (openCardId()) openCard(openCardId(), { push: false });
+        return;
+    }
+    // Keep the chosen order when the options are rebuilt.
+    const sort = wanted.srt ?? element("srt").value;
+    element("srt").innerHTML = SORTS;
+    element("srt").value = [...element("srt").options].some((option) => option.value === sort)
+        ? sort
+        : "name";
+    delete wanted.srt;
+    renderViewToggle();
+    loadCards(true);
+    if (openCardId()) openCard(openCardId(), { push: false });
 };
 
-async function openCard(id) {
+// A card opened from a list filtered by rarity shows that printing first.
+function printingInChosenRarity(items) {
+    const { rarity, rarity_family: family } = isCatalog() ? rarityParams(element("rar").value) : {};
+    if (!rarity && !family) return "";
+    const match = items.find((item) => (rarity ? item.rarity === rarity : item.rarity_family === family));
+    return match?.id || "";
+}
+
+async function openCard(id, { push = true } = {}) {
     const current = ++detailGeneration;
     element("md").dataset.mode = "catalog";
     element("md").dataset.catalogId = id;
     element("mb").innerHTML =
         '<div class="top"><h2>Cargando ficha…</h2><button class="ghost" data-close="md">Cerrar</button></div>';
-    window.pad();
+    window.alignDialogs();
     element("md").classList.add("on");
+    hidePreview();
+    writeUrl(push ? "push" : "replace");
     try {
+        priceHistory = undefined;
+        const market = window.market;
+        const history = api
+            .get(`cards/${id}/price-history`, { market, days: CATALOG.historyDays })
+            .catch(() => null);
         const [card, printings] = await Promise.all([
-            api.get(`cards/${id}`),
-            api.get(`cards/${id}/printings`, { page: 1, page_size: 24, market: window.mk })
+            api.get(`cards/${id}`, { language: window.I18N.lang }),
+            api.get(`cards/${id}/printings`, { page: 1, page_size: CATALOG.pageSize, market })
         ]);
         if (
             current !== detailGeneration ||
@@ -156,16 +795,34 @@ async function openCard(id) {
             !element("md").classList.contains("on")
         )
             return;
+        // A card of another game (a shared link): the site moves to its game,
+        // then asks again for the printings of that game's market.
+        if (card.game && card.game !== window.game) {
+            window.setGame(card.game);
+            if (isPortal()) window.tab = "Inicio";
+            window.showTab();
+            return;
+        }
         detail = card;
+        cardMeta(card.name);
+        track("carta");
+        rememberCard(id);
         printingPage = printings;
-        element("mb").innerHTML = detailHtml(detail, printingPage);
+        selectedPrinting = printingInChosenRarity(printings.items);
+        renderDetail();
+        history.then((data) => {
+            if (current !== detailGeneration || element("md").dataset.mode !== "catalog") return;
+            priceHistory = data;
+            renderChart();
+        });
     } catch (error) {
         if (current !== detailGeneration || element("md").dataset.mode !== "catalog") return;
-        element(
-            "mb"
-        ).innerHTML = `<div class="top"><h2>No se pudo cargar la ficha</h2><button class="ghost" data-close="md">Cerrar</button></div><p role="alert">${h(
-            error.message
-        )}</p>`;
+        element("mb").innerHTML = html`
+            <div class="top">
+                <h2>No se pudo cargar la ficha</h2>
+                <button class="ghost" data-close="md">Cerrar</button>
+            </div>
+            <p role="alert">${h(error.message)}</p>`;
     }
 }
 
@@ -173,20 +830,31 @@ document.addEventListener(
     "click",
     async (event) => {
         const target = event.target.closest(
-            "[data-catalog-card], [data-catalog-page], [data-printing-page], [data-catalog-retry]"
+            "[data-catalog-card], [data-catalog-page], [data-printing-page], [data-catalog-retry], [data-view]"
         );
         if (!target) return;
         event.preventDefault();
         event.stopImmediatePropagation();
         if (target.dataset.catalogCard) return openCard(target.dataset.catalogCard);
+        if (target.dataset.view) {
+            view = target.dataset.view;
+            writeJson("cm_view", view);
+            renderViewToggle();
+            writeUrl();
+            if (lastData) renderResults(lastData);
+            return;
+        }
         if (target.hasAttribute("data-catalog-retry")) {
-            facets = undefined;
+            facetsMarket = undefined;
             api.cache.clear();
             return loadCards();
         }
         if (target.dataset.catalogPage) {
             page = Number(target.dataset.catalogPage);
-            return loadCards();
+            await loadCards();
+            if (target.closest("#catalog-pagination"))
+                topPagination.scrollIntoView({ block: "nearest" });
+            return;
         }
         if (target.dataset.printingPage && detail) {
             const current = detailGeneration;
@@ -194,13 +862,14 @@ document.addEventListener(
             try {
                 const data = await api.get(`cards/${detail.id}/printings`, {
                     page: Number(target.dataset.printingPage),
-                    page_size: 24,
-                    market: window.mk
+                    page_size: CATALOG.pageSize,
+                    market: window.market
                 });
                 if (current !== detailGeneration || element("md").dataset.mode !== "catalog")
                     return;
                 printingPage = data;
-                element("mb").innerHTML = detailHtml(detail, printingPage);
+                selectedPrinting = "";
+                renderDetail();
             } catch (error) {
                 window.toast(error.message);
             } finally {
@@ -211,15 +880,84 @@ document.addEventListener(
     true
 );
 
-document.addEventListener("change", (event) => {
-    if (event.target.id === "catalog-printing" && detail)
-        element("mb").innerHTML = detailHtml(detail, printingPage, event.target.value);
+// Search box and list filters. The demo store's product list also reads the
+// search box, so this goes through window.refreshList for every tab.
+element("q").addEventListener("input", () => window.refreshList());
+installSearchSuggest({
+    input: element("q"),
+    api,
+    market: () => window.market,
+    game: () => window.game,
+    onPick: (id) => openCard(id)
 });
+document.addEventListener("change", (event) => {
+    if (TYPE_FILTERS.some((filter) => filter.id === event.target.id)) window.refreshList();
+});
+for (const id of ["rar", "stp", "srt"])
+    element(id).addEventListener("change", () => window.refreshList());
+
+document.addEventListener("change", (event) => {
+    if (event.target.id === "catalog-printing" && detail) {
+        selectedPrinting = event.target.value;
+        renderDetail();
+    }
+    // Prices follow the currency chosen in the header while a card is open.
+    if (event.target.id === "cur" && detail && element("md").dataset.mode === "catalog")
+        renderChart();
+});
+document.addEventListener(
+    "click",
+    (event) => {
+        const range = event.target.closest("[data-ph-range]");
+        if (!range) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        chartDays = Number(range.dataset.phRange);
+        renderChart();
+    },
+    true
+);
+
+// ---- Card preview on hover and back to top (their own modules) ---------------
+
+const { hidePreview } = installCardPreview({ lookup: (id) => knownCards.get(id) });
+installBackToTop({ focus: element("q") });
+installHeaderScroll();
+
+// ---- Keyboard shortcut and back to top ----------------------------------------
+
 document.addEventListener("keydown", (event) => {
+    const editing = event.target.closest?.("input, textarea, select, [contenteditable]");
+    if (event.key === "/" && !editing && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        element("q").focus();
+        element("q").select();
+        return;
+    }
     const row = event.target.closest("[data-catalog-card]");
     if (row && ["Enter", " "].includes(event.key) && event.target.tagName !== "BUTTON") {
         event.preventDefault();
         openCard(row.dataset.catalogCard);
+    }
+});
+
+// ---- Local panels and the demo store ------------------------------------------
+
+installWantlists({
+    api,
+    panel: () => (window.tab === "Deseados" ? element("wlv") : null),
+    detail: () =>
+        detail && element("md").dataset.mode === "catalog"
+            ? { card: detail, printings: printingPage, selectedId: selectedPrinting }
+            : null
+});
+installProfile({ panel: () => element("pfv") });
+installCart({
+    panel: () => element("cartv"),
+    open: () => {
+        window.tab = "Carrito";
+        window.showTab();
+        window.scrollTo(0, 0);
     }
 });
 document.addEventListener(
@@ -227,33 +965,67 @@ document.addEventListener(
     (event) => {
         if (event.target.matches?.("img.catalog-image")) {
             const fallback = document.createElement("span");
-            fallback.className = "catalog-image-fallback";
-            fallback.textContent = "Imagen no disponible";
-            event.target.replaceWith(fallback);
+            fallback.className = `catalog-image-fallback${event.target.classList.contains("grid") ? " grid" : ""}`;
+            fallback.textContent = t("Imagen no disponible");
+            // A broken image takes its provisional warning with it.
+            (event.target.closest(".img-wrap") || event.target).replaceWith(fallback);
         }
     },
     true
 );
 
-for (const name of ["detail", "vendor", "popen", "showCart"]) {
+for (const name of ["openDemoCard", "openSeller", "openProduct", "showCart"]) {
     const original = window[name];
     window[name] = function (...args) {
         const result = original(...args);
         const container = element(name === "showCart" ? "cbx" : "mb");
         const notice = document.createElement("p");
         notice.className = "catalog-status";
-        notice.textContent = "Comercio de demostración: ofertas, precios y stock ilustrativos.";
+        notice.textContent = t("Comercio de demostración: ofertas, precios y stock ilustrativos.");
         container.prepend(notice);
         return result;
     };
 }
-window.TN.Productos = "Productos (demo)";
-window.TN.Vendedores = "Vendedores (demo)";
-try {
-    const market = localStorage.getItem("cm_market");
-    if (["TCG", "OCG"].includes(market)) window.mk = market;
-} catch {
-    /* Storage can be disabled by the browser. */
-}
-window.seg();
-window.init();
+window.TAB_LABELS.Productos = "Productos (demo)";
+window.TAB_LABELS.Vendedores = "Vendedores (demo)";
+// The cart page and the profile have no tab of their own: they open from the
+// cart popup and from the account menu (account-menu.js).
+if (!window.TABS.includes("Deseados")) window.TABS.push("Deseados");
+window.TAB_LABELS.Deseados = "Lista de deseados";
+window.TAB_LABELS.Perfil = "Perfil";
+// The market last chosen in this game (frontend/demo/store.js keeps one per game).
+window.market = window.savedMarket(window.game) || gameInfo().markets[0].code;
+// "Vista del catálogo" in Personalización.
+document.addEventListener("cm:view", (event) => {
+    view = event.detail;
+    if (isCatalog()) {
+        renderViewToggle();
+        if (lastData) renderResults(lastData);
+    }
+});
+installAuth({
+    panel: (tab) => (window.tab === tab ? element(localPanels[tab]) : null),
+    go: (tab) => {
+        window.tab = tab;
+        window.showTab();
+        window.scrollTo(0, 0);
+    }
+});
+installAccountMenu();
+installLanguageMenu();
+installAdmin();
+// The home page's call to action and "Para ti" depend on who is signed in.
+document.addEventListener("cm:account", async () => {
+    await syncRecentCards();
+    if (window.tab === "Inicio") window.refreshList();
+});
+loadAccount();
+const initial = readUrl();
+window.setGame(window.game);
+applyUrl(initial);
+// Links from account emails (/verificar, /restablecer) open the Acceso panel.
+if (openAccountLink(location.pathname)) window.tab = "Acceso";
+window.updateMarketButtons();
+window.showTab();
+if (initial.card) openCard(initial.card, { push: false });
+refreshAlerts();

@@ -17,20 +17,21 @@ class ImageService:
         commercial = image.rights_status == "approved" and bool(image.authorization_reference)
         if image.rights_status == "denied" or not (commercial or self.settings.local_image_preview):
             raise AccessDenied("Ilustración sin permiso comercial; vista local no habilitada")
-        root = self.settings.image_directory.resolve()
-        if (
-            image.local_path
-            and image.thumbnail_path
-            and all(
-                (root / name).resolve().is_relative_to(root) and (root / name).is_file()
-                for name in (image.local_path, image.thumbnail_path)
-            )
-        ):
+        if self._stored(image):
             return False
         response = await self.client.http.get(image.source_url, ttl=365 * 86400)
         self._save(image, response.content)
         # Technical API access is not evidence of a commercial image licence.
         return True
+
+    def _stored(self, image) -> bool:
+        """Whether both files of the image are already inside the image folder."""
+        root = self.settings.image_directory.resolve()
+        names = (image.local_path, image.thumbnail_path)
+        return all(names) and all(
+            (root / name).resolve().is_relative_to(root) and (root / name).is_file()
+            for name in names
+        )
 
     def _save(self, image, content):
         root = self.settings.image_directory.resolve()
@@ -55,15 +56,7 @@ class ImageService:
     async def download(self, image: CardImage):
         if image.rights_status != "approved" or not image.authorization_reference:
             raise AccessDenied("No hay evidencia de permiso comercial para esta imagen")
-        root = self.settings.image_directory.resolve()
-        if (
-            image.local_path
-            and image.thumbnail_path
-            and all(
-                (root / name).resolve().is_relative_to(root) and (root / name).is_file()
-                for name in (image.local_path, image.thumbnail_path)
-            )
-        ):
+        if self._stored(image):
             return False
         metadata = await self.client.image_info(image.file_title)
         if not metadata or metadata.get("url") != image.source_url:
@@ -78,6 +71,11 @@ class ImageService:
         # Decode and re-encode raster data. SVG/HTML is never served as active content.
         self._save(image, response.content)
         return True
+
+
+def displayable(image: CardImage) -> bool:
+    """A printing scan is shown only with evidence of a permission that covers it."""
+    return image.rights_status == "approved" and bool(image.authorization_reference)
 
 
 def eligible_images(session, identifier=None):

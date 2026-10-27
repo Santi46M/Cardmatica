@@ -80,6 +80,11 @@ class HttpStore:
         await asyncio.sleep(await asyncio.to_thread(reserve))
 
 
+def same_domain(first: str, second: str) -> bool:
+    """Both names end in the same two labels (www.example.com, feeds.example.com)."""
+    return bool(first and second) and first.split(".")[-2:] == second.split(".")[-2:]
+
+
 class PoliteHttpClient:
     def __init__(self, source, settings, *, transport=None):
         self.source = source
@@ -89,17 +94,36 @@ class PoliteHttpClient:
             "ygoprodeck": settings.ygoprodeck_request_interval,
             "yugipedia": settings.yugipedia_request_interval,
             "konami": settings.konami_request_interval,
+            "news": settings.news_request_interval,
+            "products": settings.product_request_interval,
+            "scryfall": settings.scryfall_request_interval,
+            "tcgdex": settings.tcgdex_request_interval,
         }[source]
         self.allowed_hosts = {
             "ygoprodeck": {"db.ygoprodeck.com", "images.ygoprodeck.com"},
             "yugipedia": {"yugipedia.com", "ms.yugipedia.com"},
             "konami": {"www.db.yugioh-card.com"},
+            # Only the configured feeds and the GitHub API.
+            "news": {
+                urlsplit(feed.rpartition("|")[2].strip()).hostname for feed in settings.news_feeds
+            }
+            | {"api.github.com"},
+            # Pages from app/data/product_pages.json; the service adds each
+            # page's own image host once it has checked it.
+            "products": set(),
+            # The API and its image server (cards.scryfall.io: no rate limit).
+            "scryfall": {"api.scryfall.com", "cards.scryfall.io"},
+            "tcgdex": {"api.tcgdex.net", "assets.tcgdex.net"},
         }[source]
+        headers = {"User-Agent": settings.user_agent, "Accept-Encoding": "gzip, deflate"}
+        # Scryfall asks every program to say what it accepts.
+        if source == "scryfall":
+            headers["Accept"] = "application/json;q=0.9,*/*;q=0.8"
         self.client = httpx.AsyncClient(
             timeout=settings.http_timeout,
             follow_redirects=False,
             transport=transport,
-            headers={"User-Agent": settings.user_agent, "Accept-Encoding": "gzip, deflate"},
+            headers=headers,
         )
 
     def check_policy(self):
@@ -111,6 +135,17 @@ class PoliteHttpClient:
             self.settings.konami_enabled and self.settings.konami_authorization_reference.strip()
         ):
             raise AccessDenied("Konami requiere autorización escrita de extracción y uso comercial")
+        if self.source == "news" and not self.settings.news_enabled:
+            raise AccessDenied("Noticias externas deshabilitadas en la configuración")
+        if self.source == "products" and not self.settings.local_image_preview:
+            raise AccessDenied(
+                "Las fotos de productos son solo para la vista local: activar "
+                "DEPLOYMENT_MODE=local y ALLOW_LOCAL_IMAGE_PREVIEW=true"
+            )
+        if self.source == "scryfall" and not self.settings.scryfall_enabled:
+            raise AccessDenied("Scryfall deshabilitado en la configuración")
+        if self.source == "tcgdex" and not self.settings.tcgdex_enabled:
+            raise AccessDenied("TCGdex deshabilitado en la configuración")
         if self.source == "yugipedia" and not self.settings.yugipedia_enabled:
             raise AccessDenied(
                 "Yugipedia deshabilitada: revisar políticas y configurar el servicio"
@@ -125,24 +160,65 @@ class PoliteHttpClient:
             or parsed.password
             or parsed.port not in (None, 443)
         ):
-            raise AccessDenied("URL externa fuera de los orígenes permitidos")
+            raise AccessDenied(f"URL externa fuera de los orígenes permitidos: {parsed.hostname}")
+
+    def follow(self, current, location):
+        """Where a redirect leads, if it may be followed.
+
+        A feed may move within its own domain (blog.example.com → www.example.com)
+        or to a known feed service (NEWS_REDIRECT_HOSTS); any other site is refused.
+        """
+        target = urljoin(current, location)
+        # Old feed services still answer with http:// addresses; ask the same over https.
+        if target.startswith("http://"):
+            target = "https://" + target[len("http://") :]
+        host = urlsplit(target).hostname or ""
+        if self.source == "news" and host not in self.allowed_hosts:
+            here = urlsplit(current).hostname or ""
+            if same_domain(host, here) or host in self.settings.news_redirect_hosts:
+                self.allowed_hosts.add(host)
+        self.validate_url(target)
+        return target
 
     async def close(self):
         await self.client.aclose()
 
-    async def get(self, url, *, params=None, ttl=30 * 86400, refresh=False, redirects=0):
+    async def get(
+        self, url, *, params=None, ttl=30 * 86400, refresh=False, redirects=0, robots=True
+    ):
+        """robots=False only for documented APIs meant for programs (GitHub's),
+        whose robots.txt speaks to crawlers of the website."""
         self.check_policy()
         request_url = str(httpx.URL(url, params=params))
         self.validate_url(request_url)
+        if not robots:
+            return await self._fetch(request_url, ttl=ttl, refresh=refresh)
         origin = urlsplit(request_url)
         robots_url = f"{origin.scheme}://{origin.netloc}/robots.txt"
         robots_response = await self._fetch(
             robots_url, ttl=86400, refresh=False, allow_missing=True
         )
-        if robots_response.status_code in (404, 410):
+        # RFC 9309: follow at least five redirects; more counts as no robots.txt.
+        for _ in range(5):
+            if not robots_response.is_redirect:
+                break
+            robots_url = self.follow(robots_url, robots_response.headers["location"])
+            robots_response = await self._fetch(
+                robots_url, ttl=86400, refresh=False, allow_missing=True
+            )
+        status = robots_response.status_code
+        # RFC 9309: a missing file, too many redirects or a web page instead of
+        # rules mean there are no rules. Anything else unclear stops the source.
+        if (
+            status in (404, 410)
+            or robots_response.is_redirect
+            or (status == 200 and robots_response.text.lstrip().startswith("<"))
+        ):
             pass
-        elif robots_response.status_code != 200 or robots_response.text.lstrip().startswith("<"):
-            raise AccessDenied("No fue posible validar robots.txt; acceso suspendido")
+        elif status != 200:
+            raise AccessDenied(
+                f"No fue posible validar {robots_url} (HTTP {status}); acceso suspendido"
+            )
         else:
             robots = RobotFileParser()
             robots.parse(robots_response.text.splitlines())
@@ -156,7 +232,7 @@ class PoliteHttpClient:
             if redirects >= 5:
                 raise ExternalError("Demasiadas redirecciones")
             return await self.get(
-                urljoin(request_url, response.headers["location"]),
+                self.follow(request_url, response.headers["location"]),
                 ttl=ttl,
                 refresh=refresh,
                 redirects=redirects + 1,
@@ -164,85 +240,106 @@ class PoliteHttpClient:
         return response
 
     async def _fetch(self, url, *, ttl, refresh, allow_missing=False):
+        """One address, from the cache while fresh; otherwise asked again (with
+        ETag/Last-Modified), within the request budget and with retries."""
         key = digest([self.source, url, self.settings.user_agent])
         cached = self.store.read(key)
         if cached and not refresh and time.time() - cached[3] < ttl:
-            return httpx.Response(
-                cached[0],
-                headers=json.loads(cached[1]),
-                content=cached[2],
-                request=httpx.Request("GET", url),
-            )
-        headers = {}
-        if cached:
-            old_headers = json.loads(cached[1])
-            if old_headers.get("etag"):
-                headers["If-None-Match"] = old_headers["etag"]
-            if old_headers.get("last-modified"):
-                headers["If-Modified-Since"] = old_headers["last-modified"]
+            return cached_response(cached, url)
+        headers = revalidation_headers(cached)
         for attempt in range(self.settings.http_retries + 1):
             await self.store.wait(self.source, self.interval)
+            last = attempt == self.settings.http_retries
             try:
-                async with self.client.stream("GET", url, headers=headers) as streamed:
-                    content = bytearray()
-                    async for chunk in streamed.aiter_bytes():
-                        content.extend(chunk)
-                        if len(content) > 12 * 1024 * 1024:
-                            raise ExternalError("Respuesta externa superior a 12 MiB")
-                    clean_headers = dict(streamed.headers)
-                    clean_headers.pop("content-encoding", None)
-                    response = httpx.Response(
-                        streamed.status_code,
-                        headers=clean_headers,
-                        content=bytes(content),
-                        request=streamed.request,
-                    )
-                if response.status_code in (401, 403):
-                    raise AccessDenied(f"{self.source} rechazó el acceso ({response.status_code})")
-                if response.status_code == 304 and cached:
-                    response = httpx.Response(
-                        200,
-                        headers=json.loads(cached[1]),
-                        content=cached[2],
-                        request=httpx.Request("GET", url),
-                    )
-                if response.status_code == 429 or response.status_code >= 500:
-                    if attempt == self.settings.http_retries:
-                        raise ExternalError(
-                            f"{self.source}: HTTP {response.status_code} tras reintentos"
-                        )
-                    retry_after = response.headers.get("Retry-After", "")
-                    delay = 2**attempt
-                    if retry_after.isdigit():
-                        delay = max(delay, int(retry_after))
-                    elif retry_after:
-                        try:
-                            delay = max(
-                                delay,
-                                (
-                                    parsedate_to_datetime(retry_after) - datetime.now(timezone.utc)
-                                ).total_seconds(),
-                            )
-                        except (ValueError, TypeError):
-                            pass
-                    await asyncio.sleep(delay)
-                    continue
-                if allow_missing and response.status_code in (404, 410):
-                    self.store.write(key, response)
-                    return response
-                if not response.is_redirect:
-                    response.raise_for_status()
-                if "text/html" in response.headers.get("content-type", "") and any(
-                    marker in response.text[:65536].lower()
-                    for marker in ("cf-chl-", "challenge-platform", "g-recaptcha", "hcaptcha")
-                ):
-                    raise AccessDenied("Desafío de acceso detectado; no se intenta eludirlo")
-                if response.status_code == 200:
-                    self.store.write(key, response)
-                logger.info("source=%s status=%s cached=false", self.source, response.status_code)
-                return response
+                response = await self._download(url, headers)
             except (httpx.TimeoutException, httpx.NetworkError) as exc:
-                if attempt == self.settings.http_retries:
+                if last:
                     raise ExternalError(f"{self.source}: fallo de red tras reintentos") from exc
                 await asyncio.sleep(2**attempt)
+                continue
+            if response.status_code in (401, 403):
+                raise AccessDenied(f"{self.source} rechazó el acceso ({response.status_code})")
+            if response.status_code == 304 and cached:
+                response = cached_response(cached, url)
+            if response.status_code == 429 or response.status_code >= 500:
+                if last:
+                    raise ExternalError(
+                        f"{self.source}: HTTP {response.status_code} tras reintentos"
+                    )
+                await asyncio.sleep(retry_delay(response, attempt))
+                continue
+            if allow_missing and response.status_code in (404, 410):
+                self.store.write(key, response)
+                return response
+            if not response.is_redirect:
+                response.raise_for_status()
+            if is_challenge(response):
+                raise AccessDenied("Desafío de acceso detectado; no se intenta eludirlo")
+            if response.status_code == 200:
+                self.store.write(key, response)
+            logger.info("source=%s status=%s cached=false", self.source, response.status_code)
+            return response
         raise ExternalError("No se obtuvo respuesta")
+
+    async def _download(self, url, headers):
+        """The answer, read in pieces so an oversized one is cut off early."""
+        async with self.client.stream("GET", url, headers=headers) as streamed:
+            content = bytearray()
+            async for chunk in streamed.aiter_bytes():
+                content.extend(chunk)
+                if len(content) > MAX_RESPONSE_BYTES:
+                    raise ExternalError("Respuesta externa superior a 12 MiB")
+            clean_headers = dict(streamed.headers)
+            clean_headers.pop("content-encoding", None)
+            return httpx.Response(
+                streamed.status_code,
+                headers=clean_headers,
+                content=bytes(content),
+                request=streamed.request,
+            )
+
+
+MAX_RESPONSE_BYTES = 12 * 1024 * 1024
+# Signs of a page that asks to prove you are a person: it is never worked around.
+CHALLENGE_MARKERS = ("cf-chl-", "challenge-platform", "g-recaptcha", "hcaptcha")
+
+
+def cached_response(cached, url):
+    status, headers, body, _ = cached
+    return httpx.Response(
+        status, headers=json.loads(headers), content=body, request=httpx.Request("GET", url)
+    )
+
+
+def revalidation_headers(cached):
+    """Ask only for changes since the stored copy, when the server told us how."""
+    if not cached:
+        return {}
+    old = json.loads(cached[1])
+    headers = {}
+    if old.get("etag"):
+        headers["If-None-Match"] = old["etag"]
+    if old.get("last-modified"):
+        headers["If-Modified-Since"] = old["last-modified"]
+    return headers
+
+
+def retry_delay(response, attempt):
+    """Seconds to wait: doubling each time, or longer if the server says so (Retry-After)."""
+    delay = 2**attempt
+    retry_after = response.headers.get("Retry-After", "")
+    if retry_after.isdigit():
+        return max(delay, int(retry_after))
+    if retry_after:
+        try:
+            when = parsedate_to_datetime(retry_after) - datetime.now(timezone.utc)
+            return max(delay, when.total_seconds())
+        except (ValueError, TypeError):
+            pass
+    return delay
+
+
+def is_challenge(response):
+    return "text/html" in response.headers.get("content-type", "") and any(
+        marker in response.text[:65536].lower() for marker in CHALLENGE_MARKERS
+    )

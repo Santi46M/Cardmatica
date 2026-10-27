@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from urllib.parse import parse_qs, urljoin, urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from bs4 import BeautifulSoup
 
@@ -20,12 +20,6 @@ def card_ids(html: str) -> list[int]:
         if query.get("ope") == ["2"] and query.get("cid", [""])[0].isdigit():
             values.append(int(query["cid"][0]))
     return list(dict.fromkeys(values))
-
-
-def next_page(html: str, current_url: str) -> str | None:
-    soup = BeautifulSoup(html, "html.parser")
-    link = soup.select_one('a[rel="next"], .page_num a.next, .pagination a.next')
-    return urljoin(current_url, link["href"]) if link and link.get("href") else None
 
 
 def parse_card(html: str, cid: int, language: str, url: str) -> CardRecord:

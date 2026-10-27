@@ -5,6 +5,10 @@ from datetime import date, timedelta
 
 import httpx
 import pytest
+from PIL import Image
+from pydantic import ValidationError
+from sqlalchemy import func, select
+
 from app.core.config import Settings
 from app.integrations.http import AccessDenied, PoliteHttpClient
 from app.integrations.ygoprodeck.client import YgoprodeckClient
@@ -18,15 +22,13 @@ from app.models import (
     CardPrinting,
     CardTextVersion,
     DataConflict,
+    SyncJob,
 )
 from app.schemas.catalog import JobRequest
 from app.schemas.ingestion import GroupInput
 from app.services.images import ImageService
 from app.services.ingestion import IngestionService
 from app.services.reconciliation import IdentityConflict
-from PIL import Image
-from pydantic import ValidationError
-from sqlalchemy import func, select
 
 
 @pytest.fixture
@@ -70,7 +72,9 @@ def test_parser_preserves_identity_and_printing_dimensions(payload):
         not printing.images and printing.edition == "unknown" for printing in record.printings
     )
     assert record.printings[0].set_release_date == date(2026, 1, 1)
-    assert str(record.printings[0].set_source_url) == "https://db.ygoprodeck.com/api/v7/cardsets.php"
+    assert (
+        str(record.printings[0].set_source_url) == "https://db.ygoprodeck.com/api/v7/cardsets.php"
+    )
     assert record.printings[0].release_date is None
     assert "price" not in record.model_dump_json(warnings="error")
 
@@ -225,6 +229,16 @@ def test_artwork_preview_is_explicit_and_cannot_be_served_in_production(
         client.get(f"/api/v1/artworks/{image_id}", headers={"Host": "public.example"}).status_code
         == 404
     )
+    codespace = {"Host": "localhost:8000", "X-Forwarded-Host": "demo-8000.app.github.dev"}
+    # A private development domain is only accepted once it is configured explicitly.
+    assert client.get(f"/api/v1/artworks/{image_id}", headers=codespace).status_code == 404
+    monkeypatch.setattr(settings, "local_preview_host_suffixes", [".app.github.dev"])
+    assert client.get(f"/api/v1/artworks/{image_id}", headers=codespace).status_code == 200
+    spoofed = {"Host": "localhost", "X-Forwarded-Host": "evil.example"}
+    assert client.get(f"/api/v1/artworks/{image_id}", headers=spoofed).status_code == 404
+    monkeypatch.setattr(settings, "deployment_mode", "production")
+    assert client.get(f"/api/v1/artworks/{image_id}", headers=codespace).status_code == 404
+    monkeypatch.setattr(settings, "deployment_mode", "local")
     detail = client.get(f"/api/v1/cards/{card_id}").json()
     assert detail["image"]["association"] == "card_artwork"
     assert not detail["name_is_official"] and detail["name_source"] == "ygoprodeck"
@@ -311,3 +325,88 @@ def test_source_capabilities_are_validated():
             )
     with pytest.raises(ValidationError):
         Settings(_env_file=None, ygoprodeck_request_interval=0.01)
+
+
+def test_preview_images_downloads_only_missing_artwork(factory, settings, payload, monkeypatch):
+    from app.cli import preview_images
+
+    with factory.begin() as session:
+        IngestionService(session).ingest(parse_card(payload))
+    calls = []
+
+    class Runner:
+        def __init__(self):
+            self.factory = factory
+
+        def enqueue(self, request):
+            calls.append(request)
+            with factory.begin() as session:
+                job = SyncJob(source=request.source, mode=request.mode, status="completed")
+                session.add(job)
+                session.flush()
+                return job.id
+
+        def run(self, job_id):
+            async def done():
+                return None
+
+            return done()
+
+    with pytest.raises(ValueError):
+        preview_images(10, Runner())
+    monkeypatch.setattr(settings, "deployment_mode", "local")
+    monkeypatch.setattr(settings, "allow_local_image_preview", True)
+    assert preview_images(10, Runner()) == 0
+    assert [(call.mode, call.identifier) for call in calls] == [("images", "12345678")]
+    with factory.begin() as session:
+        session.scalar(select(CardArtwork)).local_path = "synthetic.png"
+    calls.clear()
+    assert preview_images(10, Runner()) == 0 and calls == []
+
+
+def test_card_texts_brings_only_the_missing_language(factory, settings, payload, monkeypatch):
+    from app.cli import card_texts
+    from app.services.catalog import card_summary
+
+    with factory.begin() as session:
+        IngestionService(session).ingest(parse_card(payload))
+    calls = []
+
+    class Runner:
+        def __init__(self):
+            self.factory = factory
+
+        def enqueue(self, request):
+            calls.append(request)
+            with factory.begin() as session:
+                job = SyncJob(source=request.source, mode=request.mode, status="completed")
+                session.add(job)
+                session.flush()
+                return job.id
+
+        def run(self, job_id):
+            async def done():
+                return None
+
+            return done()
+
+    # Portuguese comes from YGOPRODeck, card by card, for cards without it.
+    assert card_texts("pt", 10, Runner()) == 0
+    assert [(call.source, call.mode, call.language) for call in calls] == [
+        ("ygoprodeck", "card", "pt")
+    ]
+    with factory.begin() as session:
+        IngestionService(session).ingest(parse_card(payload, "pt"))
+    calls.clear()
+    assert card_texts("pt", 10, Runner()) == 0 and calls == []
+    # Spanish only Yugipedia has: it must be enabled first.
+    monkeypatch.setattr(settings, "yugipedia_enabled", False)
+    with pytest.raises(ValueError, match="YUGIPEDIA_ENABLED"):
+        card_texts("es", 10, Runner())
+    monkeypatch.setattr(settings, "yugipedia_enabled", True)
+    assert card_texts("es", 10, Runner()) == 0
+    assert calls[0].source == "yugipedia" and calls[0].identifier == payload["name"]
+    # A visitor whose language the card lacks reads its English name.
+    with factory() as session:
+        card = session.scalar(select(Card))
+        assert card_summary(card, "de").name == payload["name"]

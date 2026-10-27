@@ -1,0 +1,18 @@
+{
+    // Codespaces / Dev Containers: levanta PostgreSQL y la API con Docker al abrir el entorno.
+    // La imagen universal es la predeterminada de Codespaces y ya incluye Docker y Python.
+    "name": "Cardmática",
+    "image": "mcr.microsoft.com/devcontainers/universal:2",
+    // Genera .env con credenciales aleatorias solo la primera vez y activa la vista
+    // provisional de imágenes (sin licencia): mantener el puerto 8000 privado.
+    "postCreateCommand": "(test -f .env || python3 backend/scripts/init_env.py) && python3 backend/scripts/enable_preview_images.py",
+    // Cada vez que el entorno arranca: base de datos, migraciones, banlists, API y noticias.
+    "postStartCommand": "docker compose up --build -d db api news",
+    "forwardPorts": [8000],
+    "portsAttributes": {
+        "8000": {
+            "label": "Cardmática",
+            "onAutoForward": "openBrowser"
+        }
+    }
+}

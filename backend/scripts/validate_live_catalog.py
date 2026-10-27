@@ -4,10 +4,11 @@ import argparse
 import asyncio
 import json
 
+from sqlalchemy import func, select
+
 from app.ingestion.sync import SyncRunner
 from app.models import Archetype, Card, CardArtwork, CardImage, CardPrinting, CardSet, SyncJob
 from app.schemas.catalog import JobRequest
-from sqlalchemy import func, select
 
 SAMPLE = [
     "Blue-Eyes White Dragon",
