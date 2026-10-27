@@ -40,7 +40,18 @@ MAIN_TYPES = [
 SUPERTYPES = {"Basic", "Legendary", "Snow", "World", "Ongoing", "Host"}
 COLORS = ["W", "U", "B", "R", "G"]
 # Formats people ask about; Scryfall lists many more.
-FORMATS = ["standard", "pioneer", "modern", "legacy", "vintage", "commander", "pauper"]
+FORMATS = [
+    "standard",
+    "pioneer",
+    "modern",
+    "legacy",
+    "vintage",
+    "commander",
+    "pauper",
+    "paupercommander",
+    "oathbreaker",
+    "premodern",
+]
 # Kinds of set, as Scryfall's set_type, in words.
 SET_TYPES = {
     "core": "Core Set",

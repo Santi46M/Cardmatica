@@ -86,7 +86,9 @@ export function tabMeta(tab) {
 export function cardMeta(name) {
     set(
         t("{name} · Cartas sueltas · Cardmática", { name }),
-        t("{name}: impresiones, rarezas, estado en la banlist e historial de precios en Cardmática.", { name })
+        window.game === "yugioh"
+            ? t("{name}: impresiones, rarezas, estado en la banlist e historial de precios en Cardmática.", { name })
+            : t("{name}: impresiones, rarezas, legalidad en torneos e historial de precios en Cardmática.", { name })
     );
 }
 

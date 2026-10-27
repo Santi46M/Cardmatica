@@ -42,7 +42,7 @@ def magic():
         "toughness": "3",
         "colors": ["R", "U"],
         "keywords": ["Flying"],
-        "legalities": {"standard": "legal", "modern": "legal", "oathbreaker": "legal"},
+        "legalities": {"standard": "legal", "modern": "legal", "alchemy": "legal"},
         "games": ["paper", "arena"],
         "finishes": ["nonfoil", "foil"],
         "set": "tst",
@@ -475,3 +475,32 @@ def test_preview_images_takes_one_picture_per_card(factory, settings, magic, mon
     monkeypatch.setattr(settings, "allow_local_image_preview", True)
     assert preview_images(10, Runner()) == 0
     assert [(call.source, call.mode) for call in calls] == [("scryfall", "images")]
+
+
+def test_yugioh_banlists_stay_with_yugioh(client, factory, three_games):
+    from datetime import date
+
+    from app.services.banlists import BanlistFile, import_banlist
+
+    with factory.begin() as session:
+        for market in ("TCG", "OCG"):
+            data = {
+                "format": market,
+                "effective_date": date(2026, 1, 1),
+                "complete": True,
+                "source_name": "Synthetic test list",
+                "source_url": "https://example.com/synthetic-list",
+                "retrieved_on": date(2026, 1, 2),
+                "forbidden": [],
+                "limited": [],
+                "semi_limited": [],
+            }
+            import_banlist(session, BanlistFile.model_validate(data))
+    cards = {item["game"]: item for item in client.get("/api/v1/cards").json()["items"]}
+    # A complete list makes every Yu-Gi-Oh! card "unlimited"; not a Magic or Pokémon card.
+    detail = lambda game: client.get(f"/api/v1/cards/{cards[game]['id']}").json()  # noqa: E731
+    assert {row["format"] for row in detail("yugioh")["banlist_status"]} == {"TCG", "OCG"}
+    assert detail("magic")["banlist_status"] == []
+    assert detail("pokemon")["banlist_status"] == []
+    listed = client.get("/api/v1/cards", params={"game": "magic", "market": "TCG"}).json()
+    assert all(item["market_banlist"] is None for item in listed["items"])

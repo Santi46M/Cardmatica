@@ -147,7 +147,12 @@ def english_names(card) -> set[str]:
 
 
 def card_statuses(session, card, today: date | None = None) -> list[BanlistStatusView]:
-    """Match by English name: lists are published by name, not by catalogue identifier."""
+    """Match by English name: lists are published by name, not by catalogue identifier.
+
+    Only Yu-Gi-Oh! has these lists: a Magic or Pokémon card shows where it may be
+    played from its own data (details.legalities, details.legal)."""
+    if getattr(card, "game", "yugioh") != "yugioh":
+        return []
     names = english_names(card)
     result = []
     for row in current_lists(session, today):
@@ -171,6 +176,9 @@ def statuses_for_cards(session, cards, market, today: date | None = None) -> dic
         return {}
     row = list_in_force(session, market, today)
     if row is None:
+        return {}
+    cards = [card for card in cards if getattr(card, "game", "yugioh") == "yugioh"]
+    if not cards:
         return {}
     names = {card.id: english_names(card) for card in cards}
     wanted = set().union(*names.values())

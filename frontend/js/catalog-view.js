@@ -410,7 +410,9 @@ const FINISHES = {
 };
 const finishesText = (printing) => (printing.finishes || []).map((finish) => t(FINISHES[finish] || finish)).join(", ");
 
-// Formats where a Magic card may be played, as Scryfall says.
+// Yu-Gi-Oh!'s banlist has its equivalent in the other games: Magic's banned and
+// restricted list, format by format, and Pokémon's Standard and Expanded, which
+// say where a card may be played. The data comes with each card (Scryfall, TCGdex).
 const FORMATS = {
     standard: "Standard",
     pioneer: "Pioneer",
@@ -418,32 +420,77 @@ const FORMATS = {
     legacy: "Legacy",
     vintage: "Vintage",
     commander: "Commander",
-    pauper: "Pauper"
+    pauper: "Pauper",
+    paupercommander: "Pauper Commander",
+    oathbreaker: "Oathbreaker",
+    premodern: "Premodern"
 };
 const LEGALITY = { legal: "Legal", not_legal: "No legal", banned: "Prohibida", restricted: "Restringida" };
+// Marks of the banlist badges (styles.css .bn-*).
+const LEGALITY_BADGE = {
+    legal: ["ok", "✓"],
+    not_legal: ["unknown", "–"],
+    banned: ["forbidden", "✕"],
+    restricted: ["limited", "1"]
+};
+const MAGIC_LIST = "https://magic.wizards.com/en/banned-restricted-list";
 
-function legalityHtml(card) {
+// Each format with its state: [name, state] in the order players know them.
+function legalities(card) {
     if (card.game === "magic") {
         const formats = card.details?.legalities || {};
-        const items = Object.entries(FORMATS)
+        return Object.entries(FORMATS)
             .filter(([key]) => formats[key])
-            .map(([key, name]) => `<span class="fmt" data-legal="${h(formats[key])}">${h(name)} · ${h(t(LEGALITY[formats[key]] || formats[key]))}</span>`)
-            .join("");
-        return items ? `<span class="fmts">${items}</span>` : "";
+            .map(([key, name]) => [name, formats[key]]);
     }
     if (card.game === "pokemon") {
         const legal = card.details?.legal || {};
-        const items = [
-            ["standard", "Standard"],
-            ["expanded", "Expanded"]
+        return [
+            ["Standard", legal.standard],
+            ["Expanded", legal.expanded]
         ]
-            .filter(([key]) => key in legal)
-            .map(([key, name]) => `<span class="fmt" data-legal="${legal[key] ? "legal" : "not_legal"}">${name} · ${h(t(legal[key] ? "Legal" : "No legal"))}</span>`)
-            .join("");
-        const mark = card.details?.regulation_mark ? ` <small>${h(t("Marca de regulación {mark}", { mark: card.details.regulation_mark }))}</small>` : "";
-        return items ? `<span class="fmts">${items}</span>${mark}` : "";
+            .filter(([, value]) => value != null)
+            .map(([name, value]) => [name, value ? "legal" : "not_legal"]);
     }
-    return "";
+    return [];
+}
+
+// One line among the card's facts: the formats where it is legal, and those
+// where it is banned or restricted.
+function legalityHtml(card) {
+    const items = legalities(card)
+        .filter(([, state]) => state !== "not_legal")
+        .map(([name, state]) => `<span class="fmt" data-legal="${h(state)}">${h(name)}${state === "legal" ? "" : ` · ${h(t(LEGALITY[state]))}`}</span>`)
+        .join("");
+    return items ? `<span class="fmts">${items}</span>` : h(t("No legal en torneos"));
+}
+
+function legalityRow([name, state]) {
+    const [tone, mark] = LEGALITY_BADGE[state] || LEGALITY_BADGE.not_legal;
+    const label = t(LEGALITY[state] || state);
+    return html`
+        <div class="bl-row">
+            <span class="bn bn-${tone}" aria-hidden="true">${mark}</span>
+            <div><b>${h(name)} · ${h(label)}</b></div>
+        </div>`;
+}
+
+// The section in place of the banlist, for Magic and Pokémon.
+function legalitySectionHtml(card) {
+    const rows = legalities(card).map(legalityRow).join("");
+    if (card.game === "magic") {
+        const note = t("Según la lista de prohibidas y restringidas de Wizards of the Coast. Una carta restringida admite una sola copia en el mazo.");
+        const link = `<a href="${MAGIC_LIST}" target="_blank" rel="noopener noreferrer">${t("Lista oficial")}</a>`;
+        const body = rows || `<p class="catalog-status">${t("Todavía no hay datos de formatos para esta carta.")}</p>`;
+        return `<section class="catalog-section"><h3>${t("Prohibidas y restringidas")}</h3>${body}<p class="catalog-status">${note} ${link}</p></section>`;
+    }
+    const mark = card.details?.regulation_mark;
+    const regulation = mark
+        ? `<p class="catalog-status">${h(t("Marca de regulación {mark}: Standard admite solo las marcas vigentes de la temporada.", { mark }))}</p>`
+        : "";
+    const note = t("Pokémon no tiene una banlist como la de Yu-Gi-Oh!: Standard cambia con cada rotación y Expanded tiene su propia lista de cartas prohibidas.");
+    const body = rows || `<p class="catalog-status">${t("Todavía no hay datos de legalidad para esta carta.")}</p>`;
+    return `<section class="catalog-section"><h3>${t("Legalidad en torneos")}</h3>${body}${regulation}<p class="catalog-status">${note}</p></section>`;
 }
 
 // Magic's mana cost as small coloured symbols ({2}{G} → ②🟢), with the cost in words for readers.
@@ -499,7 +546,7 @@ function gameFactsHtml(card, printings, printing) {
         factRow("Idioma", h(languageName(printing.language))),
         factRow("Acabados", h(finishesText(printing))),
         factRow("Lanzamiento", printing.release_date ? h(formatDate(printing.release_date)) : ""),
-        factRow("Formatos", legalityHtml(card))
+        factRow("Legal en", legalityHtml(card))
     ].join("");
 }
 
@@ -635,7 +682,7 @@ export function detailHtml(card, printings, selectedId, { market = "TCG" } = {})
             ${classificationHtml(card)}
             ${section("Erratas documentadas", errataHtml(card))}
             ${section("Versiones históricas y textos comunitarios", textHistoryHtml(card))}
-            ${banlistSectionHtml(card, market)}
+            ${card.game === "magic" || card.game === "pokemon" ? legalitySectionHtml(card) : banlistSectionHtml(card, market)}
             ${sources ? `<details class="cd-sources"><summary>${t("Procedencia")}</summary><ul>${sources}</ul></details>` : ""}
         </div>`;
 }
