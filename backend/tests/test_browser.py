@@ -271,6 +271,21 @@ def test_banlist_price_history_wantlists_and_profile(live_server, browser_page, 
     assert not errors
 
 
+def test_cart_page_closes_the_window_left_open(live_server, browser_page):
+    # Adding from a product and opening the cart without closing the product
+    # first: the cart page must not stay under that window.
+    page = browser_page
+    page.goto(f"{live_server}/yugioh")
+    page.locator('[data-g="Productos"]').click()
+    page.locator("#pl tr[data-pd]").first.click()
+    page.locator("#pt [data-add]").first.click()
+    page.locator("#cb").click()
+    page.locator("#cbx [data-cart-expand]").click()
+    expect(page.locator("#md")).not_to_have_class("on")
+    page.locator("#cartv [data-cart-remove]").first.click(timeout=3000)
+    expect(page.locator("#cartv")).not_to_contain_text("Tu carrito · 1 artículo")
+
+
 def test_cart_page_from_popup(live_server, browser_page):
     page = browser_page
     errors = []

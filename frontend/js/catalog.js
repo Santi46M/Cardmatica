@@ -177,14 +177,36 @@ function renderTabs() {
     showCurrentTab();
 }
 
-// On phones the tabs scroll sideways; the current one is brought into view.
+// When the tabs do not fit (on phones, and Magic's on any screen) they scroll
+// sideways: the current one is brought into view, and the side with more tabs
+// fades out (styles.css, #tabs[data-more]).
 function showCurrentTab() {
     const nav = element("tabs");
     const current = nav.querySelector('[aria-pressed="true"]');
-    if (!current || nav.scrollWidth <= nav.clientWidth) return;
-    const left = current.getBoundingClientRect().left - nav.getBoundingClientRect().left;
-    nav.scrollLeft += left - (nav.clientWidth - current.offsetWidth) / 2;
+    if (current && nav.scrollWidth > nav.clientWidth) {
+        const left = current.getBoundingClientRect().left - nav.getBoundingClientRect().left;
+        nav.scrollLeft += left - (nav.clientWidth - current.offsetWidth) / 2;
+    }
+    markHiddenTabs();
 }
+
+function markHiddenTabs() {
+    const nav = element("tabs");
+    const more = [];
+    if (nav.scrollLeft > 1) more.push("left");
+    if (nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 1) more.push("right");
+    nav.dataset.more = more.join(" ");
+}
+
+element("tabs").addEventListener("scroll", markHiddenTabs, { passive: true });
+window.addEventListener("resize", markHiddenTabs, { passive: true });
+// With a mouse, the wheel moves the tabs sideways.
+element("tabs").addEventListener("wheel", (event) => {
+    const nav = event.currentTarget;
+    if (nav.scrollWidth <= nav.clientWidth || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+    nav.scrollLeft += event.deltaY;
+    event.preventDefault();
+});
 
 // List and grid as icons (three bars, four squares); the name stays for
 // screen readers and as a tooltip.
