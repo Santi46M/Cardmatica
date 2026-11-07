@@ -29,7 +29,7 @@ The frontend shows the family names in Spanish (frontend/js/rarities.js).
 
 from dataclasses import dataclass
 from functools import cache
-from typing import Literal, get_args
+from typing import Literal
 
 Family = Literal[
     "basic",
@@ -43,7 +43,6 @@ Family = Literal[
     "promo",
     "other",
 ]
-FAMILIES = list(get_args(Family))
 UNKNOWN = "Unknown"
 
 

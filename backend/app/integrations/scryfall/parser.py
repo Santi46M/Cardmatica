@@ -37,7 +37,6 @@ MAIN_TYPES = [
     "Land",
     "Kindred",
 ]
-SUPERTYPES = {"Basic", "Legendary", "Snow", "World", "Ongoing", "Host"}
 COLORS = ["W", "U", "B", "R", "G"]
 # Formats people ask about; Scryfall lists many more.
 FORMATS = [

@@ -195,7 +195,7 @@ function magicLine(card) {
 }
 
 // Pokémon's words as the Spanish cards print them (TCGdex's translations).
-export const POKEMON_WORDS = {
+const POKEMON_WORDS = {
     Pokemon: "Pokémon",
     Trainer: "Entrenador",
     Energy: "Energía",

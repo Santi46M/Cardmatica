@@ -3129,24 +3129,6 @@ button.acc-avatar:hover,
     }
 }
 
-@media (max-width: 960px) {
-    .bar {
-        gap: 10px;
-    }
-
-    .search {
-        min-width: 150px;
-    }
-
-    #tabs {
-        padding: 0 4px;
-    }
-
-    #tabs button {
-        padding: 11px 12px;
-    }
-}
-
 /* Teléfonos y tabletas: la cabecera en dos filas fijas, para que nada quede
    suelto en una fila a medias. El ancho fijo de la moneda evita que ensanche
    la columna del carrito. */
@@ -3246,6 +3228,14 @@ button.acc-avatar:hover,
     .lang-code,
     .lang-chevron {
         display: none;
+    }
+
+    #tabs {
+        padding: 0 4px;
+    }
+
+    #tabs button {
+        padding: 11px 12px;
     }
 }
 
@@ -3481,7 +3471,6 @@ button.acc-avatar:hover,
     color: var(--mu);
     font-size: 13px;
 }
-
 
 .acc-langs {
     display: flex;
