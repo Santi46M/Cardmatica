@@ -249,6 +249,9 @@ function pokemonLine(card) {
 
 // ---- Filters ---------------------------------------------------------------
 
+// Magic's tabs where color and mana value apply (lands have neither).
+const MAGIC_SPELL_TABS = ["Todas", "Criatura", "Instantaneo", "Conjuro", "Artefacto", "Encantamiento"];
+
 // Each filter: element id, URL parameter, API parameter, label, game and tabs.
 export const TYPE_FILTERS = [
     { id: "f-type", param: "tipo", label: "Tipo de carta", game: "yugioh", tabs: ["Todas"] },
@@ -272,7 +275,7 @@ export const TYPE_FILTERS = [
         api: "color",
         label: "Color",
         game: "magic",
-        tabs: ["Todas", "Criatura", "Instantaneo", "Conjuro", "Artefacto", "Encantamiento"]
+        tabs: MAGIC_SPELL_TABS
     },
     {
         id: "f-mana",
@@ -280,7 +283,7 @@ export const TYPE_FILTERS = [
         api: "mana_value",
         label: "Valor de maná",
         game: "magic",
-        tabs: ["Todas", "Criatura", "Instantaneo", "Conjuro", "Artefacto", "Encantamiento"]
+        tabs: MAGIC_SPELL_TABS
     },
     { id: "f-pkind", param: "pclase", api: "card_type", label: "Tipo de carta", game: "pokemon", tabs: ["Todas"] },
     { id: "f-ptype", param: "ptipo", api: "color", label: "Tipo", game: "pokemon", tabs: ["Todas", "Pokemon"] },
