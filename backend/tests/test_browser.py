@@ -1085,3 +1085,38 @@ def test_cover_opens_each_marketplace(live_server, browser_page):
     # The logo goes back to the cover.
     page.locator(".logo").first.click()
     expect(page.locator("html")).to_have_attribute("data-screen", "portal")
+
+
+def test_secret_skins(live_server, browser_page):
+    page = browser_page
+    requested = []
+    page.on("request", lambda request: requested.append(request.url))
+    page.goto(f"{live_server}/yugioh")
+    expect(page.locator("#home h1")).to_be_visible()
+    # Nobody who never chose a skin downloads its styles.
+    assert not [url for url in requested if "skins.css" in url]
+    assert page.locator("#skin-picker").count() == 0
+    # The Konami code opens the picker; a choice applies at once and stays.
+    for key in ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight"]:
+        page.keyboard.press(key)
+    for key in ["ArrowLeft", "ArrowRight", "b", "a"]:
+        page.keyboard.press(key)
+    picker = page.locator("#skin-picker")
+    expect(picker).to_be_visible()
+    expect(picker).to_contain_text("Apariencias secretas")
+    picker.locator('input[value="skeuo"]').check()
+    expect(page.locator("html")).to_have_attribute("data-skin", "skeuo")
+    picker.get_by_role("button", name="Listo").click()
+    expect(picker).to_be_hidden()
+    page.goto(f"{live_server}/privacidad")
+    expect(page.locator("html")).to_have_attribute("data-skin", "skeuo")
+    # On a phone: five quick taps on the footer's last line.
+    small = page.locator(".site-footer small")
+    for _ in range(5):
+        small.click()
+    expect(page.locator("#skin-picker")).to_be_visible()
+    page.locator('#skin-picker input[value="aero"]').check()
+    page.keyboard.press("Escape")
+    page.reload()
+    assert page.evaluate("document.documentElement.dataset.skin") is None
+    assert page.evaluate("localStorage.getItem('cm_skin')") is None

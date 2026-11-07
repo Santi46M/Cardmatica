@@ -1,0 +1,461 @@
+/* Apariencias secretas (frontend/skins.js): Skeuomorfismo y Frutiger Metro.
+
+   Solo se descarga si alguien eligió una. Cada apariencia cambia las variables
+   de styles.css (en modo oscuro y en modo claro) y, encima, las texturas y las
+   formas que la distinguen. Va después de styles.css, así que a igual
+   especificidad gana esta hoja. */
+
+/* ---- Skeuomorfismo: tapete de fieltro, cuero cosido, madera y bronce ------ */
+
+:root[data-skin="skeuo"] {
+    /* Grano para el fieltro, el cuero y el papel: ruido fino, gris y transparente. */
+    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .32 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    --tx: #f5ead3;
+    --mu: #d2bd97;
+    --ac: #f0c46a;
+    --bd: rgba(0, 0, 0, .55);
+    --gl: #3d2717;
+    --line: 240, 210, 160;
+    --tint: 255, 235, 200;
+    --shade: 0, 0, 0;
+    --page: #0f3a22;
+    --backdrop:
+        radial-gradient(1200px 800px at 50% 30%, transparent 40%, rgba(0, 0, 0, .55)),
+        var(--grain),
+        linear-gradient(180deg, #17532f, #0d351f);
+    --pop: #33200f;
+    --pop-a: rgba(51, 32, 15, .98);
+    --tip: rgba(38, 24, 11, .98);
+    --box: #3a2414;
+    --scrim: rgba(5, 15, 8, .7);
+    --field: #1d120a;
+    --btn: linear-gradient(180deg, #f7dc96 0%, #d8a64b 45%, #b5822d 55%, #e3b763 100%);
+    --btn-line: 90, 55, 10;
+    --on-btn: #2a1803;
+    --leather: radial-gradient(120% 90% at 30% 0%, rgba(255, 220, 170, .10), transparent 60%);
+    --stitch: rgba(245, 215, 160, .38);
+    --wood:
+        linear-gradient(180deg, rgba(255, 230, 190, .16), transparent 45%, rgba(0, 0, 0, .25)),
+        repeating-linear-gradient(92deg, #5b3a1f 0 7px, #66432a 7px 10px, #523319 10px 18px, #6b4728 18px 21px);
+    --serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+    --price: #ffe2a1;
+    --good: #a5e58f;
+    --bad: #ffa48f;
+    --gold: #ffd36b;
+    --warn: #ffd98a;
+    --info: #b7e3ff;
+    --ocg: #ffb0a5;
+}
+
+:root[data-skin="skeuo"][data-theme="light"] {
+    --tx: #33230f;
+    --mu: #6a5235;
+    --ac: #85520a;
+    --bd: rgba(95, 62, 22, .4);
+    --gl: #f4ead4;
+    --line: 95, 62, 22;
+    --tint: 95, 62, 22;
+    --shade: 80, 50, 15;
+    --page: #e6dac0;
+    --backdrop:
+        radial-gradient(1200px 800px at 50% 30%, transparent 45%, rgba(110, 80, 40, .25)),
+        var(--grain),
+        linear-gradient(180deg, #eee3cb, #dccdae);
+    --pop: #f8f0de;
+    --pop-a: rgba(248, 240, 222, .98);
+    --tip: rgba(250, 244, 230, .98);
+    --box: #f6eddb;
+    --scrim: rgba(70, 50, 25, .45);
+    --field: #fffbf2;
+    --leather: radial-gradient(120% 90% at 30% 0%, rgba(255, 255, 255, .55), transparent 60%);
+    --stitch: rgba(120, 80, 30, .45);
+    --wood:
+        linear-gradient(180deg, rgba(255, 255, 255, .35), transparent 45%, rgba(90, 55, 15, .18)),
+        repeating-linear-gradient(92deg, #d9b98a 0 7px, #e2c497 7px 10px, #d1ae7c 10px 18px, #e6cba1 18px 21px);
+    --price: #6b3f00;
+    --good: #2c6a1c;
+    --bad: #a3281b;
+    --gold: #7a5200;
+    --warn: #6e4f00;
+    --info: #24557a;
+    --ocg: #9b2c22;
+}
+
+/* Paneles de cuero cosido: sin vidrio, con relieve y una costura a 6 px del borde. */
+:root[data-skin="skeuo"] :is(.gl, .box) {
+    background: var(--leather), var(--grain), var(--gl);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 1px solid var(--bd);
+    outline: 1.5px dashed var(--stitch);
+    outline-offset: -6px;
+    box-shadow:
+        0 10px 24px rgba(var(--shade), .55),
+        inset 0 1px 0 rgba(255, 255, 255, .12),
+        inset 0 -2px 6px rgba(0, 0, 0, .25);
+}
+
+/* La cabecera, una tabla de madera; la costura no le hace falta. */
+:root[data-skin="skeuo"] header.gl {
+    background: var(--wood);
+    outline: 0;
+    box-shadow:
+        0 8px 20px rgba(var(--shade), .6),
+        inset 0 1px 0 rgba(255, 255, 255, .25),
+        inset 0 -1px 0 rgba(0, 0, 0, .4);
+}
+
+:root[data-skin="skeuo"] :is(h1, h2, h3, .logo) {
+    font-family: var(--serif);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, .45);
+}
+
+:root[data-skin="skeuo"][data-theme="light"] :is(h1, h2, h3, .logo) {
+    text-shadow: 0 1px 0 rgba(255, 255, 255, .7);
+}
+
+/* Botones de bronce, con bisel y letras grabadas. */
+:root[data-skin="skeuo"] :is(.btn, .seg button[aria-pressed=true], .seg button[aria-checked=true], .pill[aria-pressed=true]) {
+    color: var(--on-btn);
+    border: 1px solid rgba(var(--btn-line), .8);
+    text-shadow: 0 1px 0 rgba(255, 245, 210, .6);
+    font-weight: 600;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .7),
+        inset 0 -2px 0 rgba(0, 0, 0, .2),
+        0 2px 3px rgba(0, 0, 0, .45);
+}
+
+:root[data-skin="skeuo"] .btn:active {
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, .45);
+}
+
+:root[data-skin="skeuo"] .acc-avatar {
+    color: var(--on-btn);
+    background: radial-gradient(circle at 35% 30%, #fbe7b0, #d6a24a 55%, #9c6d22);
+    border: 1px solid rgba(var(--btn-line), .8);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), 0 2px 3px rgba(0, 0, 0, .45);
+}
+
+:root[data-skin="skeuo"] :is(.ghost, .lang-button) {
+    background: linear-gradient(180deg, rgba(255, 240, 210, .14), rgba(0, 0, 0, .14));
+    border: 1px solid var(--bd);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 1px 2px rgba(0, 0, 0, .4);
+}
+
+/* Campos hundidos en el cuero. */
+:root[data-skin="skeuo"] :is(input, select) {
+    border: 1px solid var(--bd);
+    box-shadow:
+        inset 0 2px 5px rgba(0, 0, 0, .55),
+        0 1px 0 rgba(255, 255, 255, .1);
+}
+
+:root[data-skin="skeuo"] #tabs button[aria-pressed=true] {
+    color: var(--ac);
+    border-color: var(--ac);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, .5);
+}
+
+:root[data-skin="skeuo"][data-theme="light"] #tabs button[aria-pressed=true] {
+    text-shadow: none;
+}
+
+:root[data-skin="skeuo"] .portal-game::before {
+    opacity: .35;
+}
+
+/* ---- Frutiger Metro: mosaicos planos, esquinas rectas y letras finas ----- */
+
+:root[data-skin="metro"] {
+    --tx: #ffffff;
+    --mu: #b4b4b4;
+    --ac: #2bb5f0;
+    --bd: rgba(255, 255, 255, .14);
+    --gl: #1f1f1f;
+    --line: 255, 255, 255;
+    --tint: 255, 255, 255;
+    --shade: 0, 0, 0;
+    --page: #111111;
+    --backdrop: linear-gradient(180deg, #161616, #0b0b0b);
+    --pop: #262626;
+    --pop-a: rgba(38, 38, 38, .99);
+    --tip: rgba(38, 38, 38, .99);
+    --box: #1f1f1f;
+    --scrim: rgba(0, 0, 0, .7);
+    --field: #2b2b2b;
+    --btn: #0b6fb0;
+    --btn-line: 11, 111, 176;
+    --on-btn: #ffffff;
+    --metro-font: "Segoe UI", Selawik, "Open Sans", "Helvetica Neue", system-ui, sans-serif;
+    --price: #8fd3ff;
+    --good: #8fe3a5;
+    --bad: #ff8f8f;
+    --gold: #ffd36b;
+    --warn: #ffd98a;
+    --info: #8fd3ff;
+    --ocg: #ff9f9a;
+}
+
+:root[data-skin="metro"][data-theme="light"] {
+    --tx: #1b1b1b;
+    --mu: #575757;
+    --ac: #0063b1;
+    --bd: rgba(0, 0, 0, .12);
+    --gl: #ffffff;
+    --line: 0, 0, 0;
+    --tint: 0, 0, 0;
+    --shade: 0, 0, 0;
+    --page: #f2f2f2;
+    --backdrop: linear-gradient(180deg, #f7f7f7, #ececec);
+    --pop: #ffffff;
+    --pop-a: rgba(255, 255, 255, .99);
+    --tip: rgba(255, 255, 255, .99);
+    --box: #ffffff;
+    --scrim: rgba(0, 0, 0, .4);
+    --field: #ffffff;
+    --btn: #0063b1;
+    --btn-line: 0, 99, 177;
+    --on-btn: #ffffff;
+    --price: #005a9e;
+    --good: #107c10;
+    --bad: #c42b1c;
+    --gold: #7a5200;
+    --warn: #6e4f00;
+    --info: #005a9e;
+    --ocg: #a4262c;
+}
+
+/* En Metro nada es redondo ni de vidrio: es lo que lo define. */
+:root[data-skin="metro"] *,
+:root[data-skin="metro"] *::before,
+:root[data-skin="metro"] *::after {
+    border-radius: 0 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+:root[data-skin="metro"] body {
+    font-family: var(--metro-font);
+}
+
+:root[data-skin="metro"] :is(.gl, .box) {
+    background: var(--gl);
+    border: 1px solid var(--bd);
+    box-shadow: none;
+}
+
+:root[data-skin="metro"] :is(h1, h2, .logo) {
+    font-weight: 300;
+    letter-spacing: -.01em;
+}
+
+:root[data-skin="metro"] :is(.hero2 h1, .portal-hero h1) {
+    font-size: 40px;
+}
+
+:root[data-skin="metro"] .btn,
+:root[data-skin="metro"] .acc-avatar,
+:root[data-skin="metro"] .seg button[aria-pressed=true],
+:root[data-skin="metro"] .seg button[aria-checked=true],
+:root[data-skin="metro"] .pill[aria-pressed=true] {
+    color: var(--on-btn);
+    background: var(--btn);
+    border: 2px solid var(--btn);
+    box-shadow: none;
+}
+
+:root[data-skin="metro"] .btn:hover {
+    filter: none;
+    background: color-mix(in srgb, var(--btn) 90%, white);
+}
+
+:root[data-skin="metro"] :is(.ghost, .lang-button) {
+    background: transparent;
+    border: 2px solid rgba(var(--line), .35);
+}
+
+:root[data-skin="metro"] :is(input, select) {
+    border: 2px solid rgba(var(--line), .3);
+    box-shadow: none;
+}
+
+:root[data-skin="metro"] :is(input, select):focus {
+    border-color: var(--ac);
+}
+
+/* Las pestañas como un pivote: grandes, en minúsculas y finas. */
+:root[data-skin="metro"] #tabs {
+    background: none;
+}
+
+:root[data-skin="metro"] #tabs button {
+    font-size: 17px;
+    font-weight: 300;
+    text-transform: lowercase;
+    border-bottom-width: 3px;
+}
+
+:root[data-skin="metro"] #tabs button[aria-pressed=true] {
+    color: var(--tx);
+    font-weight: 400;
+}
+
+/* Cada juego, un mosaico de su color. */
+:root[data-skin="metro"] .portal-game {
+    background: color-mix(in srgb, var(--g1) 62%, black);
+    border: 0;
+    color: #fff;
+}
+
+:root[data-skin="metro"] .portal-game::before {
+    display: none;
+}
+
+:root[data-skin="metro"] .portal-game :is(p, small, span) {
+    color: rgba(255, 255, 255, .92);
+}
+
+:root[data-skin="metro"] .portal-game .btn {
+    background: rgba(0, 0, 0, .3);
+    border-color: rgba(255, 255, 255, .75);
+}
+
+:root[data-skin="metro"] .portal-game:hover {
+    transform: none;
+    box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .55);
+}
+
+:root[data-skin="metro"] .card-tile:hover {
+    box-shadow: inset 0 0 0 2px var(--ac);
+}
+
+:root[data-skin="metro"] .promo {
+    box-shadow: none;
+}
+
+/* ---- El selector de apariencias ------------------------------------------- */
+
+.skin-picker {
+    width: min(440px, calc(100vw - 32px));
+    padding: 22px;
+    border: 1px solid var(--bd);
+    border-radius: 16px;
+    color: var(--tx);
+    background: var(--box);
+    box-shadow: 0 20px 60px rgba(var(--shade), .55);
+}
+
+.skin-picker::backdrop {
+    background: var(--scrim);
+}
+
+.skin-picker h2 {
+    margin: 0 0 6px;
+}
+
+.skin-picker p {
+    margin: 0 0 14px;
+    color: var(--mu);
+    font-size: 14px;
+}
+
+.skin-picker fieldset {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.skin-choice {
+    display: grid;
+    grid-template-columns: auto 64px 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--bd);
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.skin-choice:has(:checked) {
+    border-color: var(--ac);
+    background: rgba(var(--tint), .07);
+}
+
+.skin-choice b,
+.skin-choice small {
+    display: block;
+}
+
+.skin-choice small {
+    color: var(--mu);
+    font-size: 13px;
+}
+
+.skin-done {
+    margin: 16px 0 0 !important;
+    text-align: right;
+}
+
+/* Una muestra de cada apariencia. */
+.skin-sample {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    height: 44px;
+    padding: 5px;
+    border-radius: 6px;
+}
+
+.skin-sample i:first-child {
+    grid-column: 1 / -1;
+}
+
+.skin-sample[data-sample="aero"] {
+    background: linear-gradient(180deg, #c7eaf8, #8fd0ef 60%, #a6dc94);
+}
+
+.skin-sample[data-sample="aero"] i {
+    border-radius: 4px;
+    background: rgba(255, 255, 255, .7);
+    box-shadow: inset 0 1px 0 #fff;
+}
+
+.skin-sample[data-sample="skeuo"] {
+    background: linear-gradient(180deg, #1c5c34, #0f3a22);
+}
+
+.skin-sample[data-sample="skeuo"] i {
+    border-radius: 3px;
+    background: #4a2f1a;
+    outline: 1px dashed rgba(245, 215, 160, .6);
+    outline-offset: -3px;
+}
+
+.skin-sample[data-sample="skeuo"] i:last-child {
+    background: linear-gradient(180deg, #f7dc96, #b5822d);
+}
+
+.skin-sample[data-sample="metro"] {
+    border-radius: 0;
+    background: #111;
+}
+
+.skin-sample[data-sample="metro"] i:nth-child(1) { background: #0b6fb0; }
+.skin-sample[data-sample="metro"] i:nth-child(2) { background: #a200ff; }
+.skin-sample[data-sample="metro"] i:nth-child(3) { background: #f09609; }
+
+@media (prefers-reduced-motion: no-preference) {
+    .skin-picker[open] {
+        animation: skin-in .18s ease-out;
+    }
+}
+
+@keyframes skin-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+}
