@@ -449,15 +449,6 @@ def latest_sets(
     return recent_sets(session, market, limit)
 
 
-@router.get("/sets/latest", response_model=SetView)
-def latest_set(session: SessionDep, market: Market = "TCG"):
-    """The most recently released set of a market."""
-    found = recent_sets(session, market, 1)
-    if not found:
-        raise HTTPException(404, "Ningún set con fecha de lanzamiento")
-    return found[0]
-
-
 @router.get("/sets/{set_id}", response_model=SetView)
 def card_set(set_id: UUID, session: SessionDep):
     row = session.get(CardSet, set_id)

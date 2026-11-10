@@ -140,7 +140,10 @@ export function installCart({ panel, open }) {
             event.preventDefault();
             event.stopImmediatePropagation();
             if (target.hasAttribute("data-cart-expand")) {
+                // The cart page takes the whole screen: the drawer and any
+                // window left open under it (a product, a card) close.
                 document.getElementById("cart").classList.remove("on");
+                document.getElementById("md").classList.remove("on");
                 return open();
             }
             const cart = window.cart;

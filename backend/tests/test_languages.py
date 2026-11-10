@@ -16,7 +16,8 @@ SERVER_CALL = re.compile(r'\btr\(\s*request,\s*"((?:[^"\\]|\\.)*)"')
 
 def texts_in_code():
     found = set()
-    for path in [*FRONTEND.glob("js/*.js"), *FRONTEND.glob("demo/*.js"), FRONTEND / "theme.js"]:
+    scripts = [FRONTEND / "theme.js", FRONTEND / "skins.js"]
+    for path in [*FRONTEND.glob("js/*.js"), *FRONTEND.glob("demo/*.js"), *scripts]:
         found |= {json.loads(f'"{text}"') for text in CALL.findall(path.read_text("utf-8"))}
     pages = (ROOT / "backend" / "app" / "api" / "pages.py").read_text("utf-8")
     return found | set(SERVER_CALL.findall(pages))
