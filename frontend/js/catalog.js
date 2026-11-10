@@ -177,14 +177,36 @@ function renderTabs() {
     showCurrentTab();
 }
 
-// On phones the tabs scroll sideways; the current one is brought into view.
+// When the tabs do not fit (on phones, and Magic's on any screen) they scroll
+// sideways: the current one is brought into view, and the side with more tabs
+// fades out (styles.css, #tabs[data-more]).
 function showCurrentTab() {
     const nav = element("tabs");
     const current = nav.querySelector('[aria-pressed="true"]');
-    if (!current || nav.scrollWidth <= nav.clientWidth) return;
-    const left = current.getBoundingClientRect().left - nav.getBoundingClientRect().left;
-    nav.scrollLeft += left - (nav.clientWidth - current.offsetWidth) / 2;
+    if (current && nav.scrollWidth > nav.clientWidth) {
+        const left = current.getBoundingClientRect().left - nav.getBoundingClientRect().left;
+        nav.scrollLeft += left - (nav.clientWidth - current.offsetWidth) / 2;
+    }
+    markHiddenTabs();
 }
+
+function markHiddenTabs() {
+    const nav = element("tabs");
+    const more = [];
+    if (nav.scrollLeft > 1) more.push("left");
+    if (nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 1) more.push("right");
+    nav.dataset.more = more.join(" ");
+}
+
+element("tabs").addEventListener("scroll", markHiddenTabs, { passive: true });
+window.addEventListener("resize", markHiddenTabs, { passive: true });
+// With a mouse, the wheel moves the tabs sideways.
+element("tabs").addEventListener("wheel", (event) => {
+    const nav = event.currentTarget;
+    if (nav.scrollWidth <= nav.clientWidth || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+    nav.scrollLeft += event.deltaY;
+    event.preventDefault();
+});
 
 // List and grid as icons (three bars, four squares); the name stays for
 // screen readers and as a tooltip.
@@ -272,11 +294,10 @@ function applyWanted() {
     }
 }
 
-function openCardId() {
-    return element("md").classList.contains("on") && element("md").dataset.mode === "catalog"
-        ? element("md").dataset.catalogId
-        : null;
-}
+// The window that shows a card (and, from the demo store, products and sellers).
+const modal = element("md");
+const showingCard = () => modal.classList.contains("on") && modal.dataset.mode === "catalog";
+const openCardId = () => (showingCard() ? modal.dataset.catalogId : null);
 
 function writeUrl(mode = "replace") {
     const params = new URLSearchParams();
@@ -316,7 +337,7 @@ window.addEventListener("popstate", () => {
     window.updateMarketButtons();
     if (!state.card && openCardId()) {
         closingFromHistory = true;
-        element("md").classList.remove("on");
+        modal.classList.remove("on");
     }
     window.showTab();
     if (state.card && openCardId() !== state.card) openCard(state.card, { push: false });
@@ -324,7 +345,7 @@ window.addEventListener("popstate", () => {
 
 // Closing the card returns to the list entry the card was opened from.
 new MutationObserver(() => {
-    if (element("md").classList.contains("on")) return;
+    if (modal.classList.contains("on")) return;
     pageMeta();
     if (closingFromHistory) {
         closingFromHistory = false;
@@ -334,7 +355,7 @@ new MutationObserver(() => {
         return;
     if (history.state?.card) history.back();
     else writeUrl();
-}).observe(element("md"), { attributes: true, attributeFilter: ["class"] });
+}).observe(modal, { attributes: true, attributeFilter: ["class"] });
 
 // ---- Catalogue list ---------------------------------------------------------
 
@@ -456,7 +477,7 @@ function openScope(next) {
     // From a card's detail: its page closes without going back in history.
     if (openCardId()) {
         closingFromHistory = true;
-        element("md").classList.remove("on");
+        modal.classList.remove("on");
     }
     scope = next;
     scopeInfo = null;
@@ -568,7 +589,7 @@ function goGame(code) {
     if (!window.GAMES[code]) return;
     if (openCardId()) {
         closingFromHistory = true;
-        element("md").classList.remove("on");
+        modal.classList.remove("on");
     }
     scope = null;
     scopeInfo = null;
@@ -771,12 +792,12 @@ function printingInChosenRarity(items) {
 
 async function openCard(id, { push = true } = {}) {
     const current = ++detailGeneration;
-    element("md").dataset.mode = "catalog";
-    element("md").dataset.catalogId = id;
+    modal.dataset.mode = "catalog";
+    modal.dataset.catalogId = id;
     element("mb").innerHTML =
         '<div class="top"><h2>Cargando ficha…</h2><button class="ghost" data-close="md">Cerrar</button></div>';
     window.alignDialogs();
-    element("md").classList.add("on");
+    modal.classList.add("on");
     hidePreview();
     writeUrl(push ? "push" : "replace");
     try {
@@ -789,12 +810,7 @@ async function openCard(id, { push = true } = {}) {
             api.get(`cards/${id}`, { language: window.I18N.lang }),
             api.get(`cards/${id}/printings`, { page: 1, page_size: CATALOG.pageSize, market })
         ]);
-        if (
-            current !== detailGeneration ||
-            element("md").dataset.mode !== "catalog" ||
-            !element("md").classList.contains("on")
-        )
-            return;
+        if (current !== detailGeneration || !showingCard()) return;
         // A card of another game (a shared link): the site moves to its game,
         // then asks again for the printings of that game's market.
         if (card.game && card.game !== window.game) {
@@ -811,12 +827,12 @@ async function openCard(id, { push = true } = {}) {
         selectedPrinting = printingInChosenRarity(printings.items);
         renderDetail();
         history.then((data) => {
-            if (current !== detailGeneration || element("md").dataset.mode !== "catalog") return;
+            if (current !== detailGeneration || !showingCard()) return;
             priceHistory = data;
             renderChart();
         });
     } catch (error) {
-        if (current !== detailGeneration || element("md").dataset.mode !== "catalog") return;
+        if (current !== detailGeneration || !showingCard()) return;
         element("mb").innerHTML = html`
             <div class="top">
                 <h2>No se pudo cargar la ficha</h2>
@@ -865,7 +881,7 @@ document.addEventListener(
                     page_size: CATALOG.pageSize,
                     market: window.market
                 });
-                if (current !== detailGeneration || element("md").dataset.mode !== "catalog")
+                if (current !== detailGeneration || !showingCard())
                     return;
                 printingPage = data;
                 selectedPrinting = "";
@@ -902,7 +918,7 @@ document.addEventListener("change", (event) => {
         renderDetail();
     }
     // Prices follow the currency chosen in the header while a card is open.
-    if (event.target.id === "cur" && detail && element("md").dataset.mode === "catalog")
+    if (event.target.id === "cur" && detail && showingCard())
         renderChart();
 });
 document.addEventListener(
@@ -918,13 +934,13 @@ document.addEventListener(
     true
 );
 
-// ---- Card preview on hover and back to top (their own modules) ---------------
+// ---- Card preview on hover, back to top and the header on scroll ---------------
 
 const { hidePreview } = installCardPreview({ lookup: (id) => knownCards.get(id) });
 installBackToTop({ focus: element("q") });
 installHeaderScroll();
 
-// ---- Keyboard shortcut and back to top ----------------------------------------
+// ---- Keyboard: "/" to search, Enter to open a card -----------------------------
 
 document.addEventListener("keydown", (event) => {
     const editing = event.target.closest?.("input, textarea, select, [contenteditable]");
@@ -941,13 +957,13 @@ document.addEventListener("keydown", (event) => {
     }
 });
 
-// ---- Local panels and the demo store ------------------------------------------
+// ---- Panels of the account and the demo store -----------------------------------
 
 installWantlists({
     api,
     panel: () => (window.tab === "Deseados" ? element("wlv") : null),
     detail: () =>
-        detail && element("md").dataset.mode === "catalog"
+        detail && showingCard()
             ? { card: detail, printings: printingPage, selectedId: selectedPrinting }
             : null
 });
@@ -1014,6 +1030,9 @@ installAuth({
 installAccountMenu();
 installLanguageMenu();
 installAdmin();
+
+// ---- Start: the page the address asks for --------------------------------------
+
 // The home page's call to action and "Para ti" depend on who is signed in.
 document.addEventListener("cm:account", async () => {
     await syncRecentCards();

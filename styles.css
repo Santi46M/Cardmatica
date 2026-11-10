@@ -170,12 +170,12 @@ header {
     border-radius: 14px;
 }
 
+/* En la computadora, una sola fila; la búsqueda toma el espacio que sobra. */
 .bar {
     padding: 12px 16px;
     display: flex;
     gap: 10px;
     align-items: center;
-    flex-wrap: wrap;
 }
 
 .logo {
@@ -193,7 +193,7 @@ header {
 
 .search {
     flex: 1;
-    min-width: 170px;
+    min-width: 140px;
     display: flex;
     position: relative;
 }
@@ -314,40 +314,49 @@ select option {
     cursor: pointer;
 }
 
-nav {
+/* Las pestañas de la cabecera */
+#tabs {
     border-radius: 0 0 14px 14px;
     display: flex;
     gap: 2px;
     padding: 0 12px;
     border-top: 1px solid var(--bd);
     background: rgba(var(--tint), .03);
-    flex-wrap: wrap;
+    /* Siempre en una línea: las que no caben se deslizan de lado (catalog.js). */
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
 }
 
-nav button {
+#tabs::-webkit-scrollbar {
+    display: none;
+}
+
+#tabs button {
     background: none;
     border: 0;
     color: var(--mu);
     padding: 11px 14px;
     cursor: pointer;
     border-bottom: 2px solid transparent;
-}
-
-/* Magic tiene más pestañas que caben en una línea: se deslizan de lado, como
-   en el teléfono, en lugar de partirse en dos filas. */
-[data-game="magic"] #tabs {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: thin;
-}
-
-[data-game="magic"] #tabs button {
-    padding: 11px 11px;
+    flex: none;
     white-space: nowrap;
-    flex-shrink: 0;
 }
 
-nav button[aria-pressed=true] {
+/* Pestañas que no caben: se esfuma el lado donde hay más (catalog.js). */
+#tabs[data-more~="right"] {
+    mask-image: linear-gradient(90deg, #000 calc(100% - 48px), transparent);
+}
+
+#tabs[data-more~="left"] {
+    mask-image: linear-gradient(90deg, transparent, #000 48px);
+}
+
+#tabs[data-more="left right"] {
+    mask-image: linear-gradient(90deg, transparent, #000 48px, #000 calc(100% - 48px), transparent);
+}
+
+#tabs button[aria-pressed=true] {
     color: var(--on-btn);
     border-color: var(--ac);
 }
@@ -623,10 +632,6 @@ small {
 }
 
 /* La moneda dice su código y su nombre; con el selector de juego, un poco más angosta. */
-#cur {
-    max-width: 160px;
-}
-
 .seg[hidden] {
     display: none;
 }
@@ -665,11 +670,6 @@ small {
 }
 
 .portal-games {
-    /* A list of links, not the tab bar: none of nav's own look. */
-    border: 0;
-    border-radius: 0;
-    background: none;
-    padding: 0;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
     gap: 14px;
@@ -880,7 +880,7 @@ a.portal-game:focus-visible {
 }
 
 #cur {
-    max-width: 190px;
+    max-width: 150px;
 }
 
 .tag.a {
@@ -1446,7 +1446,8 @@ button:disabled {
     white-space: nowrap;
 }
 
-@media (max-width: 760px) {
+/* El resumen va debajo cuando al lado no le deja lugar a la tabla. */
+@media (max-width: 960px) {
     .cart-page {
         grid-template-columns: minmax(0, 1fr);
     }
@@ -3089,20 +3090,9 @@ button.acc-avatar:hover,
     display: none;
 }
 
-@media (max-width: 960px) {
-    .bar {
-        gap: 10px;
-    }
-
-    .search {
-        min-width: 150px;
-    }
-
-    #cur {
-        max-width: 150px;
-    }
-
-    /* El carrito queda como ícono con la cantidad; el texto sigue para lectores de pantalla. */
+/* El carrito queda como ícono con la cantidad; el texto sigue para lectores
+   de pantalla. */
+@media (max-width: 1100px) {
     #cb {
         display: inline-flex;
         align-items: center;
@@ -3134,33 +3124,15 @@ button.acc-avatar:hover,
         display: none;
     }
 
-    nav {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        padding: 0 4px;
-        scrollbar-width: none;
-        overscroll-behavior-x: contain;
-    }
-
-    nav::-webkit-scrollbar {
+    .lang-code {
         display: none;
-    }
-
-    nav button {
-        flex: none;
-        white-space: nowrap;
-        padding: 11px 12px;
-    }
-
-    .site-footer nav {
-        overflow: visible;
-        flex-wrap: wrap;
     }
 }
 
-/* Fila 1: logo, mercado, carrito, cuenta. Fila 2: búsqueda, tema y moneda. El ancho
-   fijo de la moneda evita que ensanche la columna del carrito. */
-@media (max-width: 760px) {
+/* Teléfonos y tabletas: la cabecera en dos filas fijas, para que nada quede
+   suelto en una fila a medias. El ancho fijo de la moneda evita que ensanche
+   la columna del carrito. */
+@media (max-width: 960px) {
     .bar {
         position: relative;
         display: grid;
@@ -3186,13 +3158,13 @@ button.acc-avatar:hover,
         justify-self: start;
         max-width: 100%;
         min-width: 0;
-        padding: 6px 8px;
-        font-size: 14px;
+        padding: 6px 2px 6px 6px;
+        font-size: 13px;
     }
 
     .logo {
         grid-area: logo;
-        font-size: 19px;
+        font-size: 18px;
     }
 
     .bar > .seg {
@@ -3256,6 +3228,14 @@ button.acc-avatar:hover,
     .lang-code,
     .lang-chevron {
         display: none;
+    }
+
+    #tabs {
+        padding: 0 4px;
+    }
+
+    #tabs button {
+        padding: 11px 12px;
     }
 }
 
@@ -3345,14 +3325,15 @@ button.acc-avatar:hover,
 }
 
 /* Logos y mercado más compactos en pantallas muy angostas (320–359 px). */
-@media (max-width: 359px) {
-    .logo {
-        font-size: 16px;
+/* Teléfonos angostos: logo y carrito más chicos, para que el juego y el
+   mercado se lean enteros. */
+@media (max-width: 389px) {
+    .bar {
+        column-gap: 4px;
     }
 
-    .bar > .seg button {
-        padding: 6px 6px;
-        font-size: 13px;
+    .logo {
+        font-size: 16px;
     }
 
     #cb {
@@ -3372,6 +3353,10 @@ button.acc-avatar:hover,
 
     .seg.m button {
         padding: 4px 14px;
+    }
+
+    .stepper button {
+        min-width: 40px;
     }
 
     input[type="checkbox"],
@@ -3486,7 +3471,6 @@ button.acc-avatar:hover,
     color: var(--mu);
     font-size: 13px;
 }
-
 
 .acc-langs {
     display: flex;

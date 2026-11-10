@@ -77,7 +77,7 @@ function demoSlides(market, shown, hidden) {
     return slides;
 }
 
-export function promoSlides(sets, market, hidden = []) {
+function promoSlides(sets, market, hidden = []) {
     const slides = sets.map(setSlide);
     return [...slides, ...demoSlides(market, slides, hidden)].slice(0, SLIDES);
 }

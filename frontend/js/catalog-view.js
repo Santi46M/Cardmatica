@@ -494,7 +494,7 @@ function legalitySectionHtml(card) {
 }
 
 // Magic's mana cost as small coloured symbols ({2}{G} → ②🟢), with the cost in words for readers.
-export function manaHtml(cost) {
+function manaHtml(cost) {
     if (!cost) return "";
     const symbols = cost.match(/\{[^}]+\}/g) || [];
     const marks = symbols

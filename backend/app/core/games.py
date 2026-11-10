@@ -26,16 +26,8 @@ MARKET_GAME = {market: game for game, markets in GAME_MARKETS.items() for market
 DEFAULT_GAME = "yugioh"
 
 
-def markets_of(game: str | None) -> tuple[str, ...]:
-    return GAME_MARKETS.get(game or DEFAULT_GAME, ())
-
-
 def game_of(market: str | None) -> str | None:
     return MARKET_GAME.get(market) if market else None
-
-
-def default_market(game: str | None) -> str:
-    return markets_of(game)[0]
 
 
 def sql_list(values) -> str:
