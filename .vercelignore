@@ -1,11 +1,12 @@
 # Not part of the test site (vercel.json): never local data, secrets or images.
-.devcontainer
-.github
-.env
-.env.*
-.cache
-data
-docs
-backend/tests
+# A leading slash means the project's root only (backend/app/data is needed).
+/.devcontainer
+/.github
+/.env
+/.env.*
+/.cache
+/data
+/docs
+/backend/tests
 **/__pycache__
 node_modules

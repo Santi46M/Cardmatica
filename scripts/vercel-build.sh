@@ -7,9 +7,9 @@ set -e
 cd "$(dirname "$0")/../backend"
 DEPS="${TMPDIR:-/tmp}/cardmatica-build"
 if command -v uv >/dev/null 2>&1; then
-    uv pip install --quiet --target "$DEPS" -c requirements.lock .
+    uv pip install --quiet --target "$DEPS" -r ../requirements.txt
 else
-    python3 -m pip install --quiet --target "$DEPS" -c requirements.lock .
+    python3 -m pip install --quiet --target "$DEPS" -r ../requirements.txt
 fi
 export PYTHONPATH="$DEPS:$PWD"
 python3 -m alembic upgrade head
