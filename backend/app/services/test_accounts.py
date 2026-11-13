@@ -85,8 +85,15 @@ def ensure_site_accounts(session: Session, settings) -> list[str]:
         role = entry.get("role", "user")
         if role not in ROLES:
             raise ValueError(f"Rol desconocido en TEST_ACCOUNTS: {role}")
+        kind = entry.get("type", "buyer")
+        if kind not in ("buyer", "seller", "both"):
+            raise ValueError(f"Tipo de cuenta desconocido en TEST_ACCOUNTS: {kind}")
         account = TestAccount(
-            entry["email"].split("@")[0], entry.get("name") or entry["email"], role, "buyer"
+            entry["email"].split("@")[0],
+            entry.get("name") or entry["email"],
+            role,
+            kind,
+            entry.get("store"),
         )
         made.append(ensure(session, account, entry["email"], entry["password"]).email)
     return made

@@ -22,7 +22,8 @@ class Settings(BaseSettings):
     # The test site's accounts, made or updated by `cardmatica prepare-test-site`
     # when it is built (vercel.json), as a JSON list in one private variable:
     # [{"email": "...", "password": "...", "name": "...", "role": "admin"}, ...]
-    # role is "admin", "moderator" or "user". Empty, none is made.
+    # role is "admin", "moderator" or "user"; optional "type" ("buyer",
+    # "seller" or "both") and "store" give the profile. Empty, none is made.
     test_accounts: list[dict] = Field(default=[], repr=False)
     # Each request may run on a new instance (Vercel sets VERCEL=1): no pool of
     # open connections, the database's pooler keeps them (app/db/session.py).
