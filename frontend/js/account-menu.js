@@ -100,9 +100,9 @@ function accessHtml() {
         </div>`;
 }
 
-// Only administrators see the way into the panel.
+// Only the staff (moderators and administrators) see the way into the panel.
 function adminHtml() {
-    if (currentUser()?.role !== "admin") return "";
+    if (!["moderator", "admin"].includes(currentUser()?.role)) return "";
     return sectionHtml(["Administración", [["Panel de administración", "Admin"]]]);
 }
 

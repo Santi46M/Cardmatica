@@ -2,7 +2,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(os.environ.get("CARDMATICA_ROOT", Path(__file__).resolve().parents[3]))
@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     database_url: str = Field(
         default="postgresql+psycopg://cardmatica:CHANGE_ME@localhost:5432/cardmatica", repr=False
     )
+    # A test site on the internet (render.yaml): a notice on every page, closed
+    # to search engines, and, with a password, only for whoever has it.
+    test_site: bool = False
+    test_site_password: str = Field(default="", repr=False)
     admin_token: str = Field(default="", repr=False)
     user_agent: str = "Cardmatica/0.2 (catalog maintenance)"
     ygoprodeck_enabled: bool = True
@@ -96,6 +100,16 @@ class Settings(BaseSettings):
     # Address used in links inside emails, e.g. "https://cardmatica.com".
     # Empty: the address of the request that triggered the email.
     public_base_url: str = ""
+
+    @field_validator("database_url")
+    @classmethod
+    def use_psycopg(cls, url: str) -> str:
+        """Hosted databases (Neon, Render) hand out postgres:// or postgresql://
+        addresses; the driver installed here is psycopg 3, so it is named."""
+        for prefix in ("postgres://", "postgresql://"):
+            if url.startswith(prefix):
+                return "postgresql+psycopg://" + url.removeprefix(prefix)
+        return url
 
     @property
     def local_image_preview(self) -> bool:

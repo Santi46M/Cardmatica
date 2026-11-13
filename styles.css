@@ -301,7 +301,8 @@ select option {
     filter: brightness(1.2);
 }
 
-.btn.s {
+.btn.s,
+.ghost.s {
     padding: 4px 10px;
     font-size: 14px;
 }
@@ -312,6 +313,17 @@ select option {
     border-radius: 8px;
     padding: 5px 11px;
     cursor: pointer;
+}
+
+/* Versión de prueba (TEST_SITE, app/api/pages.py): una franja arriba de todo. */
+.test-site-note {
+    margin: 0;
+    padding: 6px 16px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--warn);
+    background: rgba(var(--tint), .06);
+    border-bottom: 1px solid var(--bd);
 }
 
 /* Las pestañas de la cabecera */
@@ -2496,8 +2508,9 @@ button.acc-avatar:hover,
 }
 
 /* Panel de administración */
-#admv .pnl + .pnl,
-#admv .admin-stats + .pnl {
+/* Entre secciones del panel, no entre las fichas de números. */
+#admv > .pnl + .pnl,
+#admv > .admin-stats + .pnl {
     margin-top: 12px;
 }
 
@@ -2513,14 +2526,59 @@ button.acc-avatar:hover,
     font-weight: 600;
 }
 
-#admin-search {
-    width: 100%;
+/* Buscar y filtrar cuentas: en una fila, y la búsqueda toma lo que sobra. */
+.admin-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
     margin: 10px 0;
+}
+
+#admin-search {
+    flex: 1 1 220px;
 }
 
 #admin-users td small {
     display: block;
     color: var(--mu);
+}
+
+.admin-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* En el teléfono, cada cuenta es una ficha: nombre arriba, los datos de a dos
+   y las acciones abajo, sin tabla que se salga de la pantalla. */
+@media (max-width: 640px) {
+    #admin-users thead {
+        display: none;
+    }
+
+    #admin-users table,
+    #admin-users tbody {
+        display: block;
+    }
+
+    #admin-users tr {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 12px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--bd);
+    }
+
+    #admin-users td {
+        padding: 0;
+        border: 0;
+    }
+
+    #admin-users td:first-child,
+    #admin-users td:last-child,
+    #admin-users td.empty {
+        grid-column: 1 / -1;
+    }
 }
 
 .auth-notice {

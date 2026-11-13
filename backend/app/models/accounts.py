@@ -20,7 +20,9 @@ from app.db.base import Base, Entity
 
 __all__ = [
     "ROLES",
+    "STAFF",
     "AccountToken",
+    "StaffAction",
     "CardView",
     "User",
     "UserProfile",
@@ -29,8 +31,12 @@ __all__ = [
     "WantlistItem",
 ]
 
-# Who can do what. "admin" replaces the shared ADMIN_TOKEN once an admin panel exists.
+# Who can do what (app/api/admin.py). A moderator looks after accounts and the
+# home page's news; an administrator, besides, gives roles, deletes accounts
+# and runs the catalogue. Selling is not a role: it is the account type each
+# person picks in their profile (UserProfile.account_role).
 ROLES = ("user", "moderator", "admin")
+STAFF = ("moderator", "admin")
 
 
 class User(Entity, Base):
@@ -48,6 +54,8 @@ class User(Entity, Base):
     # Failed logins in a row; the account locks for a while after too many.
     failed_logins: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Blocked by the staff: no sign-in and no session until unblocked.
+    blocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sessions: Mapped[list["UserSession"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
@@ -145,3 +153,18 @@ class CardView(Entity, Base):
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     card_id: Mapped[UUID] = mapped_column(ForeignKey("cards.id", ondelete="CASCADE"))
     viewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class StaffAction(Entity, Base):
+    """What a moderator or administrator did to an account or the site, and when.
+
+    The names are copied, so the record still reads after the account is gone.
+    """
+
+    __tablename__ = "staff_actions"
+    actor_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    actor: Mapped[str] = mapped_column(String(254))
+    action: Mapped[str] = mapped_column(String(40))
+    target_id: Mapped[UUID | None] = mapped_column(index=True)
+    target: Mapped[str | None] = mapped_column(String(254))
+    detail: Mapped[str | None] = mapped_column(String(300))

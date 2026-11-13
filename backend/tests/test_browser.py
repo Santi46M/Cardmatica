@@ -1120,3 +1120,48 @@ def test_secret_skins(live_server, browser_page):
     page.reload()
     assert page.evaluate("document.documentElement.dataset.skin") is None
     assert page.evaluate("localStorage.getItem('cm_skin')") is None
+
+
+def test_moderator_and_admin_panels(live_server, browser_page, factory):
+    from app.services import test_accounts
+
+    with factory.begin() as session:
+        people = {
+            row["role"] + row["type"]: row for row in test_accounts.create(session, "example.com")
+        }
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+
+    def sign_in_as(row):
+        page.context.clear_cookies()
+        page.goto(f"{live_server}/yugioh?tab=Acceso")
+        page.locator("#auth-login input[type=email]").fill(row["email"])
+        page.locator("#auth-login input[type=password]").fill(row["password"])
+        page.locator("#auth-login button[type=submit]").click()
+        expect(page.locator("#ts")).to_contain_text("Hola,")
+        page.locator("#account-button").click()
+        page.locator('#account-menu [data-go="Admin"]').click()
+
+    # A moderator: the accounts and the news, without the record nor roles.
+    sign_in_as(people["moderatorbuyer"])
+    users = page.locator("#admin-users")
+    expect(users).to_contain_text("Tienda de prueba")
+    expect(page.locator("#admin-record")).to_have_count(0)
+    expect(users.locator("select[data-admin-role]")).to_have_count(0)
+    page.locator('[data-admin-filter="kind"]').select_option("seller")
+    expect(users.locator("tbody tr")).to_have_count(1)
+    users.locator("[data-admin-block]").click()
+    expect(users).to_contain_text("Bloqueada")
+    # The administrator sees it in the record, and deletes with a second tap.
+    sign_in_as(people["adminbuyer"])
+    expect(page.locator("#admin-record")).to_contain_text("Bloqueó la cuenta")
+    buyer = page.locator("#admin-users tbody tr", has_text=people["userbuyer"]["email"])
+    delete = buyer.locator("[data-admin-delete]")
+    delete.click()
+    expect(delete).to_have_text("¿Seguro? Toca otra vez")
+    delete.click()
+    expect(page.locator("#admin-users")).not_to_contain_text(people["userbuyer"]["email"])
+    expect(page.locator("#admin-record")).to_contain_text("Borró la cuenta")
+    expect(page.locator("#admin-record")).not_to_contain_text(people["userbuyer"]["email"])
+    assert not errors
