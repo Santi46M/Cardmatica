@@ -1,8 +1,15 @@
-// Administration panel, only for accounts with the admin role.
-// Reads /api/v1/admin (backend/app/api/admin.py) with the admin's session.
+// Administration panel, for the staff: moderators and administrators.
+// Reads /api/v1/admin (backend/app/api/admin.py) with the person's session.
+//
+// A moderator sees the overview, the accounts and the home page's news; blocks
+// and unblocks accounts and confirms emails, except those of the staff. An
+// administrator, besides, gives roles, signs accounts out, deletes them, sees
+// the catalogue's syncs and the record of what the staff did. The server
+// checks all of this again: the panel only leaves out what would be refused.
 import { escapeHtml, html } from "./html.js";
 import { lang, locale, t } from "./lang.js";
 import { request } from "./session-api.js";
+import { currentUser } from "./auth.js";
 
 const h = escapeHtml;
 const ADMIN = "/api/v1/admin";
@@ -15,48 +22,133 @@ const JOB_STATUS = {
     completed_with_errors: "Completado con errores",
     failed: "Fallido"
 };
+const ACCOUNT_TYPES = { buyer: "Comprador", seller: "Vendedor", both: "Comprador y vendedor" };
+const ACTIONS = {
+    role: "Cambió el rol",
+    block: "Bloqueó la cuenta",
+    unblock: "Desbloqueó la cuenta",
+    verify_email: "Confirmó el correo",
+    sign_out: "Cerró sus sesiones",
+    delete: "Borró la cuenta",
+    news_add: "Publicó una noticia",
+    news_delete: "Quitó una noticia"
+};
+const STAFF_ROLES = ["moderator", "admin"];
 const OVERVIEW = [
     ["cards", "Cartas"],
     ["printings", "Impresiones"],
     ["users", "Cuentas"],
+    ["sellers", "Vendedores"],
+    ["blocked", "Bloqueadas"],
     ["active_sessions", "Sesiones abiertas"],
     ["wantlists", "Listas de deseados"],
     ["sales", "Ventas registradas"],
     ["pending_jobs", "Sincronizaciones en cola"]
 ];
 
-let search = "";
+// The accounts' search and filters, kept while the panel is open.
+const filters = { q: "", role: "", kind: "", blocked: "" };
+
+const isAdmin = () => currentUser()?.role === "admin";
 
 const when = (value) => (value ? new Date(value).toLocaleString(locale) : "—");
 
 const selectedIf = (yes) => (yes ? " selected" : "");
 
-function userRow(user) {
-    const status = user.locked ? `<span class="warn-text">${t("Bloqueada")}</span>` : t("Activa");
-    const roles = Object.entries(ROLE_LABELS)
-        .map(([value, label]) => `<option value="${value}"${selectedIf(value === user.role)}>${t(label)}</option>`)
+const options = (labels, current) =>
+    Object.entries(labels)
+        .map(([value, label]) => `<option value="${value}"${selectedIf(value === current)}>${t(label)}</option>`)
         .join("");
-    const roleLabel = h(t("Rol de {name}", { name: user.display_name }));
+
+function statusHtml(user) {
+    const parts = [];
+    if (user.blocked) parts.push(`<span class="warn-text">${t("Bloqueada")}</span>`);
+    else if (user.locked) parts.push(`<span class="warn-text">${t("Bloqueo temporal")}</span>`);
+    else parts.push(t("Activa"));
+    if (!user.email_verified) parts.push(`<small>${t("correo sin confirmar")}</small>`);
+    return parts.join(" ");
+}
+
+// What this person may do to that account, as buttons; the server checks again.
+function actionsHtml(user) {
+    const me = currentUser();
+    if (user.id === me?.id) return `<small>${t("Tu cuenta")}</small>`;
+    if (!isAdmin() && STAFF_ROLES.includes(user.role)) return `<small>${t("Del equipo")}</small>`;
+    const id = h(user.id);
+    const buttons = [
+        user.blocked
+            ? `<button class="ghost s" data-admin-block="${id}" data-blocked="false">${t("Desbloquear")}</button>`
+            : `<button class="ghost s" data-admin-block="${id}" data-blocked="true">${t("Bloquear")}</button>`
+    ];
+    if (!user.email_verified) buttons.push(`<button class="ghost s" data-admin-verify="${id}">${t("Confirmar correo")}</button>`);
+    if (isAdmin()) {
+        if (user.sessions) buttons.push(`<button class="ghost s" data-admin-sign-out="${id}">${t("Cerrar sesiones")}</button>`);
+        buttons.push(`<button class="ghost s danger" data-admin-delete="${id}">${t("Borrar")}</button>`);
+    }
+    return `<div class="admin-actions">${buttons.join("")}</div>`;
+}
+
+function userRow(user) {
+    const store = user.store_name ? ` · ${h(user.store_name)}` : "";
+    const role = isAdmin()
+        ? html`<select data-admin-role="${h(user.id)}" aria-label="${h(t("Rol de {name}", { name: user.display_name }))}">${options(ROLE_LABELS, user.role)}</select>`
+        : h(t(ROLE_LABELS[user.role] || user.role));
     return html`
         <tr>
             <td><b>${h(user.display_name)}</b><small>${h(user.email)}</small></td>
+            <td>${h(t(ACCOUNT_TYPES[user.account_type] || ""))}${store}</td>
             <td>${h(new Date(user.created_at).toLocaleDateString(locale))}</td>
-            <td>${status}</td>
-            <td><select data-admin-role="${h(user.id)}" aria-label="${roleLabel}">${roles}</select></td>
+            <td>${statusHtml(user)}</td>
+            <td>${role}</td>
+            <td>${actionsHtml(user)}</td>
         </tr>`;
 }
 
 function usersHtml(data) {
-    const rows = data.items.map(userRow).join("") || `<tr><td colspan="4" class="empty">${t("Ninguna cuenta coincide.")}</td></tr>`;
+    const rows = data.items.map(userRow).join("") || `<tr><td colspan="6" class="empty">${t("Ninguna cuenta coincide.")}</td></tr>`;
     const count = t(data.total === 1 ? "{count} cuenta" : "{count} cuentas", { count: data.total });
     return html`
         <table>
             <thead>
-                <tr><th>${t("Cuenta")}</th><th>${t("Alta")}</th><th>${t("Estado")}</th><th>${t("Rol")}</th></tr>
+                <tr><th>${t("Cuenta")}</th><th>${t("Tipo")}</th><th>${t("Alta")}</th><th>${t("Estado")}</th><th>${t("Rol")}</th><th>${t("Acciones")}</th></tr>
             </thead>
             <tbody>${rows}</tbody>
         </table>
         <small class="catalog-status">${count}</small>`;
+}
+
+function filtersHtml() {
+    const any = (label) => `<option value="">${t(label)}</option>`;
+    return html`
+        <div class="admin-filters">
+            <input id="admin-search" type="search" placeholder="${t("Buscar por correo, nombre o tienda")}" aria-label="${t("Buscar cuentas")}" value="${h(filters.q)}">
+            <select data-admin-filter="role" aria-label="${t("Rol")}">${any("Todos los roles")}${options(ROLE_LABELS, filters.role)}</select>
+            <select data-admin-filter="kind" aria-label="${t("Tipo")}">${any("Compradores y vendedores")}${options({ buyer: "Compradores", seller: "Vendedores" }, filters.kind)}</select>
+            <select data-admin-filter="blocked" aria-label="${t("Estado")}">${any("Cualquier estado")}${options({ false: "Activas", true: "Bloqueadas" }, filters.blocked)}</select>
+        </div>`;
+}
+
+function recordHtml(rows) {
+    if (!rows.length) return `<p class="catalog-status">${t("Todavía no hay acciones registradas.")}</p>`;
+    const items = rows
+        .map(
+            (row) => html`
+                <tr>
+                    <td>${h(when(row.at))}</td>
+                    <td>${h(row.actor)}</td>
+                    <td>${h(t(ACTIONS[row.action] || row.action))}</td>
+                    <td>${h(row.target || "—")}</td>
+                    <td>${h(row.detail || "")}</td>
+                </tr>`
+        )
+        .join("");
+    return html`
+        <table>
+            <thead>
+                <tr><th>${t("Fecha")}</th><th>${t("Quién")}</th><th>${t("Acción")}</th><th>${t("Cuenta")}</th><th>${t("Detalle")}</th></tr>
+            </thead>
+            <tbody>${items}</tbody>
+        </table>`;
 }
 
 function jobsHtml(jobs) {
@@ -157,38 +249,52 @@ function newsForm() {
         </form>`;
 }
 
-async function loadNews() {
-    const slot = document.getElementById("admin-news");
+async function loadInto(id, path, draw) {
+    const slot = document.getElementById(id);
     if (!slot) return;
     try {
-        slot.innerHTML = newsListHtml(await request(`${ADMIN}/news`));
+        slot.innerHTML = draw(await request(path));
     } catch (error) {
         slot.innerHTML = `<p class="warn">${h(error.message)}</p>`;
     }
 }
 
-async function loadUsers() {
-    const slot = document.getElementById("admin-users");
-    if (!slot) return;
-    try {
-        slot.innerHTML = usersHtml(await request(`${ADMIN}/users?q=${encodeURIComponent(search)}`));
-    } catch (error) {
-        slot.innerHTML = `<p class="warn">${h(error.message)}</p>`;
-    }
+function loadUsers() {
+    const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== ""));
+    return loadInto("admin-users", `${ADMIN}/users?${query}`, usersHtml);
 }
+
+const loadNews = () => loadInto("admin-news", `${ADMIN}/news`, newsListHtml);
+
+const loadRecord = () => loadInto("admin-record", `${ADMIN}/actions?limit=50`, recordHtml);
 
 export async function renderAdmin(container) {
     container.innerHTML = `<h3>${t("Administración")}</h3><p class="catalog-status">${t("Cargando…")}</p>`;
+    const admin = isAdmin();
     try {
         const [overview, jobs] = await Promise.all([
             request(`${ADMIN}/overview`),
-            request(`${ADMIN}/sync-jobs?limit=10`)
+            admin ? request(`${ADMIN}/sync-jobs?limit=10`) : null
         ]);
         const stats = OVERVIEW.map(
             ([key, label]) => `<div class="gl pnl"><small>${t(label)}</small><b>${overview[key]}</b></div>`
         ).join("");
+        const role = t(ROLE_LABELS[currentUser()?.role] || "");
+        const adminOnly = admin
+            ? html`
+                <section class="gl pnl">
+                    <b>${t("Registro de acciones del equipo")}</b>
+                    <div class="wrap" id="admin-record"></div>
+                    <small>${t("Quién hizo qué y cuándo: se guarda aunque la cuenta ya no exista.")}</small>
+                </section>
+                <section class="gl pnl">
+                    <b>${t("Últimas sincronizaciones")}</b>
+                    <div class="wrap">${jobsHtml(jobs)}</div>
+                    <small>${t("Se encolan con <code>cardmatica sync</code> y las procesa el worker.")}</small>
+                </section>`
+            : "";
         container.innerHTML = html`
-            <h3>${t("Administración")}</h3>
+            <h3>${t("Administración")} <small class="catalog-status">${h(role)}</small></h3>
             <div class="admin-stats">${stats}</div>
             <section class="gl pnl">
                 <b>${t("Lo más visto · últimos 7 días")}</b>
@@ -197,14 +303,11 @@ export async function renderAdmin(container) {
             </section>
             <section class="gl pnl">
                 <b>${t("Cuentas")}</b>
-                <input id="admin-search" type="search" placeholder="${t("Buscar por correo o nombre")}" aria-label="${t("Buscar cuentas")}" value="${h(search)}">
+                ${filtersHtml()}
                 <div class="wrap" id="admin-users"></div>
+                <small>${t(admin ? "Bloquear cierra todas las sesiones de la cuenta. Cada acción queda en el registro." : "Puedes bloquear cuentas y confirmar correos, salvo los del equipo. Cada acción queda en el registro.")}</small>
             </section>
-            <section class="gl pnl">
-                <b>${t("Últimas sincronizaciones")}</b>
-                <div class="wrap">${jobsHtml(jobs)}</div>
-                <small>${t("Se encolan con <code>cardmatica sync</code> y las procesa el worker.")}</small>
-            </section>
+            ${adminOnly}
             <section class="gl pnl">
                 <b>${t("Noticias del inicio")}</b>
                 ${newsForm()}
@@ -213,32 +316,56 @@ export async function renderAdmin(container) {
             </section>`;
         loadUsers();
         loadNews();
+        if (admin) loadRecord();
     } catch (error) {
         container.innerHTML = `<h3>${t("Administración")}</h3><p class="warn">${h(error.message)}</p>`;
     }
+}
+
+// An action on an account, then the table (and the record) again.
+async function act(path, options, done) {
+    try {
+        await request(`${ADMIN}${path}`, options);
+        window.toast?.(t(done));
+    } catch (error) {
+        window.toast?.(error.message);
+    }
+    loadUsers();
+    if (isAdmin()) loadRecord();
+}
+
+// Deleting asks for a second click on the same button within a few seconds.
+const CONFIRM_MS = 4000;
+
+function confirmed(button) {
+    if (button.dataset.armed) return true;
+    button.dataset.armed = "1";
+    const label = button.textContent;
+    button.textContent = t("¿Seguro? Toca otra vez");
+    setTimeout(() => {
+        delete button.dataset.armed;
+        button.textContent = label;
+    }, CONFIRM_MS);
+    return false;
 }
 
 export function installAdmin() {
     let timer;
     document.addEventListener("input", (event) => {
         if (event.target.id !== "admin-search") return;
-        search = event.target.value.trim();
+        filters.q = event.target.value.trim();
         clearTimeout(timer);
         timer = setTimeout(loadUsers, 250);
     });
     document.addEventListener("change", async (event) => {
+        const filter = event.target.dataset.adminFilter;
+        if (filter) {
+            filters[filter] = event.target.value;
+            return loadUsers();
+        }
         const id = event.target.dataset.adminRole;
         if (!id) return;
-        try {
-            await request(`${ADMIN}/users/${id}/role`, {
-                method: "POST",
-                body: { role: event.target.value }
-            });
-            window.toast?.(t("Rol actualizado"));
-        } catch (error) {
-            window.toast?.(error.message);
-            loadUsers();
-        }
+        act(`/users/${id}/role`, { method: "POST", body: { role: event.target.value } }, "Rol actualizado");
     });
     document.addEventListener("submit", async (event) => {
         if (event.target.id !== "admin-news-form") return;
@@ -257,13 +384,25 @@ export function installAdmin() {
         }
     });
     document.addEventListener("click", async (event) => {
-        const button = event.target.closest("[data-admin-news-delete]");
+        const button = event.target.closest("[data-admin-block], [data-admin-verify], [data-admin-sign-out], [data-admin-delete], [data-admin-news-delete]");
         if (!button) return;
-        try {
-            await request(`${ADMIN}/news/${button.dataset.adminNewsDelete}`, { method: "DELETE" });
-            loadNews();
-        } catch (error) {
-            window.toast?.(error.message);
+        const { adminBlock, adminVerify, adminSignOut, adminDelete, adminNewsDelete } = button.dataset;
+        if (adminBlock) {
+            const blocked = button.dataset.blocked === "true";
+            act(`/users/${adminBlock}/block`, { method: "POST", body: { blocked } }, blocked ? "Cuenta bloqueada" : "Cuenta desbloqueada");
+        } else if (adminVerify) {
+            act(`/users/${adminVerify}/verify-email`, { method: "POST" }, "Correo confirmado");
+        } else if (adminSignOut) {
+            act(`/users/${adminSignOut}/sign-out`, { method: "POST" }, "Sesiones cerradas");
+        } else if (adminDelete) {
+            if (confirmed(button)) act(`/users/${adminDelete}`, { method: "DELETE" }, "Cuenta borrada");
+        } else if (adminNewsDelete) {
+            try {
+                await request(`${ADMIN}/news/${adminNewsDelete}`, { method: "DELETE" });
+                loadNews();
+            } catch (error) {
+                window.toast?.(error.message);
+            }
         }
     });
 }

@@ -16,6 +16,7 @@ from app.models import Card, CardArtwork, CardImage, SyncError, SyncJob, User
 from app.models.accounts import ROLES
 from app.schemas.catalog import JobRequest
 from app.schemas.ingestion import CardRecord
+from app.services import test_accounts
 from app.services.accounts import normalize_email, remove_expired
 from app.services.banlists import bundled_files, import_banlist, load_file
 from app.services.ingestion import IngestionService
@@ -307,6 +308,16 @@ def build_parser() -> argparse.ArgumentParser:
     role.add_argument("email")
     role.add_argument("role", choices=list(ROLES))
 
+    testers = commands.add_parser(
+        "test-accounts",
+        help="Crear o renovar las cuentas de prueba (admin, moderador, vendedor, comprador)",
+    )
+    testers.add_argument(
+        "--domain",
+        default="example.com",
+        help="Dominio de sus correos (example.com no recibe correo)",
+    )
+
     approval = commands.add_parser(
         "image-rights", help="Registrar la revisión de derechos de una imagen"
     )
@@ -360,6 +371,18 @@ def run_set_role(args, parser):
             parser.error("No existe una cuenta con ese correo")
         user.role = args.role
     print(json.dumps({"email": email, "role": args.role}))
+    return 0
+
+
+def run_test_accounts(args, parser):
+    """One account of each kind, each with a new password shown only here."""
+    with session_factory().begin() as session:
+        created = test_accounts.create(session, args.domain)
+    if not get_settings().test_site:
+        print("Aviso: TEST_SITE no está activado en este entorno.", file=sys.stderr)
+    for row in created:
+        print(f"{row['role']:<10} {row['type']:<7} {row['email']:<34} {row['password']}")
+    print("Guardar estas contraseñas ahora: no se vuelven a mostrar.", file=sys.stderr)
     return 0
 
 
@@ -442,6 +465,7 @@ COMMANDS = {
     "product-images": run_product_images,
     "cleanup": run_cleanup,
     "set-role": run_set_role,
+    "test-accounts": run_test_accounts,
     "image-rights": run_image_rights,
 }
 

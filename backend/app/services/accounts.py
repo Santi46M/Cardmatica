@@ -27,6 +27,7 @@ TOKEN_BYTES = 32
 # Same answer for "no such account" and "wrong password", so the login form
 # cannot be used to find out who has an account.
 WRONG_LOGIN = "Correo o contraseña incorrectos."
+BLOCKED = "Esta cuenta está bloqueada. Escríbenos si crees que es un error."
 # Spent on unknown emails too, so both answers take as long.
 _DUMMY_HASH = hash_password(secrets.token_urlsafe(16))
 
@@ -77,6 +78,12 @@ def authenticate(session: Session, email: str, password: str) -> User:
         verify_password(password, _DUMMY_HASH)
         raise AccountError(WRONG_LOGIN)
     now = utcnow()
+    if user.blocked_at:
+        # Checked after the password, so the message says nothing to whoever
+        # does not know it.
+        if verify_password(password, user.password_hash):
+            raise AccountError(BLOCKED)
+        raise AccountError(WRONG_LOGIN)
     locked = as_aware(user.locked_until)
     if locked and locked > now:
         minutes = max(1, round((locked - now).total_seconds() / 60))
@@ -132,7 +139,7 @@ def session_user(session: Session, token: str | None) -> tuple[User, UserSession
     if not token:
         return None
     row = session.scalar(select(UserSession).where(UserSession.token_hash == token_hash(token)))
-    if not row or as_aware(row.expires_at) <= utcnow():
+    if not row or as_aware(row.expires_at) <= utcnow() or row.user.blocked_at:
         return None
     return row.user, row
 
