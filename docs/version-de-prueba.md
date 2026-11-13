@@ -22,7 +22,7 @@ Dos caminos, los dos gratis:
 | `DATABASE_URL` | La cadena de Supabase, tal cual. |
 | `TEST_SITE` | `true` |
 | `TEST_SITE_USER` y `TEST_SITE_PASSWORD` | Usuario y contraseña que el navegador pide para entrar. |
-| `TEST_ACCOUNTS` | Las cuentas de prueba, en una lista: `[{"email": "...", "password": "...", "name": "...", "role": "admin"}, ...]` (`role`: `admin`, `moderator` o `user`). |
+| `TEST_ACCOUNTS` | Las cuentas de prueba, en una lista: `[{"email": "...", "password": "...", "name": "...", "role": "admin"}, ...]` (`role`: `admin`, `moderator` o `user`; opcionales `type`: `buyer`, `seller` o `both`, y `store`, el nombre de la tienda). |
 | `CACHE_DIRECTORY` y `IMAGE_DIRECTORY` | `/tmp/cache` y `/tmp/images` (lo único escribible en Vercel). |
 
 Cambiar una contraseña en Vercel y volver a desplegar la cambia en la cuenta, y cierra

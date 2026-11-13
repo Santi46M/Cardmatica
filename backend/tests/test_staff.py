@@ -185,7 +185,13 @@ def test_the_test_sites_accounts_come_from_its_settings(client, factory, setting
             "name": "Jefa",
             "role": "admin",
         },
-        {"email": "socio@example.org", "password": "clave del socio 2026", "name": "Socio"},
+        {
+            "email": "socio@example.org",
+            "password": "clave del socio 2026",
+            "name": "Socio",
+            "type": "seller",
+            "store": "El Socio",
+        },
     ]
     monkeypatch.setattr(settings, "test_accounts", listed)
     with factory.begin() as session:
@@ -195,6 +201,8 @@ def test_the_test_sites_accounts_come_from_its_settings(client, factory, setting
     people = ids(client)
     assert people["socio@example.org"]["role"] == "user"
     assert people["socio@example.org"]["display_name"] == "Socio"
+    assert people["socio@example.org"]["account_type"] == "seller"
+    assert people["socio@example.org"]["store_name"] == "El Socio"
     # Built again with a new password: the old one stops working.
     listed[1] = {**listed[1], "password": "otra clave del socio"}
     with factory.begin() as session:
