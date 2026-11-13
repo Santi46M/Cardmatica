@@ -16,6 +16,7 @@ from app.core.caching import CacheControlMiddleware
 from app.core.config import ROOT, get_settings
 from app.core.logging import configure_logging
 from app.core.security import SecurityHeadersMiddleware
+from app.core.test_site import TestSiteMiddleware
 
 configure_logging()
 app = FastAPI(title="Cardmática — Catálogo", version="1.0.0")
@@ -32,8 +33,11 @@ app.add_middleware(CacheControlMiddleware)
 app.add_middleware(SecurityHeadersMiddleware, hsts=get_settings().deployment_mode == "production")
 # Added last so it runs first: requests for an unknown host are refused early.
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=get_settings().allowed_hosts)
+# Outermost: on a test site the password comes before anything else.
+app.add_middleware(TestSiteMiddleware)
 app.include_router(catalog.router)
 app.include_router(admin.router)
+app.include_router(admin.staff_router)
 app.include_router(auth.router)
 app.include_router(account.router)
 app.include_router(analytics.router)

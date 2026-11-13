@@ -6,12 +6,19 @@ person's lists in one transaction, and reading fills in the card names, codes
 and rarities from the catalogue, so they never go stale.
 """
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.base import utcnow
 from app.models import Card, CardPrinting, CardSet, Rarity
-from app.models.accounts import User, UserProfile, UserSession, Wantlist, WantlistItem
+from app.models.accounts import (
+    StaffAction,
+    User,
+    UserProfile,
+    UserSession,
+    Wantlist,
+    WantlistItem,
+)
 from app.schemas.accounts import (
     AccountData,
     Preferences,
@@ -216,5 +223,10 @@ def export(session: Session, user: User) -> dict:
 
 def delete_account(session: Session, user: User) -> None:
     """Removes the account and everything tied to it: profile, preferences,
-    wantlists, sessions and email links (ON DELETE CASCADE in the database)."""
+    wantlists, sessions and email links (ON DELETE CASCADE in the database).
+
+    The staff's record keeps what was done, but no longer whose email it was."""
+    gone = f"Cuenta borrada ({str(user.id)[:8]})"
+    session.execute(update(StaffAction).where(StaffAction.target_id == user.id).values(target=gone))
+    session.execute(update(StaffAction).where(StaffAction.actor_id == user.id).values(actor=gone))
     session.execute(delete(User).where(User.id == user.id))

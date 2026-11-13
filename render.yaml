@@ -1,0 +1,39 @@
+# The test site on Render's free plan, with its database on Neon.
+# Step by step in docs/version-de-prueba.md.
+#
+# Free means it sleeps after 15 minutes without visits and takes about a
+# minute to wake up. Card and product images stay off, as on any public
+# deployment: DEPLOYMENT_MODE is production.
+services:
+  - type: web
+    name: cardmatica-prueba
+    runtime: docker
+    plan: free
+    # Next to the database: on Neon, pick AWS US East (N. Virginia).
+    region: virginia
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health/live
+    autoDeploy: true
+    envVars:
+      # Neon's connection string, as Neon gives it (postgresql://…?sslmode=require).
+      - key: DATABASE_URL
+        sync: false
+      # Optional: with a value, the site asks for it before showing anything.
+      - key: TEST_SITE_PASSWORD
+        sync: false
+      - key: TEST_SITE
+        value: "true"
+      - key: DEPLOYMENT_MODE
+        value: production
+      - key: ALLOW_LOCAL_IMAGE_PREVIEW
+        value: "false"
+      # Render's proxy is the only way in, so its forwarded addresses are trusted.
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"
+      # Emails are written to Render's log (Logs tab) instead of being sent.
+      - key: EMAIL_BACKEND
+        value: console
+      - key: CACHE_DIRECTORY
+        value: /data/cache
+      - key: IMAGE_DIRECTORY
+        value: /data/images

@@ -348,6 +348,8 @@ def test_every_css_class_is_used():
         *ROOT.glob("frontend/**/*.js"),
         *ROOT.glob("frontend/pages/*.html"),
         ROOT / "index.html",
+        # Markup the server adds to pages (the test site's notice).
+        *ROOT.glob("backend/app/api/*.py"),
     ]
     text = "".join(path.read_text(encoding="utf-8") for path in sources)
     # Built at run time from a status: `bn-${tone}` (frontend/js/banlist.js).

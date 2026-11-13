@@ -1,0 +1,15 @@
+# Only what the image needs (Dockerfile): never local data, secrets or images.
+.git
+.github
+.devcontainer
+.env
+.env.*
+.cache
+data
+docs
+**/__pycache__
+**/*.egg-info
+**/.pytest_cache
+**/.ruff_cache
+backend/tests
+node_modules

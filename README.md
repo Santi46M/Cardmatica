@@ -167,6 +167,13 @@ python -m alembic -c backend/alembic.ini upgrade head
 python -m uvicorn app.main:app --reload
 ```
 
+## Versión de prueba en internet
+
+Gratis, en Render (la web) y Neon (la base de datos), con cuentas de prueba de cada tipo
+(administrador, moderador, vendedor y comprador): paso a paso en
+[version-de-prueba.md](docs/version-de-prueba.md). La configuración está en `render.yaml`
+y la imagen, que incluye la API y las páginas, en el `Dockerfile` de la raíz.
+
 ## Ejecución íntegra con Docker
 
 Tras crear `.env`:
@@ -478,10 +485,19 @@ propio sitio), `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` y,
 en producción bajo HTTPS, HSTS (`backend/app/core/security.py`). En producción,
 definir `ALLOWED_HOSTS` con el dominio real.
 
-Administración (`/api/v1/admin`): acepta la sesión de una cuenta con rol `admin`
-(con CSRF, como el resto de cambios) o el token para scripts. El panel está en el
-menú de cuenta de los administradores: resumen, cuentas con su rol y últimas
-sincronizaciones. El primer administrador se nombra desde la terminal:
+Administración (`/api/v1/admin`): acepta la sesión de una cuenta del equipo (con CSRF,
+como el resto de cambios) o el token para scripts. El panel está en el menú de cuenta:
+
+- **Moderador** (`moderator`): resumen, cuentas (buscar por correo, nombre o tienda y
+  filtrar por rol, tipo y estado), bloquear y desbloquear, confirmar correos y las
+  noticias del inicio. No actúa sobre cuentas del equipo.
+- **Administrador** (`admin`): todo lo anterior, más roles, cerrar sesiones, borrar
+  cuentas, el registro de acciones del equipo y las sincronizaciones.
+
+Nadie actúa sobre su propia cuenta, y cada acción queda registrada con quién la hizo
+(`staff_actions`). Bloquear cierra todas las sesiones de la cuenta e impide entrar hasta
+desbloquearla. Vender no es un rol: es el tipo de cuenta que cada persona elige en su
+perfil. El primer administrador se nombra desde la terminal:
 
 ```bash
 docker compose exec api cardmatica set-role tu@correo.com admin

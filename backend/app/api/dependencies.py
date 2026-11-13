@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.session import get_session
+from app.models.accounts import STAFF
 from app.services import accounts
 
 # Cookies of a signed-in browser (see app/api/auth.py).
@@ -73,36 +74,51 @@ Current = Annotated[tuple, Depends(current)]
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
-def require_admin(
-    request: Request,
-    session: SessionDep,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
-    token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
-    csrf_header: Annotated[str | None, Header(alias=CSRF_HEADER)] = None,
-    csrf_cookie: Annotated[str | None, Cookie(alias=CSRF_COOKIE)] = None,
-):
-    """Administration: an admin account's session, or the ADMIN_TOKEN for scripts."""
-    if credentials:
-        admin_token = get_settings().admin_token
-        if len(admin_token) < 32:
+def _staff_member(roles: tuple[str, ...], refused: str):
+    """A staff account's session with one of these roles, or the ADMIN_TOKEN
+    for scripts (worth an administrator; the dependency then gives None)."""
+
+    def dependency(
+        request: Request,
+        session: SessionDep,
+        credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+        token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
+        csrf_header: Annotated[str | None, Header(alias=CSRF_HEADER)] = None,
+        csrf_cookie: Annotated[str | None, Cookie(alias=CSRF_COOKIE)] = None,
+    ):
+        if credentials:
+            admin_token = get_settings().admin_token
+            if len(admin_token) < 32:
+                raise HTTPException(
+                    503,
+                    "Administración deshabilitada: configurar ADMIN_TOKEN de al menos 32 caracteres",
+                )
+            if not secrets.compare_digest(credentials.credentials, admin_token):
+                raise HTTPException(
+                    401,
+                    "Credencial administrativa inválida",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            return None
+        found = accounts.session_user(session, token)
+        if not found:
             raise HTTPException(
-                503,
-                "Administración deshabilitada: configurar ADMIN_TOKEN de al menos 32 caracteres",
+                401,
+                "Inicia sesión con una cuenta del equipo",
+                headers={"WWW-Authenticate": "Bearer"},
             )
-        if not secrets.compare_digest(credentials.credentials, admin_token):
-            raise HTTPException(
-                401, "Credencial administrativa inválida", headers={"WWW-Authenticate": "Bearer"}
-            )
-        return None
-    found = accounts.session_user(session, token)
-    if not found:
-        raise HTTPException(
-            401, "Inicia sesión como administrador", headers={"WWW-Authenticate": "Bearer"}
-        )
-    user = found[0]
-    if user.role != "admin":
-        raise HTTPException(403, "Tu cuenta no tiene permisos de administración")
-    if request.method not in SAFE_METHODS:
-        same_origin(request)
-        csrf(csrf_header, csrf_cookie)
-    return user
+        user = found[0]
+        if user.role not in roles:
+            raise HTTPException(403, refused)
+        if request.method not in SAFE_METHODS:
+            same_origin(request)
+            csrf(csrf_header, csrf_cookie)
+        return user
+
+    return dependency
+
+
+# Administration: roles, deleting accounts, the catalogue (app/api/admin.py).
+require_admin = _staff_member(("admin",), "Solo un administrador puede hacer esto")
+# What moderators may do too: look after accounts and the home page's news.
+require_staff = _staff_member(STAFF, "Tu cuenta no tiene permisos de administración")

@@ -104,6 +104,20 @@ def _meta(page: str, attribute: str, name: str, value: str) -> str:
     return pattern.sub(f'<meta {attribute}="{name}" content="{value}">', page, count=1)
 
 
+def _test_site_notice(page: str, request: Request) -> str:
+    """On the test site (app/core/test_site.py) every page says so, at the top."""
+    note = tr(
+        request,
+        "Versión de prueba: los vendedores, precios y valoraciones son de demostración y las cuentas pueden borrarse.",
+    )
+    page = page.replace(
+        "<body>", f'<body>\n<p class="test-site-note" role="note">{html.escape(note)}</p>', 1
+    )
+    return page.replace(
+        "</title>", '</title>\n    <meta name="robots" content="noindex, nofollow">', 1
+    )
+
+
 def render(
     file,
     request: Request,
@@ -154,6 +168,8 @@ def render(
         page,
         count=1,
     )
+    if get_settings().test_site:
+        page = _test_site_notice(page, request)
     page, import_map = assets.version_page(page)
     response = HTMLResponse(page, status_code=status_code)
     # The same address answers in each visitor's language.
@@ -310,6 +326,8 @@ def archetype_page(
 
 @router.get("/robots.txt")
 def robots(request: Request):
+    if get_settings().test_site:
+        return PlainTextResponse("User-agent: *\nDisallow: /\n")
     return PlainTextResponse(
         f"User-agent: *\nDisallow: /api/\nSitemap: {site_url(request)}/sitemap.xml\n"
     )
