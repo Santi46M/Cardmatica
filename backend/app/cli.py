@@ -464,11 +464,11 @@ def print_job(job: SyncJob) -> int:
 
 def run_prepare_test_site(args, parser):
     """What the test site needs before it opens, run each time it is built
-    (vercel.json, after the migrations and the banlists): its two accounts,
-    and, while the catalogue is empty, a first set of cards."""
+    (vercel.json, after the migrations and the banlists): its accounts, and,
+    while the catalogue is empty, a first set of cards."""
     settings = get_settings()
     with session_factory().begin() as session:
-        for email in test_accounts.ensure_site_pair(session, settings):
+        for email in test_accounts.ensure_site_accounts(session, settings):
             print(json.dumps({"account": email}))
         empty = session.scalar(select(Card.id).limit(1)) is None
     if not empty or not args.max_cards:

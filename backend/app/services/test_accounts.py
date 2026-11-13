@@ -2,8 +2,7 @@
 
 `cardmatica test-accounts` makes one of each kind with new random passwords,
 shown once by the command. `cardmatica prepare-test-site` makes the test site's
-two accounts, an administrator and a plain one, with the passwords kept in the
-host's private settings. No password is stored in the code.
+accounts listed in the host's private settings (TEST_ACCOUNTS). No password is stored in the code.
 """
 
 import secrets
@@ -14,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.db.base import utcnow
 from app.models import User, UserProfile
+from app.models.accounts import ROLES
 from app.services.accounts import end_all_sessions, normalize_email, register
 from app.services.passwords import hash_password, verify_password
 
@@ -78,19 +78,15 @@ def create(session: Session, domain: str) -> list[dict]:
     return created
 
 
-# The test site's pair (TEST_ADMIN_* and TEST_USER_*, app/core/config.py).
-SITE_PAIR = (
-    ("admin", TestAccount("admin", "Admin de prueba", "admin", "buyer")),
-    ("user", TestAccount("usuario", "Usuario de prueba", "user", "buyer")),
-)
-
-
-def ensure_site_pair(session: Session, settings) -> list[str]:
-    """The administrator and the plain account of the test site, from its settings."""
+def ensure_site_accounts(session: Session, settings) -> list[str]:
+    """The test site's accounts, from its private settings (TEST_ACCOUNTS)."""
     made = []
-    for key, account in SITE_PAIR:
-        email = getattr(settings, f"test_{key}_email")
-        password = getattr(settings, f"test_{key}_password")
-        if email and password:
-            made.append(ensure(session, account, email, password).email)
+    for entry in settings.test_accounts:
+        role = entry.get("role", "user")
+        if role not in ROLES:
+            raise ValueError(f"Rol desconocido en TEST_ACCOUNTS: {role}")
+        account = TestAccount(
+            entry["email"].split("@")[0], entry.get("name") or entry["email"], role, "buyer"
+        )
+        made.append(ensure(session, account, entry["email"], entry["password"]).email)
     return made
