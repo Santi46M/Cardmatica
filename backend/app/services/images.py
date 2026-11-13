@@ -3,9 +3,11 @@ import io
 
 from PIL import Image
 from sqlalchemy import select
+from sqlalchemy.orm import object_session
 
 from app.integrations.http import AccessDenied
 from app.models import Card, CardArtwork, CardImage, CardPrinting
+from app.services import image_store
 
 
 class ImageService:
@@ -25,16 +27,14 @@ class ImageService:
         return True
 
     def _stored(self, image) -> bool:
-        """Whether both files of the image are already inside the image folder."""
-        root = self.settings.image_directory.resolve()
-        names = (image.local_path, image.thumbnail_path)
-        return all(names) and all(
-            (root / name).resolve().is_relative_to(root) and (root / name).is_file()
-            for name in names
+        """Whether both files of the image are already kept (app/services/image_store.py)."""
+        session = object_session(image)
+        return all(
+            image_store.exists(session, self.settings, name)
+            for name in (image.local_path, image.thumbnail_path)
         )
 
     def _save(self, image, content):
-        root = self.settings.image_directory.resolve()
         checksum = hashlib.sha256(content).hexdigest()
         with Image.open(io.BytesIO(content)) as raster:
             if (
@@ -44,13 +44,17 @@ class ImageService:
                 raise ValueError("Formato o tamaño de imagen no permitido")
             raster.load()
             raster = raster.convert("RGB")
-            root.mkdir(parents=True, exist_ok=True)
-            image.local_path = f"{checksum}.png"
-            image.thumbnail_path = f"{checksum}-thumb.png"
-            raster.thumbnail((480, 700))
-            raster.save(root / image.local_path, "PNG")
-            raster.thumbnail((120, 180))
-            raster.save(root / image.thumbnail_path, "PNG")
+        # WebP: a fraction of a PNG's weight, so the catalogue loads faster.
+        files = {}
+        for suffix, size in (("", (480, 700)), ("-thumb", (120, 180))):
+            raster.thumbnail(size)
+            output = io.BytesIO()
+            raster.save(output, "WEBP", quality=82)
+            files[f"{checksum}{suffix}.webp"] = output.getvalue()
+        session = object_session(image)
+        for name, data in files.items():
+            image_store.save(session, self.settings, name, data)
+        image.local_path, image.thumbnail_path = files
         image.sha256 = checksum
 
     async def download(self, image: CardImage):
