@@ -177,19 +177,27 @@ def test_test_accounts_one_of_each_kind_with_fresh_passwords(client, factory):
     assert people[seller]["email_verified"] is True
 
 
-def test_the_test_sites_pair_comes_from_its_settings(client, factory, settings, monkeypatch):
-    monkeypatch.setattr(settings, "test_admin_email", "jefa@example.org")
-    monkeypatch.setattr(settings, "test_admin_password", "clave de la jefa 2026")
-    monkeypatch.setattr(settings, "test_user_email", "socio@example.org")
-    monkeypatch.setattr(settings, "test_user_password", "clave del socio 2026")
+def test_the_test_sites_accounts_come_from_its_settings(client, factory, settings, monkeypatch):
+    listed = [
+        {
+            "email": "jefa@example.org",
+            "password": "clave de la jefa 2026",
+            "name": "Jefa",
+            "role": "admin",
+        },
+        {"email": "socio@example.org", "password": "clave del socio 2026", "name": "Socio"},
+    ]
+    monkeypatch.setattr(settings, "test_accounts", listed)
     with factory.begin() as session:
-        made = test_accounts.ensure_site_pair(session, settings)
+        made = test_accounts.ensure_site_accounts(session, settings)
     assert made == ["jefa@example.org", "socio@example.org"]
     assert sign_in(client, "jefa@example.org", "clave de la jefa 2026").status_code == 200
-    assert ids(client)["socio@example.org"]["role"] == "user"
+    people = ids(client)
+    assert people["socio@example.org"]["role"] == "user"
+    assert people["socio@example.org"]["display_name"] == "Socio"
     # Built again with a new password: the old one stops working.
-    monkeypatch.setattr(settings, "test_user_password", "otra clave del socio")
+    listed[1] = {**listed[1], "password": "otra clave del socio"}
     with factory.begin() as session:
-        test_accounts.ensure_site_pair(session, settings)
+        test_accounts.ensure_site_accounts(session, settings)
     assert sign_in(client, "socio@example.org", "clave del socio 2026").status_code == 401
     assert sign_in(client, "socio@example.org", "otra clave del socio").status_code == 200

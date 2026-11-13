@@ -4,7 +4,7 @@ Dos caminos, los dos gratis:
 
 - **Vercel + Supabase** (`vercel.json`): sin Codespace. Vercel construye y publica la
   web; Supabase guarda la base de datos. Al construir, `scripts/vercel-build.sh`
-  actualiza la base, carga las banlists, crea las dos cuentas de prueba y, mientras el
+  actualiza la base, carga las banlists, crea las cuentas de prueba y, mientras el
   catálogo esté vacío, trae las primeras 1000 cartas.
 - **Render + Neon** (`render.yaml` y el `Dockerfile`): más abajo, paso a paso, cargando
   el catálogo desde el Codespace.
@@ -22,8 +22,7 @@ Dos caminos, los dos gratis:
 | `DATABASE_URL` | La cadena de Supabase, tal cual. |
 | `TEST_SITE` | `true` |
 | `TEST_SITE_USER` y `TEST_SITE_PASSWORD` | Usuario y contraseña que el navegador pide para entrar. |
-| `TEST_ADMIN_EMAIL` y `TEST_ADMIN_PASSWORD` | La cuenta de administrador. |
-| `TEST_USER_EMAIL` y `TEST_USER_PASSWORD` | La cuenta común. |
+| `TEST_ACCOUNTS` | Las cuentas de prueba, en una lista: `[{"email": "...", "password": "...", "name": "...", "role": "admin"}, ...]` (`role`: `admin`, `moderator` o `user`). |
 | `CACHE_DIRECTORY` y `IMAGE_DIRECTORY` | `/tmp/cache` y `/tmp/images` (lo único escribible en Vercel). |
 
 Cambiar una contraseña en Vercel y volver a desplegar la cambia en la cuenta, y cierra

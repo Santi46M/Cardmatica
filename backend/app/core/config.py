@@ -19,13 +19,11 @@ class Settings(BaseSettings):
     test_site: bool = False
     test_site_user: str = ""
     test_site_password: str = Field(default="", repr=False)
-    # The two accounts of the test site, made or updated by `cardmatica
-    # prepare-test-site` when it is built (vercel.json): an administrator and a
-    # plain account. Empty, none is made.
-    test_admin_email: str = ""
-    test_admin_password: str = Field(default="", repr=False)
-    test_user_email: str = ""
-    test_user_password: str = Field(default="", repr=False)
+    # The test site's accounts, made or updated by `cardmatica prepare-test-site`
+    # when it is built (vercel.json), as a JSON list in one private variable:
+    # [{"email": "...", "password": "...", "name": "...", "role": "admin"}, ...]
+    # role is "admin", "moderator" or "user". Empty, none is made.
+    test_accounts: list[dict] = Field(default=[], repr=False)
     # Each request may run on a new instance (Vercel sets VERCEL=1): no pool of
     # open connections, the database's pooler keeps them (app/db/session.py).
     serverless: bool = Field(default=False, validation_alias=AliasChoices("SERVERLESS", "VERCEL"))
