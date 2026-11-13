@@ -2,6 +2,7 @@
 
 import io
 from datetime import date, timedelta
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -334,34 +335,32 @@ def test_preview_images_downloads_only_missing_artwork(factory, settings, payloa
         IngestionService(session).ingest(parse_card(payload))
     calls = []
 
-    class Runner:
-        def __init__(self):
-            self.factory = factory
+    async def download(service, artwork):
+        calls.append((service.client.http, artwork.source_slug))
+        return True
 
-        def enqueue(self, request):
-            calls.append(request)
-            with factory.begin() as session:
-                job = SyncJob(source=request.source, mode=request.mode, status="completed")
-                session.add(job)
-                session.flush()
-                return job.id
-
-        def run(self, job_id):
-            async def done():
-                return None
-
-            return done()
-
+    monkeypatch.setattr(ImageService, "download_artwork", download)
+    sources = {"ygoprodeck": SimpleNamespace(http="ygoprodeck")}
     with pytest.raises(ValueError):
-        preview_images(10, Runner())
+        preview_images(10, factory=factory, clients=sources)
     monkeypatch.setattr(settings, "deployment_mode", "local")
     monkeypatch.setattr(settings, "allow_local_image_preview", True)
-    assert preview_images(10, Runner()) == 0
-    assert [(call.mode, call.identifier) for call in calls] == [("images", "12345678")]
+    assert preview_images(10, factory=factory, clients=sources) == 0
+    assert calls == [("ygoprodeck", "ygoprodeck")]
     with factory.begin() as session:
-        session.scalar(select(CardArtwork)).local_path = "synthetic.png"
+        session.scalar(select(CardArtwork)).local_path = "synthetic.webp"
     calls.clear()
-    assert preview_images(10, Runner()) == 0 and calls == []
+    assert preview_images(10, factory=factory, clients=sources) == 0 and calls == []
+
+
+def test_the_test_site_behind_its_password_shows_pictures(settings, monkeypatch):
+    monkeypatch.setattr(settings, "allow_local_image_preview", True)
+    monkeypatch.setattr(settings, "test_site", True)
+    assert not settings.local_image_preview
+    monkeypatch.setattr(settings, "test_site_password", "secreta")
+    assert settings.local_image_preview
+    monkeypatch.setattr(settings, "allow_local_image_preview", False)
+    assert not settings.local_image_preview
 
 
 def test_card_texts_brings_only_the_missing_language(factory, settings, payload, monkeypatch):

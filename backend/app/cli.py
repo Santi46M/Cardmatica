@@ -2,8 +2,10 @@ import argparse
 import asyncio
 import json
 import sys
+import time
 from datetime import date, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import UUID
 
 from sqlalchemy import select
@@ -12,6 +14,7 @@ from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.db.session import session_factory
 from app.ingestion.sync import SyncRunner, worker
+from app.integrations.http import AccessDenied, PoliteHttpClient
 from app.models import Card, CardArtwork, CardImage, SyncError, SyncJob, User
 from app.models.accounts import ROLES
 from app.schemas.catalog import JobRequest
@@ -19,6 +22,7 @@ from app.schemas.ingestion import CardRecord
 from app.services import test_accounts
 from app.services.accounts import normalize_email, remove_expired
 from app.services.banlists import bundled_files, import_banlist, load_file
+from app.services.images import ImageService
 from app.services.ingestion import IngestionService
 
 
@@ -112,67 +116,77 @@ async def refresh_news(*, forever=False):
         await asyncio.sleep(settings.news_refresh_hours * 3600)
 
 
-def preview_images(max_cards: int, runner=None):
-    """Download the general artwork of every catalogue card for the local preview.
-
-    Only for private development environments: the artwork stays unverified and
-    is never served in production (see docs/source-policies.md).
+def preview_images(max_cards: int, *, minutes: float | None = None, factory=None, clients=None):
+    """Download one picture for each catalogue card still without one, of
+    every game, for a private preview: a local machine or the test site behind
+    its password. The pictures stay unverified and are never shown anywhere
+    else (docs/source-policies.md). With minutes, it stops when that time is up;
+    the next run picks up where this one left.
     """
-    from sqlalchemy import exists
-    from sqlalchemy.orm import aliased
-
     settings = get_settings()
     if not settings.local_image_preview:
         raise ValueError(
-            "Activar DEPLOYMENT_MODE=local y ALLOW_LOCAL_IMAGE_PREVIEW=true antes de descargar"
+            "Activar ALLOW_LOCAL_IMAGE_PREVIEW=true con DEPLOYMENT_MODE=local "
+            "(o en la versión de prueba con contraseña) antes de descargar"
         )
-    runner = runner or SyncRunner()
-    downloaded = exists().where(CardArtwork.card_id == Card.id, CardArtwork.local_path.is_not(None))
-    with runner.factory() as session:
-        # Yu-Gi-Oh!: by YGOPRODeck's id. Magic and Pokémon: by the printing
-        # their artwork comes from ("en:me03-001" for TCGdex, with its language).
-        identifiers = [
-            ("ygoprodeck", str(value), "en")
-            for value in session.scalars(
-                select(Card.ygoprodeck_id)
-                .where(Card.ygoprodeck_id.is_not(None), ~downloaded)
-                .order_by(Card.display_name)
-                .limit(max_cards)
-            )
-        ]
-        stored = aliased(CardArtwork)
-        has_picture = (
-            exists()
-            .where(stored.card_id == Card.id, stored.local_path.is_not(None))
-            .correlate(Card)
-        )
-        pending = session.execute(
-            select(Card.id, CardArtwork.source_slug, CardArtwork.external_id)
-            .join(Card, Card.id == CardArtwork.card_id)
-            .where(CardArtwork.source_slug.in_(["scryfall", "tcgdex"]), ~has_picture)
+    deadline = time.monotonic() + minutes * 60 if minutes else None
+    summary = asyncio.run(
+        download_artworks(factory or session_factory(), settings, max_cards, deadline, clients)
+    )
+    print(json.dumps(summary))
+    return 1 if summary["failed"] else 0
+
+
+async def download_artworks(factory, settings, max_cards, deadline=None, clients=None):
+    """The downloads of preview_images: one picture per card, one client per source."""
+    from sqlalchemy import exists
+    from sqlalchemy.orm import aliased
+
+    stored = aliased(CardArtwork)
+    has_picture = exists().where(
+        stored.card_id == CardArtwork.card_id, stored.local_path.is_not(None)
+    )
+    with factory() as session:
+        rows = session.execute(
+            select(CardArtwork.id, CardArtwork.card_id, CardArtwork.source_slug)
+            .join(Card)
+            .where(CardArtwork.rights_status != "denied", ~has_picture)
             .order_by(Card.display_name, CardArtwork.external_id)
         )
         # One picture per card is enough for the preview.
-        cards = set()
-        for card_id, source, external in pending:
-            if len(identifiers) >= max_cards:
+        chosen, cards = [], set()
+        for artwork_id, card_id, source in rows:
+            if len(chosen) >= max_cards:
                 break
-            if card_id in cards:
-                continue
-            cards.add(card_id)
-            language, _, identifier = external.rpartition(":")
-            identifiers.append((source, identifier, language or "en"))
-    failed = 0
-    for source, identifier, language in identifiers:
-        job_id = runner.enqueue(
-            JobRequest(source=source, mode="images", identifier=identifier, language=language)
-        )
-        asyncio.run(runner.run(job_id))
-        with runner.factory() as session:
-            if session.get(SyncJob, job_id).status in {"failed", "completed_with_errors"}:
+            if card_id not in cards:
+                cards.add(card_id)
+                chosen.append((artwork_id, source))
+    clients = dict(clients or {})
+    opened = []
+    downloaded = failed = 0
+    try:
+        for artwork_id, source in chosen:
+            if deadline and time.monotonic() > deadline:
+                break
+            if source not in clients:
+                http = PoliteHttpClient(source, settings)
+                http.check_policy()
+                opened.append(http)
+                clients[source] = SimpleNamespace(http=http)
+            try:
+                with factory.begin() as session:
+                    artwork = session.get(CardArtwork, artwork_id)
+                    await ImageService(settings, clients[source]).download_artwork(artwork)
+                downloaded += 1
+            except AccessDenied:
+                raise
+            except Exception as exc:
                 failed += 1
-    print(json.dumps({"cards": len(identifiers), "failed": failed}))
-    return 1 if failed else 0
+                print(json.dumps({"artwork": str(artwork_id), "error": str(exc)[:200]}))
+    finally:
+        for http in opened:
+            await http.close()
+    return {"cards": len(chosen), "downloaded": downloaded, "failed": failed}
 
 
 # Where the card text of each language comes from: YGOPRODeck translates into
@@ -310,9 +324,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     prepare = commands.add_parser(
         "prepare-test-site",
-        help="Cuentas de la versión de prueba y, con el catálogo vacío, sus primeras cartas",
+        help="Cuentas de la versión de prueba, primeras cartas de cada juego e ilustraciones",
     )
     prepare.add_argument("--max-cards", type=int, default=1000)
+    prepare.add_argument(
+        "--image-minutes",
+        type=float,
+        default=0,
+        help="Minutos como máximo para bajar ilustraciones (solo con la vista previa activada)",
+    )
 
     testers = commands.add_parser(
         "test-accounts",
@@ -462,23 +482,35 @@ def print_job(job: SyncJob) -> int:
     return 1 if job.status in {"failed", "completed_with_errors"} else 0
 
 
+# Where each game's cards come from (docs/source-policies.md).
+GAME_SOURCES = {"yugioh": "ygoprodeck", "magic": "scryfall", "pokemon": "tcgdex"}
+
+
 def run_prepare_test_site(args, parser):
     """What the test site needs before it opens, run each time it is built
-    (vercel.json, after the migrations and the banlists): its accounts, and,
-    while the catalogue is empty, a first set of cards."""
+    (vercel.json, after the migrations and the banlists): its accounts, a first
+    set of cards of each game whose catalogue is still empty, and, when the
+    preview is on, the pictures still missing, for at most --image-minutes."""
     settings = get_settings()
     with session_factory().begin() as session:
         for email in test_accounts.ensure_site_accounts(session, settings):
             print(json.dumps({"account": email}))
-        empty = session.scalar(select(Card.id).limit(1)) is None
-    if not empty or not args.max_cards:
-        return 0
-    runner = SyncRunner()
-    request = JobRequest(
-        source="ygoprodeck", mode="initial", max_cards=args.max_cards, max_printings=2
-    )
-    # A first catalogue that stops at the limit is a success ("paused").
-    print_job(run_job(runner, runner.enqueue(request)))
+        empty = [
+            game
+            for game in GAME_SOURCES
+            if session.scalar(select(Card.id).where(Card.game == game).limit(1)) is None
+        ]
+    if args.max_cards:
+        runner = SyncRunner()
+        for game in empty:
+            request = JobRequest(
+                source=GAME_SOURCES[game], mode="initial", max_cards=args.max_cards, max_printings=2
+            )
+            # A first catalogue that stops at the limit is a success ("paused").
+            print(json.dumps({"game": game}))
+            print_job(run_job(runner, runner.enqueue(request)))
+    if settings.local_image_preview and args.image_minutes:
+        preview_images(5000, minutes=args.image_minutes)
     return 0
 
 

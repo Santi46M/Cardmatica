@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy import func, select
 
 from app.api.dependencies import SessionDep
@@ -36,7 +36,7 @@ from app.schemas.catalog import (
     PrintingView,
     SetView,
 )
-from app.services import card_views, rarities, recommendations
+from app.services import card_views, image_store, rarities, recommendations
 from app.services import product_images as product_photos
 from app.services.banlists import current_lists, list_view, statuses_for_cards
 from app.services.card_types import ATTRIBUTES, RACES, taxonomy
@@ -562,52 +562,59 @@ def facets(session: SessionDep, market: Market | None = None, game: Game | None 
     }
 
 
+def stored_picture(session, name: str | None, headers: dict, missing: str) -> Response:
+    """One kept picture file (app/services/image_store.py), or a 404."""
+    content = image_store.read(session, get_settings(), name)
+    if content is None:
+        raise HTTPException(404, missing)
+    return Response(content, media_type=image_store.media_type(name), headers=headers)
+
+
 @router.get("/images/{image_id}", tags=["Imágenes"])
 def image(image_id: UUID, session: SessionDep, thumbnail: bool = False):
     row = session.get(CardImage, image_id)
     if not row or not displayable(row):
         raise HTTPException(404, "Imagen no disponible con permiso verificado")
-    relative = row.thumbnail_path if thumbnail else row.local_path
-    root = get_settings().image_directory.resolve()
-    path = (root / relative).resolve() if relative else None
-    if not path or not path.is_relative_to(root) or not path.is_file():
-        raise HTTPException(404, "Imagen pendiente de descarga autorizada")
-    return FileResponse(
-        path, media_type="image/png", headers={"Cache-Control": "private, no-cache"}
+    return stored_picture(
+        session,
+        row.thumbnail_path if thumbnail else row.local_path,
+        {"Cache-Control": "private, no-cache"},
+        "Imagen pendiente de descarga autorizada",
     )
 
 
 def local_preview(request: Request) -> bool:
     """Whether provisional, unlicensed pictures may be shown for this request."""
     settings = get_settings()
+    if not settings.local_image_preview:
+        return False
+    # The test site's password already keeps everyone else out.
+    if settings.private_test_site:
+        return True
     # Codespaces forwards the private port under its own domain.
     forwarded = request.headers.get("x-forwarded-host", "").split(",")[0].strip()
     host = forwarded.rsplit(":", 1)[0] if forwarded else request.url.hostname
-    return settings.local_image_preview and settings.is_preview_host(host)
+    return settings.is_preview_host(host)
 
 
 @router.get("/artworks/{image_id}", tags=["Imágenes"])
 def artwork(image_id: UUID, request: Request, session: SessionDep, thumbnail: bool = False):
     row = session.get(CardArtwork, image_id)
-    settings = get_settings()
     commercial = row and row.rights_status == "approved" and bool(row.authorization_reference)
     if not row or row.rights_status == "denied" or not (commercial or local_preview(request)):
         raise HTTPException(404, "Ilustración no disponible para este uso")
-    relative = row.thumbnail_path if thumbnail else row.local_path
-    root = settings.image_directory.resolve()
-    path = (root / relative).resolve() if relative else None
-    if not path or not path.is_relative_to(root) or not path.is_file():
-        raise HTTPException(404, "Ilustración pendiente de descarga")
-    return FileResponse(
-        path,
-        media_type="image/png",
-        headers={
-            "Cache-Control": "private, no-cache",
+    return stored_picture(
+        session,
+        row.thumbnail_path if thumbnail else row.local_path,
+        {
+            # Named by their content, so a browser may keep them a day.
+            "Cache-Control": "private, max-age=86400",
             "X-Image-Association": "card-artwork",
             "X-Image-Usage": "commercial-permission-verified"
             if commercial
             else "local-preview-only",
         },
+        "Ilustración pendiente de descarga",
     )
 
 

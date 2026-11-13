@@ -4,8 +4,9 @@ Dos caminos, los dos gratis:
 
 - **Vercel + Supabase** (`vercel.json`): sin Codespace. Vercel construye y publica la
   web; Supabase guarda la base de datos. Al construir, `scripts/vercel-build.sh`
-  actualiza la base, carga las banlists, crea las cuentas de prueba y, mientras el
-  catálogo esté vacío, trae las primeras 1000 cartas.
+  actualiza la base, carga las banlists, crea las cuentas de prueba, trae las primeras
+  500 cartas de cada juego (Yu-Gi-Oh!, Magic y Pokémon) cuyo catálogo esté vacío y, por
+  hasta 15 minutos, las ilustraciones que falten: cada despliegue suma más.
 - **Render + Neon** (`render.yaml` y el `Dockerfile`): más abajo, paso a paso, cargando
   el catálogo desde el Codespace.
 
@@ -23,7 +24,10 @@ Dos caminos, los dos gratis:
 | `TEST_SITE` | `true` |
 | `TEST_SITE_USER` y `TEST_SITE_PASSWORD` | Usuario y contraseña que el navegador pide para entrar. |
 | `TEST_ACCOUNTS` | Las cuentas de prueba, en una lista: `[{"email": "...", "password": "...", "name": "...", "role": "admin"}, ...]` (`role`: `admin`, `moderator` o `user`; opcionales `type`: `buyer`, `seller` o `both`, y `store`, el nombre de la tienda). |
-| `CACHE_DIRECTORY` y `IMAGE_DIRECTORY` | `/tmp/cache` y `/tmp/images` (lo único escribible en Vercel). |
+| `CACHE_DIRECTORY` | `/tmp/cache` (lo único escribible en Vercel). |
+| `IMAGE_STORAGE` | `database`: las ilustraciones se guardan en Supabase (Vercel no conserva archivos). |
+| `ALLOW_LOCAL_IMAGE_PREVIEW` | `true`, para ver ilustraciones (solo con `TEST_SITE_PASSWORD`, ver abajo). |
+| `YGOPRODECK_REQUEST_INTERVAL` | `0.25`: cuatro pedidos por segundo, bajo el límite de 20 que publica YGOPRODeck. |
 
 Cambiar una contraseña en Vercel y volver a desplegar la cambia en la cuenta, y cierra
 sus sesiones. Vercel avisa `VERCEL=1`, así que la web no guarda conexiones abiertas: las
@@ -33,9 +37,12 @@ Lo que vale para los dos caminos:
 
 - **Se duerme.** Sin visitas se apaga; la siguiente tarda unos segundos (Vercel) o
   alrededor de un minuto (Render) en abrir. Después anda normal.
-- **Sin imágenes de cartas ni de productos.** Como todo despliegue público
-  (`DEPLOYMENT_MODE=production`): las ilustraciones y fotos provisionales sin licencia
-  solo se ven en la vista local privada.
+- **Ilustraciones solo detrás de la contraseña.** Las ilustraciones sin licencia
+  comercial se ven, marcadas como provisionales, únicamente en la vista local privada o
+  en la versión de prueba con `TEST_SITE_PASSWORD` y `ALLOW_LOCAL_IMAGE_PREVIEW=true`.
+  Un sitio público (`DEPLOYMENT_MODE=production` sin contraseña) no las muestra nunca.
+  Render guarda las imágenes en archivos que se borran al dormirse: allí conviene
+  `IMAGE_STORAGE=database` también.
 - **Cada página dice que es una versión de prueba** y los buscadores no la indexan.
   Con `TEST_SITE_PASSWORD`, además, el navegador pide una contraseña antes de mostrar nada.
 - **Los correos no salen**: se escriben en el registro del servicio (Logs), con su enlace. Un administrador puede marcar un correo como confirmado desde el panel.

@@ -1,6 +1,7 @@
 import os
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -80,6 +81,9 @@ class Settings(BaseSettings):
     news_refresh_hours: float = Field(default=3, ge=0.5, le=48)
     news_request_interval: float = Field(default=5, ge=1)
     image_directory: Path = ROOT / "data/images"
+    # "database" keeps the card pictures in stored_images instead of the
+    # folder above: for hosts whose disk does not last, like Vercel.
+    image_storage: Literal["files", "database"] = "files"
     cors_origins: list[str] = ["http://localhost:8000", "http://localhost:5500"]
     # Host names the site answers to. "*" accepts any; set the real domain in
     # production, e.g. ["cardmatica.com", "www.cardmatica.com"].
@@ -122,8 +126,16 @@ class Settings(BaseSettings):
         return url
 
     @property
+    def private_test_site(self) -> bool:
+        """The test site behind its password (app/core/test_site.py)."""
+        return self.test_site and bool(self.test_site_password)
+
+    @property
     def local_image_preview(self) -> bool:
-        return self.deployment_mode == "local" and self.allow_local_image_preview
+        """Provisional, unlicensed pictures, only where nobody else can see them:
+        a local machine, or the test site behind its password."""
+        private = self.deployment_mode == "local" or self.private_test_site
+        return private and self.allow_local_image_preview
 
     def is_preview_host(self, hostname: str | None) -> bool:
         if not hostname:

@@ -417,3 +417,26 @@ def test_latest_set_set_and_archetype_pages(factory, client, record):
     assert (
         f"/set/{latest['id']}</loc>" in sitemap and f"/arquetipo/{archetype['id']}</loc>" in sitemap
     )
+
+
+def test_vercel_installs_the_locked_versions():
+    """requirements.txt (Vercel) lists what the site runs on, at the lock's versions."""
+    from app.core.config import ROOT
+
+    def pins(path):
+        lines = (ROOT / path).read_text(encoding="utf-8").splitlines()
+        return {line.split("==")[0].lower(): line for line in lines if "==" in line}
+
+    deployed, locked = pins("requirements.txt"), pins("backend/requirements.lock")
+    assert deployed.items() <= locked.items()
+    # Everything the backend declares is there.
+    for name in [
+        "fastapi",
+        "sqlalchemy",
+        "alembic",
+        "psycopg",
+        "psycopg-binary",
+        "pydantic-settings",
+    ]:
+        assert name in deployed
+    assert "pytest" not in deployed and "playwright" not in deployed
