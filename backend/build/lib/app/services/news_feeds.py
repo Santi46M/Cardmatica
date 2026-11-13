@@ -1,0 +1,296 @@
+"""News of the home page brought up to date from their sources.
+
+    Yu-Gi-Oh!    the RSS or Atom feeds in NEWS_FEEDS, each in its language:
+                 Konami Europa and Latinoamérica in Spanish, Konami América
+                 Latina and Yu-Gi-Oh! Nexus in Portuguese, Konami,
+                 YGOrganization and YGOPRODeck in English. Title, link, date and
+                 a short excerpt as the source wrote them, with the source's
+                 name; nothing is translated. The article stays on its site.
+    Cardmática   the merged pull requests of the site's public repository
+                 (GitHub API), without maintenance ones; written in Spanish.
+
+`cardmatica news-worker` refreshes them every NEWS_REFRESH_HOURS; the API
+never goes out to the internet while answering a visitor. A source that fails
+keeps its previous news; the administrators' ones are never replaced.
+"""
+
+import hashlib
+import html
+import json
+import logging
+import re
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from email.utils import parsedate_to_datetime
+from urllib.parse import urlsplit
+from xml.etree import ElementTree
+
+from sqlalchemy import delete, select
+
+from app.core.languages import LANGUAGES
+from app.models import NewsItem
+
+logger = logging.getLogger(__name__)
+
+# Fetched news older than this are dropped; there are always newer ones.
+KEEP_DAYS = 180
+SUMMARY_CHARS = 220
+URL_CHARS = 500  # NewsItem.url
+ATOM = "{http://www.w3.org/2005/Atom}"
+
+
+@dataclass
+class Entry:
+    title: str
+    url: str
+    published: date
+    summary: str
+
+
+def plain(text: str | None, limit: int = SUMMARY_CHARS) -> str:
+    """Text without HTML or Markdown marks, cut at a word."""
+    text = re.sub(r"<[^>]+>", " ", text or "")
+    text = re.sub(r"!?\[([^\]]*)\]\([^)]*\)", r"\1", text)  # [text](link)
+    text = re.sub(r"[*_`#>]+", "", html.unescape(text))
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    # One character is kept for the ellipsis, so the text fits its column.
+    return text[: limit - 1].rsplit(" ", 1)[0].rstrip(",.;:") + "…"
+
+
+def _date(value: str | None) -> date | None:
+    if not value:
+        return None
+    value = value.strip()
+    try:
+        return parsedate_to_datetime(value).date()  # RSS: "Sat, 24 Oct 2026 10:00:00 +0000"
+    except (TypeError, ValueError):
+        pass
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).date()  # Atom
+    except ValueError:
+        return None
+
+
+# A bare "&", an HTML-only entity such as &nbsp; and control characters are the
+# usual slips of hand-made feeds; XML parsers refuse the whole feed for any of them.
+_BARE_AMPERSAND = re.compile(rb"&(?!#\d+;|#x[0-9a-fA-F]+;|[A-Za-z][A-Za-z0-9]*;)")
+_HTML_ENTITY = re.compile(rb"&([A-Za-z][A-Za-z0-9]*);")
+_CONTROL = re.compile(rb"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+_XML_ENTITIES = {b"amp", b"lt", b"gt", b"quot", b"apos"}
+
+
+def repaired(content: bytes) -> bytes:
+    """The feed with those slips fixed, for a second try."""
+
+    def entity(match):
+        name = match.group(1)
+        if name in _XML_ENTITIES:
+            return match.group(0)
+        character = html.unescape(f"&{name.decode()};")
+        return f"&#{ord(character)};".encode() if len(character) == 1 else b"&amp;" + name + b";"
+
+    content = _CONTROL.sub(b"", content)
+    content = _BARE_AMPERSAND.sub(b"&amp;", content)
+    return _HTML_ENTITY.sub(entity, content)
+
+
+def parse_feed(content: bytes) -> list[Entry]:
+    """Items of an RSS 2.0 or Atom feed with an https link and a date."""
+    # A feed has no reason to declare entities; refusing them avoids expansion attacks.
+    if b"<!DOCTYPE" in content[:4096].upper():
+        raise ValueError("Feed con DOCTYPE: no se procesa")
+    try:
+        root = ElementTree.fromstring(content)
+    except ElementTree.ParseError:
+        try:
+            root = ElementTree.fromstring(repaired(content))
+        except ElementTree.ParseError:
+            # Only a feed is read item by item; a web page stays an error.
+            if not re.search(rb"<(rss|feed)\b", content[:4096]):
+                raise
+            return _valid(_loose_entries(content))
+    entries = []
+    for item in root.iter("item"):
+        entries.append(
+            (
+                item.findtext("title"),
+                item.findtext("link"),
+                item.findtext("pubDate"),
+                item.findtext("description"),
+            )
+        )
+    for item in root.iter(f"{ATOM}entry"):
+        links = item.findall(f"{ATOM}link")
+        link = next(
+            (node.get("href") for node in links if node.get("rel", "alternate") == "alternate"),
+            None,
+        )
+        entries.append(
+            (
+                item.findtext(f"{ATOM}title"),
+                link,
+                item.findtext(f"{ATOM}published") or item.findtext(f"{ATOM}updated"),
+                item.findtext(f"{ATOM}summary") or item.findtext(f"{ATOM}content"),
+            )
+        )
+    return _valid(entries)
+
+
+def _loose_entries(content: bytes) -> list[tuple]:
+    """Items read one by one, for a feed whose XML is broken somewhere.
+
+    A single bad character (a stray "<" in one article, invalid bytes) makes an
+    XML parser drop the whole feed; reading each item on its own keeps the rest.
+    """
+    text = content.decode("utf-8", errors="replace")
+
+    def field(block, name):
+        match = re.search(rf"<{name}\b[^>]*>(.*?)</{name}>", block, re.S)
+        if not match:
+            return None
+        value = match.group(1).strip()
+        cdata = re.fullmatch(r"<!\[CDATA\[(.*)\]\]>", value, re.S)
+        return cdata.group(1) if cdata else html.unescape(value)
+
+    entries = []
+    for block in re.findall(r"<item\b[^>]*>(.*?)</item>", text, re.S):
+        entries.append(
+            (
+                field(block, "title"),
+                field(block, "link"),
+                field(block, "pubDate"),
+                field(block, "description"),
+            )
+        )
+    for block in re.findall(r"<entry\b[^>]*>(.*?)</entry>", text, re.S):
+        link = next(
+            (
+                html.unescape(href.group(1))
+                for tag in re.findall(r"<link\b[^>]*>", block)
+                if not re.search(r'rel="(?!alternate")', tag)
+                and (href := re.search(r'href="([^"]+)"', tag))
+            ),
+            None,
+        )
+        entries.append(
+            (
+                field(block, "title"),
+                link,
+                field(block, "published") or field(block, "updated"),
+                field(block, "summary") or field(block, "content"),
+            )
+        )
+    return entries
+
+
+def _valid(entries) -> list[Entry]:
+    """Entries with a title, a date and an https link, as shown on the home page."""
+    found = []
+    for title, link, published, summary in entries:
+        link, when = (link or "").strip(), _date(published)
+        if not title or not when or urlsplit(link).scheme != "https" or len(link) > URL_CHARS:
+            continue
+        found.append(Entry(plain(title, 140), link, when, plain(summary)))
+    return found
+
+
+def parse_pulls(data: list[dict], skip_prefixes: list[str]) -> list[Entry]:
+    """Merged pull requests that are site news, newest first."""
+    found = []
+    for pull in data:
+        title = re.sub(r"\s*\(#\d+\)$", "", pull.get("title") or "").strip()
+        if (
+            not pull.get("merged_at")
+            or (pull.get("user") or {}).get("type") == "Bot"
+            or any(title.startswith(prefix) for prefix in skip_prefixes)
+        ):
+            continue
+        # The first paragraph says what changed; the rest is for developers.
+        body = (pull.get("body") or "").strip().split("\n\n")[0]
+        found.append(
+            Entry(plain(title, 140), pull["html_url"], _date(pull["merged_at"]), plain(body))
+        )
+    return sorted(found, key=lambda entry: entry.published, reverse=True)
+
+
+def key_for(url: str) -> str:
+    return "feed:" + hashlib.sha256(url.encode()).hexdigest()[:32]
+
+
+def feed_setting(text: str) -> tuple[str, str, str]:
+    """ "pt|Yu-Gi-Oh! Nexus|https://…" → ("pt", "Yu-Gi-Oh! Nexus", "https://…")."""
+    language, name, url = (part.strip() for part in text.split("|", 2))
+    if language not in LANGUAGES:
+        raise ValueError(f"Idioma de feed desconocido: {language}")
+    return language, name or urlsplit(url).hostname, url
+
+
+def store(
+    session, section: str, source_name: str | None, entries: list[Entry], language: str = "es"
+) -> int:
+    """Add new entries and update changed ones; a link already shown is not repeated."""
+    known = {
+        row.url: row for row in session.scalars(select(NewsItem).where(NewsItem.url.is_not(None)))
+    }
+    added = 0
+    for entry in entries:
+        row = known.get(entry.url)
+        if row is None:
+            row = NewsItem(key=key_for(entry.url), url=entry.url)
+            session.add(row)
+            known[entry.url] = row
+            added += 1
+        elif not row.key.startswith("feed:"):
+            continue  # Written by an administrator: theirs stays.
+        row.section, row.source_name, row.language = section, source_name, language
+        row.title, row.summary, row.published_on = (
+            entry.title,
+            entry.summary or entry.title,
+            entry.published,
+        )
+    return added
+
+
+def prune(session, today: date | None = None):
+    limit = (today or date.today()) - timedelta(days=KEEP_DAYS)
+    session.execute(
+        delete(NewsItem).where(NewsItem.key.startswith("feed:"), NewsItem.published_on < limit)
+    )
+
+
+async def refresh(session, client, settings) -> dict:
+    """Bring every source up to date; one failing source does not stop the others."""
+    ttl = int(settings.news_refresh_hours * 3600) - 60
+    results = {}
+    for feed in settings.news_feeds:
+        name = feed
+        try:
+            language, name, url = feed_setting(feed)
+            response = await client.get(url, ttl=ttl)
+            results[name] = store(session, "yugioh", name, parse_feed(response.content), language)
+        except Exception as error:  # noqa: BLE001 - logged, the other sources go on
+            logger.warning("Noticias de %s no disponibles: %s", name, error)
+            results[name] = f"error: {type(error).__name__}: {error}"
+    if settings.news_site_repo:
+        try:
+            response = await client.get(
+                f"https://api.github.com/repos/{settings.news_site_repo}/pulls",
+                params={
+                    "state": "closed",
+                    "base": "main",
+                    "per_page": 30,
+                    "sort": "updated",
+                    "direction": "desc",
+                },
+                ttl=ttl,
+                robots=False,
+            )
+            entries = parse_pulls(json.loads(response.content), settings.news_site_skip_prefixes)
+            results["GitHub"] = store(session, "site", None, entries)
+        except Exception as error:  # noqa: BLE001
+            logger.warning("Novedades del sitio no disponibles: %s", error)
+            results["GitHub"] = f"error: {type(error).__name__}: {error}"
+    prune(session)
+    return results
