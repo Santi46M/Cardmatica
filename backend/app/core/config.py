@@ -2,7 +2,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(os.environ.get("CARDMATICA_ROOT", Path(__file__).resolve().parents[3]))
@@ -17,7 +17,18 @@ class Settings(BaseSettings):
     # A test site on the internet (render.yaml): a notice on every page, closed
     # to search engines, and, with a password, only for whoever has it.
     test_site: bool = False
+    test_site_user: str = ""
     test_site_password: str = Field(default="", repr=False)
+    # The two accounts of the test site, made or updated by `cardmatica
+    # prepare-test-site` when it is built (vercel.json): an administrator and a
+    # plain account. Empty, none is made.
+    test_admin_email: str = ""
+    test_admin_password: str = Field(default="", repr=False)
+    test_user_email: str = ""
+    test_user_password: str = Field(default="", repr=False)
+    # Each request may run on a new instance (Vercel sets VERCEL=1): no pool of
+    # open connections, the database's pooler keeps them (app/db/session.py).
+    serverless: bool = Field(default=False, validation_alias=AliasChoices("SERVERLESS", "VERCEL"))
     admin_token: str = Field(default="", repr=False)
     user_agent: str = "Cardmatica/0.2 (catalog maintenance)"
     ygoprodeck_enabled: bool = True

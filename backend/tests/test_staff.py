@@ -175,3 +175,21 @@ def test_test_accounts_one_of_each_kind_with_fresh_passwords(client, factory):
     people = ids(client)
     assert people[seller]["store_name"] == "Tienda de prueba"
     assert people[seller]["email_verified"] is True
+
+
+def test_the_test_sites_pair_comes_from_its_settings(client, factory, settings, monkeypatch):
+    monkeypatch.setattr(settings, "test_admin_email", "jefa@example.org")
+    monkeypatch.setattr(settings, "test_admin_password", "clave de la jefa 2026")
+    monkeypatch.setattr(settings, "test_user_email", "socio@example.org")
+    monkeypatch.setattr(settings, "test_user_password", "clave del socio 2026")
+    with factory.begin() as session:
+        made = test_accounts.ensure_site_pair(session, settings)
+    assert made == ["jefa@example.org", "socio@example.org"]
+    assert sign_in(client, "jefa@example.org", "clave de la jefa 2026").status_code == 200
+    assert ids(client)["socio@example.org"]["role"] == "user"
+    # Built again with a new password: the old one stops working.
+    monkeypatch.setattr(settings, "test_user_password", "otra clave del socio")
+    with factory.begin() as session:
+        test_accounts.ensure_site_pair(session, settings)
+    assert sign_in(client, "socio@example.org", "clave del socio 2026").status_code == 401
+    assert sign_in(client, "socio@example.org", "otra clave del socio").status_code == 200

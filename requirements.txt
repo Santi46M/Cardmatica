@@ -1,0 +1,4 @@
+# What Vercel installs for the test site (vercel.json): the site's package with
+# only what it needs to run, at the versions verified in backend/requirements.lock.
+-c backend/requirements.lock
+./backend

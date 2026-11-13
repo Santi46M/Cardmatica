@@ -1,30 +1,58 @@
 # Versión de prueba en internet (gratis)
 
-La web corre en **Render** (plan gratis) y la base de datos en **Neon** (plan gratis).
-El catálogo y las cuentas de prueba se cargan una vez desde el Codespace.
+Dos caminos, los dos gratis:
 
-Lo que hay que saber antes:
+- **Vercel + Supabase** (`vercel.json`): sin Codespace. Vercel construye y publica la
+  web; Supabase guarda la base de datos. Al construir, `scripts/vercel-build.sh`
+  actualiza la base, carga las banlists, crea las dos cuentas de prueba y, mientras el
+  catálogo esté vacío, trae las primeras 1000 cartas.
+- **Render + Neon** (`render.yaml` y el `Dockerfile`): más abajo, paso a paso, cargando
+  el catálogo desde el Codespace.
 
-- **Se duerme.** Tras 15 minutos sin visitas se apaga; la siguiente visita tarda
-  alrededor de un minuto en abrir. Después anda normal.
+## Vercel + Supabase
+
+1. **Supabase**: un proyecto nuevo (región US East). En **Connect**, la cadena del
+   *Transaction pooler* (puerto 6543). La web no prepara consultas, como pide ese modo.
+2. **Vercel**: un proyecto desde el repositorio, sin tocar los ajustes de construcción
+   (los lee de `vercel.json`), con estas variables (Settings → Environment Variables,
+   las contraseñas marcadas como *Sensitive*):
+
+| Variable | Valor |
+| --- | --- |
+| `DATABASE_URL` | La cadena de Supabase, tal cual. |
+| `TEST_SITE` | `true` |
+| `TEST_SITE_USER` y `TEST_SITE_PASSWORD` | Usuario y contraseña que el navegador pide para entrar. |
+| `TEST_ADMIN_EMAIL` y `TEST_ADMIN_PASSWORD` | La cuenta de administrador. |
+| `TEST_USER_EMAIL` y `TEST_USER_PASSWORD` | La cuenta común. |
+| `CACHE_DIRECTORY` y `IMAGE_DIRECTORY` | `/tmp/cache` y `/tmp/images` (lo único escribible en Vercel). |
+
+Cambiar una contraseña en Vercel y volver a desplegar la cambia en la cuenta, y cierra
+sus sesiones. Vercel avisa `VERCEL=1`, así que la web no guarda conexiones abiertas: las
+administra el *pooler* de Supabase.
+
+Lo que vale para los dos caminos:
+
+- **Se duerme.** Sin visitas se apaga; la siguiente tarda unos segundos (Vercel) o
+  alrededor de un minuto (Render) en abrir. Después anda normal.
 - **Sin imágenes de cartas ni de productos.** Como todo despliegue público
   (`DEPLOYMENT_MODE=production`): las ilustraciones y fotos provisionales sin licencia
   solo se ven en la vista local privada.
 - **Cada página dice que es una versión de prueba** y los buscadores no la indexan.
   Con `TEST_SITE_PASSWORD`, además, el navegador pide una contraseña antes de mostrar nada.
-- **Los correos no salen**: se escriben en el registro de Render (pestaña **Logs**),
-  con su enlace. Un administrador puede marcar un correo como confirmado desde el panel.
+- **Los correos no salen**: se escriben en el registro del servicio (Logs), con su enlace. Un administrador puede marcar un correo como confirmado desde el panel.
 - **La tienda sigue siendo de demostración**: vendedores, precios y valoraciones ficticios
   y marcados como tales.
 
-## 1. La base de datos en Neon
+## Render + Neon
+
+### 1. La base de datos en Neon
 
 1. Entrar a <https://neon.com> con la cuenta de GitHub.
 2. **New project**: nombre `cardmatica`, región **AWS US East (N. Virginia)**, Postgres 17.
 3. En **Connect**, copiar la *connection string*. Empieza con `postgresql://` y termina
    con `?sslmode=require`. Es una contraseña: no pegarla en chats ni en el repositorio.
 
-## 2. El catálogo y las cuentas de prueba, desde el Codespace
+### 2. El catálogo y las cuentas de prueba, desde el Codespace
 
 En la terminal del Codespace, con el repositorio al día:
 
@@ -48,7 +76,7 @@ Volver a ejecutarlo les da contraseñas nuevas (y cierra sus sesiones).
 El plan gratis de Neon tiene 1 GB: alcanza de sobra para esas 1000 cartas. Para el
 catálogo completo de Yu-Gi-Oh!, quitar `--max-cards 1000` (tarda bastante más).
 
-## 3. La web en Render
+### 3. La web en Render
 
 1. Entrar a <https://render.com> con la cuenta de GitHub y darle acceso al repositorio
    **Santi46M/Cardmatica**.
