@@ -25,8 +25,9 @@ No incluyen una asociación verificable a rareza, edición o código. Se almacen
 en card_artworks; card_images continúa reservado a escaneos por impresión.
 Ninguna de las 24 ilustraciones de la muestra fue aprobada para explotación comercial:
 autor y licencia quedan sin completar cuando el proveedor no los declara.
-Solo se muestran como prueba local con DEPLOYMENT_MODE=local y
-ALLOW_LOCAL_IMAGE_PREVIEW=true, etiquetas visibles y puerto publicado en loopback.
+Solo se muestran como prueba privada, con etiquetas visibles y ALLOW_LOCAL_IMAGE_PREVIEW=true:
+en local (DEPLOYMENT_MODE=local, puerto publicado en loopback) o en la versión de prueba
+con contraseña (TEST_SITE_PASSWORD; sin indexar y sin acceso para quien no la tenga).
 Producción exige evidencia de permiso por imagen; revocarlo bloquea su entrega.
 También queda pendiente verificar los derechos aplicables a textos para el uso comercial previsto.
 

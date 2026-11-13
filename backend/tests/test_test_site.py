@@ -2,6 +2,10 @@
 
 import base64
 
+import pytest
+
+from app.integrations.http import AccessDenied
+
 
 def basic(password):
     return {"Authorization": "Basic " + base64.b64encode(f"x:{password}".encode()).decode()}
@@ -45,3 +49,57 @@ def test_with_a_user_name_both_must_match(client, settings, monkeypatch):
     assert client.get("/", headers=basic("una clave de prueba")).status_code == 401
     good = base64.b64encode(b"admin:una clave de prueba").decode()
     assert client.get("/", headers={"Authorization": f"Basic {good}"}).status_code == 200
+
+
+def test_the_test_site_keeps_its_pictures_in_the_database(client, factory, settings, monkeypatch):
+    """With no lasting disk (Vercel), pictures are rows, shown only behind the password."""
+    import asyncio
+    import io
+    from types import SimpleNamespace
+
+    from PIL import Image
+    from sqlalchemy import select
+
+    from app.models import Card, CardArtwork, StoredImage
+    from app.services.images import ImageService
+
+    monkeypatch.setattr(settings, "image_storage", "database")
+    picture = io.BytesIO()
+    Image.new("RGB", (600, 875), "teal").save(picture, "PNG")
+
+    class Http:
+        async def get(self, url, **options):
+            return SimpleNamespace(content=picture.getvalue())
+
+    with factory.begin() as session:
+        card = Card(display_name="Carta sintética")
+        artwork = CardArtwork(
+            card=card,
+            source_slug="ygoprodeck",
+            external_id="synthetic",
+            source_url="https://images.ygoprodeck.com/images/cards/0.jpg",
+        )
+        session.add(artwork)
+        session.flush()
+        artwork_id = artwork.id
+        # Not without the preview: on a public site it stays out.
+        with pytest.raises(AccessDenied):
+            asyncio.run(
+                ImageService(settings, SimpleNamespace(http=Http())).download_artwork(artwork)
+            )
+    monkeypatch.setattr(settings, "test_site", True)
+    monkeypatch.setattr(settings, "test_site_password", "una clave de prueba")
+    monkeypatch.setattr(settings, "allow_local_image_preview", True)
+    with factory.begin() as session:
+        artwork = session.get(CardArtwork, artwork_id)
+        asyncio.run(ImageService(settings, SimpleNamespace(http=Http())).download_artwork(artwork))
+        assert artwork.local_path.endswith(".webp")
+        assert len(session.scalars(select(StoredImage.name)).all()) == 2
+    assert not list(settings.image_directory.glob("*.webp"))
+    shown = client.get(
+        f"/api/v1/artworks/{artwork_id}?thumbnail=true", headers=basic("una clave de prueba")
+    )
+    assert shown.status_code == 200 and shown.headers["content-type"] == "image/webp"
+    with Image.open(io.BytesIO(shown.content)) as thumbnail:
+        assert thumbnail.width <= 120
+    assert client.get(f"/api/v1/artworks/{artwork_id}").status_code == 401

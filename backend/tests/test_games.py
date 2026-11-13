@@ -4,6 +4,7 @@ Synthetic objects shaped like each API's answers; no real card data.
 """
 
 import copy
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -16,9 +17,10 @@ from app.integrations.scryfall.client import ScryfallClient
 from app.integrations.scryfall.parser import parse_card as parse_scryfall
 from app.integrations.tcgdex.client import TcgdexClient
 from app.integrations.tcgdex.parser import parse_card as parse_tcgdex
-from app.models import Card, CardArtwork, CardPrinting, CardSet, SyncJob
+from app.models import Card, CardArtwork, CardPrinting, CardSet
 from app.schemas.catalog import JobRequest
 from app.services import rarities
+from app.services.images import ImageService
 from app.services.ingestion import IngestionService
 
 ORACLE = "00000000-0000-4000-8000-000000000001"
@@ -453,28 +455,16 @@ def test_preview_images_takes_one_picture_per_card(factory, settings, magic, mon
         assert session.scalar(select(func.count()).select_from(CardArtwork)) == 2
     calls = []
 
-    class Runner:
-        def __init__(self):
-            self.factory = factory
+    async def download(service, artwork):
+        calls.append(artwork.source_slug)
+        return True
 
-        def enqueue(self, request):
-            calls.append(request)
-            with factory.begin() as session:
-                job = SyncJob(source=request.source, mode=request.mode, status="completed")
-                session.add(job)
-                session.flush()
-                return job.id
-
-        def run(self, job_id):
-            async def done():
-                return None
-
-            return done()
-
+    monkeypatch.setattr(ImageService, "download_artwork", download)
     monkeypatch.setattr(settings, "deployment_mode", "local")
     monkeypatch.setattr(settings, "allow_local_image_preview", True)
-    assert preview_images(10, Runner()) == 0
-    assert [(call.source, call.mode) for call in calls] == [("scryfall", "images")]
+    sources = {"scryfall": SimpleNamespace(http=None)}
+    assert preview_images(10, factory=factory, clients=sources) == 0
+    assert calls == ["scryfall"]
 
 
 def test_yugioh_banlists_stay_with_yugioh(client, factory, three_games):
