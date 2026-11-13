@@ -36,3 +36,12 @@ def test_with_a_password_only_who_has_it_gets_in(client, settings, monkeypatch):
     assert client.get("/", headers=basic("una clave de prueba")).status_code == 200
     # The host's health check gets through without it.
     assert client.get("/health/live").status_code == 200
+
+
+def test_with_a_user_name_both_must_match(client, settings, monkeypatch):
+    monkeypatch.setattr(settings, "test_site", True)
+    monkeypatch.setattr(settings, "test_site_user", "admin")
+    monkeypatch.setattr(settings, "test_site_password", "una clave de prueba")
+    assert client.get("/", headers=basic("una clave de prueba")).status_code == 401
+    good = base64.b64encode(b"admin:una clave de prueba").decode()
+    assert client.get("/", headers={"Authorization": f"Basic {good}"}).status_code == 200

@@ -1,0 +1,11 @@
+# Not part of the test site (vercel.json): never local data, secrets or images.
+.devcontainer
+.github
+.env
+.env.*
+.cache
+data
+docs
+backend/tests
+**/__pycache__
+node_modules

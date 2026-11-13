@@ -308,6 +308,12 @@ def build_parser() -> argparse.ArgumentParser:
     role.add_argument("email")
     role.add_argument("role", choices=list(ROLES))
 
+    prepare = commands.add_parser(
+        "prepare-test-site",
+        help="Cuentas de la versión de prueba y, con el catálogo vacío, sus primeras cartas",
+    )
+    prepare.add_argument("--max-cards", type=int, default=1000)
+
     testers = commands.add_parser(
         "test-accounts",
         help="Crear o renovar las cuentas de prueba (admin, moderador, vendedor, comprador)",
@@ -436,20 +442,44 @@ def run_sync(args, parser):
         if args.enqueue_only:
             print(job_id)
             return 0
+    return print_job(run_job(runner, job_id))
+
+
+def run_job(runner: SyncRunner, job_id: UUID) -> SyncJob:
     asyncio.run(runner.run(job_id))
     with runner.factory() as session:
-        job = session.get(SyncJob, job_id)
-        print(
-            json.dumps(
-                {
-                    "job_id": str(job_id),
-                    "status": job.status,
-                    "processed": job.processed,
-                    "failures": job.failures,
-                }
-            )
-        )
-        return 1 if job.status in {"failed", "completed_with_errors"} else 0
+        return session.get(SyncJob, job_id)
+
+
+def print_job(job: SyncJob) -> int:
+    summary = {
+        "job_id": str(job.id),
+        "status": job.status,
+        "processed": job.processed,
+        "failures": job.failures,
+    }
+    print(json.dumps(summary))
+    return 1 if job.status in {"failed", "completed_with_errors"} else 0
+
+
+def run_prepare_test_site(args, parser):
+    """What the test site needs before it opens, run each time it is built
+    (vercel.json, after the migrations and the banlists): its accounts, and,
+    while the catalogue is empty, a first set of cards."""
+    settings = get_settings()
+    with session_factory().begin() as session:
+        for email in test_accounts.ensure_site_accounts(session, settings):
+            print(json.dumps({"account": email}))
+        empty = session.scalar(select(Card.id).limit(1)) is None
+    if not empty or not args.max_cards:
+        return 0
+    runner = SyncRunner()
+    request = JobRequest(
+        source="ygoprodeck", mode="initial", max_cards=args.max_cards, max_printings=2
+    )
+    # A first catalogue that stops at the limit is a success ("paused").
+    print_job(run_job(runner, runner.enqueue(request)))
+    return 0
 
 
 COMMANDS = {
@@ -466,6 +496,7 @@ COMMANDS = {
     "cleanup": run_cleanup,
     "set-role": run_set_role,
     "test-accounts": run_test_accounts,
+    "prepare-test-site": run_prepare_test_site,
     "image-rights": run_image_rights,
 }
 

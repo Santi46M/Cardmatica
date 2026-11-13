@@ -175,3 +175,37 @@ def test_test_accounts_one_of_each_kind_with_fresh_passwords(client, factory):
     people = ids(client)
     assert people[seller]["store_name"] == "Tienda de prueba"
     assert people[seller]["email_verified"] is True
+
+
+def test_the_test_sites_accounts_come_from_its_settings(client, factory, settings, monkeypatch):
+    listed = [
+        {
+            "email": "jefa@example.org",
+            "password": "clave de la jefa 2026",
+            "name": "Jefa",
+            "role": "admin",
+        },
+        {
+            "email": "socio@example.org",
+            "password": "clave del socio 2026",
+            "name": "Socio",
+            "type": "seller",
+            "store": "El Socio",
+        },
+    ]
+    monkeypatch.setattr(settings, "test_accounts", listed)
+    with factory.begin() as session:
+        made = test_accounts.ensure_site_accounts(session, settings)
+    assert made == ["jefa@example.org", "socio@example.org"]
+    assert sign_in(client, "jefa@example.org", "clave de la jefa 2026").status_code == 200
+    people = ids(client)
+    assert people["socio@example.org"]["role"] == "user"
+    assert people["socio@example.org"]["display_name"] == "Socio"
+    assert people["socio@example.org"]["account_type"] == "seller"
+    assert people["socio@example.org"]["store_name"] == "El Socio"
+    # Built again with a new password: the old one stops working.
+    listed[1] = {**listed[1], "password": "otra clave del socio"}
+    with factory.begin() as session:
+        test_accounts.ensure_site_accounts(session, settings)
+    assert sign_in(client, "socio@example.org", "clave del socio 2026").status_code == 401
+    assert sign_in(client, "socio@example.org", "otra clave del socio").status_code == 200

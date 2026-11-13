@@ -19,3 +19,5 @@ node_modules/
 test-results/
 playwright-report/
 
+# Install leftovers (pip install . en scripts/vercel-build.sh).
+build/
