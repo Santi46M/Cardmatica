@@ -649,7 +649,7 @@ I18N.add({
     "Nivel/Rango {number}": "Nível/Classe {number}",
     "No encontradas ({count})": "Não encontradas ({count})",
     "No hay cartas almacenadas que coincidan con estos filtros.": "Não há cartas armazenadas que correspondam a estes filtros.",
-    "No hay cartas con ese nombre en este juego.": "Não há cartas com esse nome neste jogo.",
+    "No hay cartas así en este juego.": "Não há cartas assim neste jogo.",
     "No hay impresiones documentadas para este mercado.": "Não há impressões documentadas para este mercado.",
     "No legal": "Não legal",
     "No legal en torneos": "Não legal em torneios",

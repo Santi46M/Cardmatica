@@ -8,6 +8,8 @@
     /* Header, content and footer share one width and one edge (the gutter). */
     --page-width: 1120px;
     --gutter: 10px;
+    /* The size of the page's text, and of the fields that take it. */
+    --text-size: 15px;
     --tx: #e8f1fa;
     --mu: #9db0c6;
     --ac: #6fd3f2;
@@ -111,7 +113,7 @@
 body {
     margin: 0;
     color: var(--tx);
-    font: 15px/1.45 "Segoe UI", Frutiger, "Trebuchet MS", system-ui, sans-serif;
+    font: var(--text-size)/1.45 "Segoe UI", Frutiger, "Trebuchet MS", system-ui, sans-serif;
     min-height: 100vh;
     background: var(--page);
     -webkit-text-size-adjust: 100%;
@@ -3742,13 +3744,61 @@ button.acc-avatar:hover,
     }
 }
 
-/* La foto de la copia: miniatura al lado del nombre, entera en otra pestaña. */
+/* La copia en venta: una cámara al lado del nombre si tiene foto; la foto se
+   ve al pasar el cursor (o al tocarla en el teléfono). stock.js la ubica. */
 .st-card {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     align-items: flex-start;
 }
 
+.st-photo {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin-top: 3px;
+    color: var(--mu);
+}
+
+.st-photo[tabindex] {
+    cursor: zoom-in;
+}
+
+.st-photo[tabindex]:hover,
+.st-photo[tabindex]:focus-visible {
+    color: var(--ac);
+}
+
+.st-photo svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+}
+
+.st-photo img {
+    position: fixed;
+    z-index: 40;
+    width: 180px;
+    height: 250px;
+    object-fit: contain;
+    border-radius: 8px;
+    border: 1px solid var(--bd);
+    background: var(--tip);
+    box-shadow: 0 10px 28px rgba(var(--shade), .45);
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity .12s;
+    pointer-events: none;
+}
+
+.st-photo:hover img,
+.st-photo:focus img {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Bajo cada carta y en «Vendedores», la foto sí va en miniatura (market.js). */
 .photo-thumb {
     flex: none;
     display: block;
@@ -3762,6 +3812,62 @@ button.acc-avatar:hover,
     width: 34px;
     height: 46px;
     object-fit: cover;
+}
+
+/* La rareza, del alto de las letras del código del set. */
+.st-card small .rr-icon {
+    height: 1.15em;
+    vertical-align: -.2em;
+    border-radius: 2px;
+}
+
+/* Buscar la carta: juego y nombre en una fila, filtros como en la tienda. */
+.st-find {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.st-find > label:first-child {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--mu);
+}
+
+.st-find .st-search {
+    flex: 1;
+}
+
+/* The captions are small; the fields, as big as the filters below. */
+.st-find select,
+.st-find input {
+    font-size: var(--text-size);
+    color: var(--tx);
+}
+
+.st-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.st-filters select {
+    flex: 0 1 auto;
+    max-width: 100%;
+}
+
+@media (max-width: 640px) {
+    .st-find {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .st-filters select {
+        flex: 1 1 45%;
+    }
 }
 
 .st-photo-preview {
