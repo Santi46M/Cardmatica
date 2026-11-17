@@ -404,15 +404,32 @@ def test_each_game_lists_only_its_cards(client, three_games):
     assert [row["name"] for row in suggestions.json()] == ["Synthetic Sproutling"]
 
 
+def test_magic_colourless_and_multicolour(client, three_games):
+    def names(color):
+        items = client.get("/api/v1/cards", params={"game": "magic", "color": color}).json()[
+            "items"
+        ]
+        return [item["name"] for item in items]
+
+    # The synthetic card is blue and red: two colours.
+    assert names("U") == names("M") == ["Synthetic Spark Weaver"]
+    assert names("C") == [] and names("G") == []
+
+
 def test_facets_follow_the_game(client, three_games):
     magic = client.get("/api/v1/facets", params={"market": "MTG"}).json()
     assert magic["game"] == "magic" and magic["rarities"] == ["Mythic Rare"]
-    assert magic["types"]["kinds_present"] == ["Creature"]
-    assert magic["types"]["colors_present"] == ["U", "R"] and magic["types"]["mana_values"] == [3]
+    # The colours and types are always all of them; the mana values, those the cards have.
+    assert magic["types"]["colors"] == ["W", "U", "B", "R", "G"] and magic["types"][
+        "mana_values"
+    ] == [3]
+    assert "Kindred" in magic["types"]["kinds"]
     assert magic["product_types"] == ["Expansion"]
     pokemon = client.get("/api/v1/facets", params={"game": "pokemon"}).json()
     assert pokemon["rarity_groups"] == [{"family": "ultra", "names": ["Double Rare"]}]
-    assert "Basic" in pokemon["types"]["subtypes_present"]
+    assert len(pokemon["types"]["colors"]) == 11 and pokemon["types"]["stages"][0] == "Basic"
+    # Pokémon have no Level, Rank or mana value to list.
+    assert "levels" not in pokemon["types"] and "mana_values" not in pokemon["types"]
     yugioh = client.get("/api/v1/facets", params={"market": "TCG"}).json()
     assert yugioh["game"] == "yugioh" and yugioh["rarities"] == ["Rare"]
     assert "monster" in yugioh["types"]

@@ -57,7 +57,6 @@ var GAMES = {
             Conjuro: { subtype: "Sorcery" },
             Artefacto: { subtype: "Artifact" },
             Encantamiento: { subtype: "Enchantment" },
-            Planeswalker: { subtype: "Planeswalker" },
             Tierra: { subtype: "Land" }
         },
         search: "Nombre, set o número de coleccionista"
