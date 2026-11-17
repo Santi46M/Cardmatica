@@ -133,7 +133,10 @@ def test_catalogue_filters_by_type_levels(client, factory, record):
     assert card["types"]["frame"] == "Synchro" and card["types"]["abilities"] == ["Tuner"]
     types = client.get("/api/v1/facets").json()["types"]
     assert types["spell"][:2] == ["Normal", "Quick-Play"] and types["trap"][-1] == "Counter"
-    assert "Spellcaster" in types["races_present"] and "Zombie" not in types["races_present"]
+    # Every monster type is offered, Divine-Beast and Creator God too.
+    assert {"Spellcaster", "Zombie", "Divine-Beast", "Creator God"} <= set(
+        types["monster"]["races"]
+    )
 
 
 def test_level_rank_and_link_are_separate_and_sort_by_release(client, factory, record):
