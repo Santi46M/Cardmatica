@@ -430,20 +430,21 @@ function optionsFor(filter, tab, types) {
 }
 
 // The filters of a tab, as <select> elements (labels kept for screen readers).
-export function typeFiltersHtml(tab, types, game = "yugioh") {
+// `prefix` keeps apart two sets of filters on the same page ("st-" in Mi stock).
+export function typeFiltersHtml(tab, types, game = "yugioh", prefix = "") {
     return TYPE_FILTERS.filter((filter) => filter.game === game && filter.tabs.includes(tab))
         .map((filter) => {
             const label = labelOf(filter, tab);
-            return `<select id="${filter.id}" aria-label="${h(label)}" title="${h(label)}">${optionsFor(filter, tab, types)}</select>`;
+            return `<select id="${prefix}${filter.id}" aria-label="${h(label)}" title="${h(label)}">${optionsFor(filter, tab, types)}</select>`;
         })
         .join("");
 }
 
-// API parameters from the filters on screen.
-export function typeParams() {
+// API parameters from the filters on screen (those drawn with the same prefix).
+export function typeParams(prefix = "") {
     const params = {};
     for (const filter of TYPE_FILTERS) {
-        const value = document.getElementById(filter.id)?.value;
+        const value = document.getElementById(prefix + filter.id)?.value;
         if (!value) continue;
         if (filter.id === "f-type") {
             // "Monster::" is every monster; "Monster:frame:Effect" one kind of them.

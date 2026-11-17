@@ -1,5 +1,6 @@
-// "Mi stock": the cards a seller has for sale. A card is found by name or
-// code, then its printing, condition, language, units and price are chosen;
+// "Mi stock": the cards a seller has for sale, of every game. A card is found
+// by game, name or code and the store's filters (whatever game the site has
+// open), then its printing, condition, language, units and price are chosen;
 // below, what is already on sale, to change or take off.
 // Reads and writes /api/v1/listings (backend/app/api/listings.py); buyers see
 // it under each card and in "Vendedores" (market.js).
@@ -10,14 +11,17 @@ import { currentUser } from "./auth.js";
 import { accountNavHtml } from "./account-nav.js";
 import { currentProfile } from "./profile.js";
 import { finishName } from "./catalog-view.js";
-import { rarityBadge } from "./rarities.js";
-import { LISTINGS, conditionHtml, finishText, forgetOffers, languageText, photoThumb, priceHtml } from "./market.js";
+import { rarityBadge, rarityOptionsHtml, rarityParams } from "./rarities.js";
+import { typeFiltersHtml, typeParams } from "./card-types.js";
+import { LISTINGS, conditionHtml, finishText, forgetOffers, languageText, priceHtml } from "./market.js";
 
 const h = escapeHtml;
 const LANGUAGES = ["ES", "EN", "PT", "FR", "DE", "IT", "JP", "KO", "ZH"];
 // The catalogue says "ja"; a seller says "JP", as Cardmarket does.
 const FROM_CATALOGUE = { ja: "JP" };
-const SEARCH_RESULTS = 8;
+const SEARCH_RESULTS = 12;
+// The filters here have their own ids, apart from the store's (card-types.js).
+const PREFIX = "st-";
 // Above this, in US dollars, a copy needs the seller's photo
 // (PHOTO_FROM_USD in backend/app/services/listings.py).
 const PHOTO_FROM_USD = 10;
@@ -28,6 +32,16 @@ const SEARCH_DELAY_MS = 250;
 // The card being put on sale and its printings, while the form is open.
 let chosen = null;
 let panel = () => null;
+
+// The game and category searched here: the site's game at first, then the
+// seller's choice, which the selector at the top of the site does not change.
+let searchGame = null;
+let searchTab = "Todas";
+// Filter options of each game (/api/v1/facets), asked once.
+const facetsOf = {};
+
+// "Todas" and the card tabs of the game (games.js).
+const tabsOf = (game) => ["Todas", ...Object.keys(window.GAMES[game].params || {})];
 
 // The profile, once read (it can just have changed); before, what the server said.
 function sells() {
@@ -117,13 +131,45 @@ async function photoData(file) {
 // The photo chosen in the form, ready to send.
 let formPhoto = null;
 
+// Category, the store's filters for it and rarity. Empty until the game's
+// options arrive (loadFacets draws them again).
+function filtersHtml() {
+    const facets = facetsOf[searchGame];
+    if (!facets) return "";
+    const tabs = tabsOf(searchGame).map((tab) => [tab, t(window.GAME_TAB_LABELS[tab] || tab)]);
+    const label = t("Rareza");
+    return html`
+        <select id="st-tab" aria-label="${t("Categoría")}" title="${t("Categoría")}">${options(tabs, searchTab)}</select>
+        ${typeFiltersHtml(searchTab, facets.types, searchGame, PREFIX)}
+        <select id="st-rar" aria-label="${label}" title="${label}">${rarityOptionsHtml(facets.rarity_groups, searchGame)}</select>`;
+}
+
+async function loadFacets() {
+    const game = searchGame;
+    try {
+        facetsOf[game] ||= await request(`/api/v1/facets?game=${game}`);
+    } catch {
+        return; // Searching by name still works without the filters.
+    }
+    const slot = document.getElementById("st-filters");
+    if (slot && game === searchGame) slot.innerHTML = filtersHtml();
+}
+
 function formHtml() {
+    searchGame ||= window.game;
     const picked = chosen
         ? html`<p class="st-chosen"><b>${h(chosen.card.name)}</b> <small>${plural(chosen.printings.length, "{count} impresión", "{count} impresiones")}</small></p>`
         : html`
-            <label class="st-search">${t("Busca la carta por nombre o código")}
-                <input id="st-q" type="search" autocomplete="off" placeholder="${t("Nombre, código, set o arquetipo")}">
-            </label>
+            <div class="st-find">
+                <label>${t("Juego")}<select id="st-game">${options(
+                    window.GAME_ORDER.map((game) => [game, window.GAMES[game].name]),
+                    searchGame
+                )}</select></label>
+                <label class="st-search">${t("Busca la carta por nombre o código")}
+                    <input id="st-q" type="search" autocomplete="off" placeholder="${t(window.GAMES[searchGame].search)}">
+                </label>
+            </div>
+            <div class="st-filters" id="st-filters">${filtersHtml()}</div>
             <div id="st-results" class="st-results" role="list"></div>`;
     return html`
         <form class="gl pnl" id="st-form" novalidate>
@@ -134,13 +180,24 @@ function formHtml() {
         </form>`;
 }
 
+// A camera where the copy has a photo; the photo shows only while the
+// pointer is on it (or it has focus: a tap on a phone).
+const CAMERA =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l1.6 2H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.4L9 4Zm3 4.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Zm0 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/></svg>';
+
+function photoIcon(listing) {
+    if (!listing.photo_url) return `<span class="st-photo"></span>`;
+    const label = t("Foto de la carta");
+    return `<span class="st-photo" tabindex="0" role="img" aria-label="${label}" title="${label}">${CAMERA}<img data-src="${h(listing.photo_url)}" alt=""></span>`;
+}
+
 function rowHtml(listing) {
     const id = h(listing.id);
     return html`
         <tr>
             <td>
                 <div class="st-card">
-                    ${photoThumb(listing)}
+                    ${photoIcon(listing)}
                     <div>
                         <button class="lk" data-catalog-card="${h(listing.card_id)}">${h(listing.card_name)}</button>
                         <small>${rarityBadge(listing, listing.game)} ${h(listing.code)}${listing.comment ? ` · ${h(listing.comment)}` : ""}</small>
@@ -222,12 +279,14 @@ export function renderStock(container) {
             <div class="wrap" id="st-mine"><p class="catalog-status">${t("Cargando…")}</p></div>
             <small>${t("Los compradores ven tus ofertas en cada carta y en «Vendedores», con el precio en su moneda.")}</small>
         </section>`;
+    loadFacets();
     loadMine();
 }
 
 function redrawForm() {
     const slot = document.getElementById("st-form-slot");
     if (slot) slot.innerHTML = formHtml();
+    if (!chosen) loadFacets();
     document.getElementById(chosen ? "st-printing" : "st-q")?.focus();
 }
 
@@ -242,14 +301,23 @@ function showError(message) {
 let searchTimer;
 let searchGeneration = 0;
 
-async function search(text) {
+async function search() {
     const results = document.getElementById("st-results");
+    if (!results) return;
     const generation = ++searchGeneration;
-    if (text.length < 2) {
+    const text = document.getElementById("st-q").value.trim();
+    const filters = {
+        ...window.GAMES[searchGame].params?.[searchTab],
+        ...typeParams(PREFIX),
+        ...rarityParams(document.getElementById("st-rar")?.value)
+    };
+    // A name of two letters or more, or any filter: a list of every card is no help.
+    if (text.length < 2 && !Object.keys(filters).length) {
         results.innerHTML = "";
         return;
     }
-    const params = new URLSearchParams({ q: text, game: window.game, page_size: SEARCH_RESULTS });
+    const params = new URLSearchParams({ game: searchGame, page_size: SEARCH_RESULTS, ...filters });
+    if (text.length >= 2) params.set("q", text);
     try {
         const data = await request(`/api/v1/cards?${params}`);
         if (generation !== searchGeneration) return;
@@ -260,7 +328,7 @@ async function search(text) {
                           `<button type="button" class="ghost st-result" role="listitem" data-st-card="${h(card.id)}">${h(card.name)}<small>${plural(card.printing_count, "{count} impresión", "{count} impresiones")}</small></button>`
                   )
                   .join("")
-            : `<p class="empty">${t("No hay cartas con ese nombre en este juego.")}</p>`;
+            : `<p class="empty">${t("No hay cartas así en este juego.")}</p>`;
     } catch (error) {
         results.innerHTML = `<p class="warn">${h(error.message)}</p>`;
     }
@@ -402,19 +470,43 @@ export function installStock({ panel: find }) {
         if (event.target.id === "st-price") updatePhotoNote();
         if (event.target.id !== "st-q") return;
         clearTimeout(searchTimer);
-        const text = event.target.value.trim();
-        searchTimer = setTimeout(() => search(text), SEARCH_DELAY_MS);
+        searchTimer = setTimeout(search, SEARCH_DELAY_MS);
     });
     document.addEventListener("change", (event) => {
         if (event.target.id === "st-currency") updatePhotoNote();
         if (event.target.id === "st-photo") pickFormPhoto(event.target);
         if (event.target.dataset?.stPhoto) replacePhoto(event.target);
+        if (event.target.id === "st-game") {
+            searchGame = event.target.value;
+            searchTab = "Todas";
+            document.getElementById("st-q").placeholder = t(window.GAMES[searchGame].search);
+            document.getElementById("st-filters").innerHTML = filtersHtml();
+            loadFacets();
+            search();
+        } else if (event.target.id === "st-tab") {
+            searchTab = event.target.value;
+            document.getElementById("st-filters").innerHTML = filtersHtml();
+            search();
+        } else if (event.target.closest?.("#st-filters")) search();
         if (event.target.id !== "st-printing") return;
         const printing = chosen?.printings.find((item) => item.id === event.target.value);
         const finishes = printing?.finishes || [];
         document.getElementById("st-finish-field").hidden = !finishes.length;
         document.getElementById("st-finish").innerHTML = options(finishes.map((finish) => [finish, finishName(finish)]), finishes[0]);
     });
+    // The photo opens beside its camera, over the table: placed by hand, as the
+    // table scrolls sideways on a phone and would cut it.
+    for (const name of ["mouseover", "focusin"])
+        document.addEventListener(name, (event) => {
+            const icon = event.target.closest?.(".st-photo[tabindex]");
+            if (!icon) return;
+            const box = icon.getBoundingClientRect();
+            const photo = icon.querySelector("img");
+            // Asked for the first time it is wanted, not with the whole list.
+            if (!photo.src) photo.src = photo.dataset.src;
+            photo.style.left = `${Math.min(box.right + 8, window.innerWidth - photo.offsetWidth - 8)}px`;
+            photo.style.top = `${Math.max(8, Math.min(box.top - 20, window.innerHeight - photo.offsetHeight - 8))}px`;
+        });
     document.addEventListener("submit", (event) => {
         if (event.target.id !== "st-form") return;
         event.preventDefault();

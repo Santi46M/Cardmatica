@@ -1236,6 +1236,16 @@ def test_a_seller_puts_a_card_on_sale_and_buyers_find_it(live_server, browser_pa
 
     stock = page.locator("#stockv")
     expect(stock).to_contain_text("Todavía no tienes cartas a la venta.")
+    # The search has its own game, apart from the one the site has open.
+    page.locator("#st-game").select_option("magic")
+    expect(page.locator("#st-tab")).to_contain_text("Criaturas")
+    assert page.evaluate("window.game") == "yugioh"
+    page.locator("#st-game").select_option("yugioh")
+    # The store's filters find cards without typing a name.
+    page.locator("#st-tab").select_option("Monstruo")
+    expect(page.locator("#st-f-attribute")).to_be_visible()
+    expect(page.locator("[data-st-card]", has_text="Synthetic Test Dragon")).to_be_visible()
+    page.locator("#st-tab").select_option("Todas")
     page.locator("#st-q").fill("Synthetic")
     page.locator("[data-st-card]", has_text="Synthetic Test Dragon").click()
     expect(page.locator("#st-printing")).to_contain_text("TST-EN001")
@@ -1263,7 +1273,12 @@ def test_a_seller_puts_a_card_on_sale_and_buyers_find_it(live_server, browser_pa
     expect(page.locator("#st-photo-preview")).to_be_visible()
     page.locator("#st-form button[type=submit]").click()
     expect(mine).to_have_count(2)
-    expect(page.locator("#st-mine .photo-thumb img")).to_have_count(1)
+    # A camera beside the name; the photo only on hovering it.
+    camera = page.locator("#st-mine .st-photo[tabindex]")
+    expect(camera).to_have_count(1)
+    expect(camera.locator("img")).to_be_hidden()
+    camera.hover()
+    expect(camera.locator("img")).to_be_visible()
 
     # A buyer finds the store among the sellers, and the offer under the card.
     page.locator('[data-g="Vendedores"]').click()
