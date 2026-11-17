@@ -1303,3 +1303,26 @@ def test_phone_tables_fit_and_edges_line_up(live_server, browser_page):
             assert page.evaluate(sideways) == [], (width, tab)
             header, main, footer = page.evaluate(edges)
             assert header == main == footer, (width, tab)
+
+
+def test_the_test_site_key_opens_in_a_real_browser(
+    live_server, browser_page, settings, monkeypatch
+):
+    """The password page works where the browser's own box would not appear."""
+    from app.core import test_site
+
+    monkeypatch.setattr(settings, "test_site", True)
+    monkeypatch.setattr(settings, "test_site_password", "llave-de-prueba-42")
+    monkeypatch.setattr(test_site, "WRONG_WAIT_SECONDS", 0)
+    page = browser_page
+    page.goto(f"{live_server}/yugioh?tab=Todas")
+    page.locator("#password").fill("otra")
+    page.locator("button[type=submit]").click()
+    expect(page.locator(".no")).to_be_visible()
+    page.locator("#password").fill("llave-de-prueba-42")
+    page.locator("button[type=submit]").click()
+    expect(page).to_have_url(f"{live_server}/yugioh?tab=Todas")
+    expect(page.locator("#list [data-catalog-card]").first).to_be_visible()
+    # Remembered: a new visit goes straight in.
+    page.goto(f"{live_server}/magic")
+    expect(page.locator("header")).to_be_visible()
