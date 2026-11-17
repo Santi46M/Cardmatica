@@ -6,7 +6,8 @@ other address of a script or style, such as an old version, must be checked
 with the server before reuse ("no-cache" plus the ETag the static file server
 sends: an unchanged file costs a 304 with no body). Icons and the Open Graph
 image change rarely and can be kept a day. Catalogue answers may be reused
-for a minute; account and admin answers are never stored.
+for a minute; account and admin answers, and a seller's own stock, are never
+stored. Offers on sale are checked every time.
 """
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -31,6 +32,9 @@ RULES = (
     ("/api/v1/account", "private, no-store"),
     ("/api/v1/admin", "private, no-store"),
     ("/api/v1/analytics", "private, no-store"),
+    ("/api/v1/listings/mine", "private, no-store"),
+    # Offers change whenever a seller edits their stock: checked every time.
+    ("/api/v1/listings", "no-cache"),
     ("/api/", f"public, max-age={CATALOG_SECONDS}"),
 )
 

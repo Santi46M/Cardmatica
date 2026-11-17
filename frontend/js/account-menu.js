@@ -35,7 +35,7 @@ const SECTIONS = [
     [
         "Ventas",
         [
-            ["Mi stock", null],
+            ["Mi stock", "Stock"],
             ["Ventas y cobros", null]
         ]
     ],

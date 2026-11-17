@@ -6,6 +6,7 @@ import { WANTLIST } from "./config.js";
 import { formatDate, money, toEuro } from "./format.js";
 import { track } from "./analytics.js";
 import { currentUser } from "./auth.js";
+import { accountNavHtml } from "./account-nav.js";
 import { request } from "./session-api.js";
 import { printingOptionsHtml } from "./printings.js";
 import { installShoppingWizard, wizardHtml } from "./shopping-wizard.js";
@@ -434,6 +435,9 @@ export async function refreshAlerts() {
     if (container && window.tab === "Deseados") renderWantlists(container);
 }
 
+// Signed in, the lists are one of the account's pages (account-nav.js).
+const accountNav = () => (currentUser() ? accountNavHtml("Deseados", currentUser().sells) : "");
+
 export function renderWantlists(container) {
     const list = activeList();
     const create = html`
@@ -442,7 +446,7 @@ export function renderWantlists(container) {
     if (!list) {
         const none = t("Todavía no tienes listas de deseados. Crea una aquí o abre una carta y usa «♥ Añadir a la lista de deseados».");
         container.innerHTML = html`
-            <h3>${t("Mis listas de deseados")}</h3>
+            <h3>${t("Mis listas de deseados")}</h3>${accountNav()}
             <div class="gl pnl">
                 <p class="empty">${none}</p>
                 <div class="tools">${create}</div>
@@ -460,7 +464,7 @@ export function renderWantlists(container) {
     const where = t(currentUser() ? "Tus listas se guardan en tu cuenta." : "Tus listas se guardan en este navegador.");
     const remove = t(pendingDelete === list.id ? "Confirmar: eliminar la lista" : "Eliminar esta lista");
     container.innerHTML = html`
-        <h3>${t("Mis listas de deseados")}</h3>
+        <h3>${t("Mis listas de deseados")}</h3>${accountNav()}
         ${alertsHtml()}
         <div class="tools">${pills}${create}</div>
         <div class="tools">

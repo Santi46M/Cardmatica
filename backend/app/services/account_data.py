@@ -24,11 +24,12 @@ from app.schemas.accounts import (
     Preferences,
     PriceAlert,
     ProfileData,
+    ProfileView,
     WantlistData,
     WantlistItemData,
     WantlistsData,
 )
-from app.services import card_views
+from app.services import card_views, listings
 from app.services.accounts import AccountError, as_aware
 from app.services.rarities import canonical
 
@@ -43,18 +44,18 @@ def _profile_row(session: Session, user: User) -> UserProfile:
 
 def account_data(session: Session, user: User) -> AccountData:
     row = session.scalar(select(UserProfile).where(UserProfile.user_id == user.id))
-    profile = None
-    if row and row.full_name:
-        profile = ProfileData(
-            role=row.account_role,
-            name=row.full_name,
-            store=row.store_name or "",
-            country=row.country,
-            address=row.address or "",
-            phone=row.phone or "",
-            payments=row.payment_methods,
-        )
-    return AccountData(profile=profile, preferences=Preferences(**(row.preferences if row else {})))
+    if row is None:
+        return AccountData(profile=None, preferences=Preferences())
+    profile = ProfileView(
+        role=row.account_role or "buyer",
+        name=row.full_name or "",
+        store=row.store_name or "",
+        country=row.country,
+        address=row.address or "",
+        phone=row.phone or "",
+        payments=row.payment_methods or [],
+    )
+    return AccountData(profile=profile, preferences=Preferences(**(row.preferences or {})))
 
 
 def save_profile(session: Session, user: User, data: ProfileData) -> None:
@@ -209,6 +210,10 @@ def export(session: Session, user: User) -> dict:
         "preferences": data.preferences.model_dump(),
         "wantlists": wantlists(session, user).model_dump(mode="json"),
         "viewed_cards": [str(card_id) for card_id in card_views.recent_ids(session, user)],
+        "listings": [
+            listing.model_dump(mode="json", exclude={"seller"})
+            for listing in listings.mine(session, user)
+        ],
         "sessions": [
             {
                 "started_at": _iso(row.created_at),
@@ -223,10 +228,11 @@ def export(session: Session, user: User) -> dict:
 
 def delete_account(session: Session, user: User) -> None:
     """Removes the account and everything tied to it: profile, preferences,
-    wantlists, sessions and email links (ON DELETE CASCADE in the database).
+    wantlists, stock on sale, sessions and email links (ON DELETE CASCADE).
 
     The staff's record keeps what was done, but no longer whose email it was."""
     gone = f"Cuenta borrada ({str(user.id)[:8]})"
+    listings.forget_photos(session, user)
     session.execute(update(StaffAction).where(StaffAction.target_id == user.id).values(target=gone))
     session.execute(update(StaffAction).where(StaffAction.actor_id == user.id).values(actor=gone))
     session.execute(delete(User).where(User.id == user.id))

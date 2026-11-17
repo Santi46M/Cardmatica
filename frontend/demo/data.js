@@ -88,30 +88,30 @@ DEMO.sets = {
 // "priceFactor" multiplica el precio base de la carta; "tone" es el color de la
 // etiqueta, el mismo que usa el catálogo real (frontend/js/rarities.js).
 DEMO.rarities = {
-    C: { name: "Common", priceFactor: 1, tone: "common" },
-    SR: { name: "Super Rare", priceFactor: 2.4, tone: "super" },
-    UR: { name: "Ultra Rare", priceFactor: 4, tone: "ultra" },
-    ScR: { name: "Secret Rare", priceFactor: 6, tone: "secret" },
-    PlScR: { name: "Platinum Secret Rare", priceFactor: 12, tone: "secret" },
-    QCScR: { name: "Quarter Century Secret Rare", priceFactor: 15, tone: "secret" },
-    StR: { name: "Starlight Rare", priceFactor: 30, tone: "premium" },
+    C: { name: "Common", priceFactor: 1 },
+    SR: { name: "Super Rare", priceFactor: 2.4 },
+    UR: { name: "Ultra Rare", priceFactor: 4 },
+    ScR: { name: "Secret Rare", priceFactor: 6 },
+    PlScR: { name: "Platinum Secret Rare", priceFactor: 12 },
+    QCScR: { name: "Quarter Century Secret Rare", priceFactor: 15 },
+    StR: { name: "Starlight Rare", priceFactor: 30 },
     // Magic: the four rarities of every set (Scryfall).
-    MC: { name: "Common", priceFactor: 1, tone: "common" },
-    MU: { name: "Uncommon", priceFactor: 1.6, tone: "rare" },
-    MR: { name: "Rare", priceFactor: 5, tone: "gold" },
-    MM: { name: "Mythic Rare", priceFactor: 10, tone: "mythic" },
+    MC: { name: "Common", priceFactor: 1 },
+    MU: { name: "Uncommon", priceFactor: 1.6 },
+    MR: { name: "Rare", priceFactor: 5 },
+    MM: { name: "Mythic Rare", priceFactor: 10 },
     // Pokémon, as TCGdex, Cardmarket and TCGplayer name them.
-    PC: { name: "Common", priceFactor: 1, tone: "common" },
-    PU: { name: "Uncommon", priceFactor: 1.3, tone: "rare" },
-    PRR: { name: "Double Rare", priceFactor: 4, tone: "ultra" },
-    PACE: { name: "ACE SPEC Rare", priceFactor: 3, tone: "ultra" },
-    PUR: { name: "Ultra Rare", priceFactor: 8, tone: "ultra" },
-    PIR: { name: "Illustration Rare", priceFactor: 6, tone: "premium" },
-    PSIR: { name: "Special Illustration Rare", priceFactor: 25, tone: "premium" },
-    PSR: { name: "Secret Rare", priceFactor: 10, tone: "secret" },
-    PHR: { name: "Hyper Rare", priceFactor: 15, tone: "secret" },
-    PMAR: { name: "Mega Attack Rare", priceFactor: 12, tone: "secret" },
-    PMHR: { name: "Mega Hyper Rare", priceFactor: 40, tone: "secret" }
+    PC: { name: "Common", priceFactor: 1 },
+    PU: { name: "Uncommon", priceFactor: 1.3 },
+    PRR: { name: "Double Rare", priceFactor: 4 },
+    PACE: { name: "ACE SPEC Rare", priceFactor: 3 },
+    PUR: { name: "Ultra Rare", priceFactor: 8 },
+    PIR: { name: "Illustration Rare", priceFactor: 6 },
+    PSIR: { name: "Special Illustration Rare", priceFactor: 25 },
+    PSR: { name: "Secret Rare", priceFactor: 10 },
+    PHR: { name: "Hyper Rare", priceFactor: 15 },
+    PMAR: { name: "Mega Attack Rare", priceFactor: 12 },
+    PMHR: { name: "Mega Hyper Rare", priceFactor: 40 }
 };
 
 // Estados de conservación, del mejor al peor. Los colores llevan texto blanco

@@ -13,6 +13,7 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import select
+from sqlalchemy.orm import object_session
 
 from app.api.dependencies import (
     CSRF_COOKIE,
@@ -38,7 +39,7 @@ from app.schemas.accounts import (
     TokenInput,
     UserView,
 )
-from app.services import accounts
+from app.services import accounts, listings
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Cuentas"])
 LAST_SEEN_EVERY = timedelta(minutes=5)
@@ -269,4 +270,5 @@ def user_view(user) -> UserView:
         role=user.role,
         email_verified=user.email_verified_at is not None,
         created_at=accounts.as_aware(user.created_at),
+        sells=listings.can_sell(object_session(user), user),
     )

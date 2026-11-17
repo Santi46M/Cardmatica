@@ -10,7 +10,8 @@ La fuente principal es **YGOPRODeck API v7**. La API, persistencia, normalizaci�
 procedencia, reconciliación, trabajos y vistas reutilizan la arquitectura existente. Las
 pruebas automatizadas usan fixtures sintéticas y HTTP simulado. Las
 funcionalidades comerciales originales se conservan y están identificadas como
-demostración. No existe todavía un backend de vendedores, precios ni pedidos.
+demostración. Los vendedores reales ya publican su stock («Mi stock», abajo); todavía
+no existen los pedidos ni los pagos.
 Los UUID del catálogo no se mezclan con los índices del carrito original.
 
 Se cargó una muestra real desde YGOPRODeck: **5 cartas, 164 impresiones, 103 sets,
@@ -33,7 +34,7 @@ frontend/js/catalog.js          Punto de entrada: pestañas, lista, ficha, direc
 frontend/js/catalog-view.js     HTML de la lista, la cuadrícula y la ficha de carta
 frontend/js/card-types.js       Tipos de carta por niveles, en español, y sus filtros
 frontend/js/search-suggest.js   Sugerencias con miniatura mientras se escribe en la búsqueda
-frontend/js/rarities.js         Rarezas: familias en español, filtro agrupado y etiqueta de color
+frontend/js/rarities.js         Rarezas: familias en español, filtro agrupado e íconos (los del binder y dibujados)
 frontend/js/printings.js        Impresiones legibles y agrupadas por set
 frontend/js/collections.js      Página de cada set y arquetipo, y banner del último set
 frontend/js/trending.js, news.js  Inicio: cartas en tendencia y noticias
@@ -41,19 +42,20 @@ frontend/js/shopping-wizard.js  Asistente de compra de la lista de deseados
 frontend/js/header-scroll.js    En el teléfono, la cabecera se esconde al bajar y vuelve al subir
 frontend/js/auth.js, account-menu.js, profile.js, wantlists.js   Cuenta y sus datos
 frontend/js/admin.js            Panel de administración
+frontend/js/stock.js, market.js  «Mi stock» del vendedor y las ofertas reales que ven los compradores
 frontend/js/config.js           Valores ajustables del frontend (paginación, tiempos, cachés)
-frontend/pages/, assets/        Páginas legales y 404; íconos e imagen Open Graph
+frontend/pages/, assets/        Páginas legales y 404; íconos, rarezas (assets/rarities) e imagen Open Graph
 frontend/demo/data.js           Datos de la tienda demo: cartas, sets y productos reales; vendedores, precios y stock inventados
 frontend/theme.js               PROVISIONAL: botón de modo claro (Frutiger Aero) y oscuro
 frontend/i18n.js, i18n/, js/lang.js  Idiomas: t(), diccionarios portugués e inglés
 frontend/demo/store.js          Tienda demo y piezas compartidas (pestañas, moneda, ventanas, carrito)
 backend/app/core/               Configuración, logging JSON, cabeceras de seguridad, caché y versiones de archivos
-backend/app/models/             Catálogo, procedencia, cuentas, wantlists y estadísticas
+backend/app/models/             Catálogo, procedencia, cuentas, wantlists, stock en venta, imágenes y estadísticas
 backend/app/repositories/       SQL paginado y upserts
-backend/app/services/           Reconciliación, tipos de carta, rarezas, cuentas, correo, precios e imágenes
-backend/app/integrations/       HTTP respetuoso, YGOPRODeck y Yugipedia
+backend/app/services/           Reconciliación, tipos de carta, rarezas, cuentas, ventas, correo, precios e imágenes
+backend/app/integrations/       HTTP respetuoso; YGOPRODeck y Yugipedia, Scryfall (Magic) y TCGdex (Pokémon)
 backend/app/ingestion/          Normalización, checkpoints y worker
-backend/app/api/                Catálogo, cuentas, administración, estadísticas y páginas HTML
+backend/app/api/                Catálogo, cuentas, ventas, administración, estadísticas y páginas HTML
 backend/alembic/                Migraciones versionadas
 backend/tests/                  Dominio, HTTP simulado, API y navegador
 ```
@@ -357,6 +359,16 @@ una carta que no figura queda como permitida; en una incompleta, como «sin esta
 verificado». Para una lista nueva: copiar un JSON existente, actualizar fecha, fuente y
 nombres, y volver a ejecutar el comando. La importación es idempotente.
 
+**Mi stock.** Una cuenta cuyo perfil dice «Vendedor» (o «Comprador y vendedor») pone
+cartas a la venta desde el menú de la cuenta: busca la carta, elige impresión, acabado,
+estado, idioma, unidades y precio en su moneda, y después cambia unidades y precio o la
+quita. Los compradores ven esas ofertas debajo de cada carta, y la tienda en
+«Vendedores», encima de las de demostración, con el precio en su moneda
+(`/api/v1/listings`, `backend/app/services/listings.py`). No se ven las ofertas de una
+cuenta bloqueada ni las de quien deja de vender. Por encima de 10 USD (con los tipos de
+cambio de la tienda) cada copia necesita la foto del vendedor. Comprarlas llega con los
+pedidos.
+
 **Historial de precios.** Se construye solo con ventas completadas en Cardmática
 (tabla `price_observations`); nunca con guías de precios externas. Mientras no exista el
 backend de pedidos, un administrador puede registrar una venta:
@@ -371,10 +383,19 @@ La ficha muestra la última venta con su fecha aunque nadie tenga la carta a la 
 o no haya ventas en el periodo elegido.
 
 **Listas de deseados y perfil.** Sin cuenta se guardan en el navegador (localStorage);
-con cuenta, en el servidor (ver «Cuentas» más abajo). Un perfil de vendedor todavía no
-publica una tienda. Las listas referencian el UUID y la impresión del catálogo, nunca
+con cuenta, en el servidor (ver «Cuentas» más abajo). Un perfil de vendedor publica
+su tienda con «Mi stock». Las listas referencian el UUID y la impresión del catálogo, nunca
 índices del comercio de demostración. En el código y la API conservan el nombre técnico
 `wantlists`.
+
+**Mi perfil.** La cuenta se muestra como una carta propia, enmarcada con los colores del
+juego en pantalla. El arte son sus iniciales, la línea de tipo dice el rol y el país, y
+las estadísticas muestran artículos y unidades para un vendedor, o listas y cartas
+buscadas para un comprador. A la derecha están el valor del stock y cuántas copias
+tienen foto, los datos de la cuenta y la personalización. Una fila de enlaces une las
+páginas de la cuenta: perfil, Mi stock, listas de deseados y seguridad
+(`frontend/js/profile.js`, `account-nav.js`). La cuenta trae su perfil aunque esté
+incompleto, así una cuenta de vendedor creada por el equipo ya aparece como vendedora.
 
 **En tendencia y noticias del inicio.** «En tendencia» junta listas que salen solo
 de datos del catálogo (`backend/app/services/trending.py`): bajan de precio (ventas

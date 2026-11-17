@@ -8,14 +8,24 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import exists, select
+from sqlalchemy.orm import aliased
 
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.db.session import session_factory
 from app.ingestion.sync import SyncRunner, worker
 from app.integrations.http import AccessDenied, PoliteHttpClient
-from app.models import Card, CardArtwork, CardImage, SyncError, SyncJob, User
+from app.models import (
+    Card,
+    CardArtwork,
+    CardImage,
+    CardName,
+    CardTextVersion,
+    SyncError,
+    SyncJob,
+    User,
+)
 from app.models.accounts import ROLES
 from app.schemas.catalog import JobRequest
 from app.schemas.ingestion import CardRecord
@@ -93,7 +103,6 @@ def import_banlists(paths: list[Path]):
 
 async def refresh_news(*, forever=False):
     """Bring the news up to date now, or every NEWS_REFRESH_HOURS when forever."""
-    from app.integrations.http import PoliteHttpClient
     from app.services import news_feeds
 
     settings = get_settings()
@@ -139,9 +148,6 @@ def preview_images(max_cards: int, *, minutes: float | None = None, factory=None
 
 async def download_artworks(factory, settings, max_cards, deadline=None, clients=None):
     """The downloads of preview_images: one picture per card, one client per source."""
-    from sqlalchemy import exists
-    from sqlalchemy.orm import aliased
-
     stored = aliased(CardArtwork)
     has_picture = exists().where(
         stored.card_id == CardArtwork.card_id, stored.local_path.is_not(None)
@@ -198,10 +204,6 @@ TEXT_LANGUAGES = [*TEXT_SOURCES, "es", "ja", "ko"]
 
 def card_texts(language: str, max_cards: int, runner=None):
     """Bring the name and effect text in one language for catalogue cards that lack it."""
-    from sqlalchemy import exists
-
-    from app.models import CardName, CardTextVersion
-
     settings = get_settings()
     source = TEXT_SOURCES.get(language, "yugipedia")
     if source == "yugipedia" and not settings.yugipedia_enabled:

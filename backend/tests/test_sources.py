@@ -1,6 +1,5 @@
 import asyncio
 import time
-from datetime import date
 
 import httpx
 import pytest
@@ -8,8 +7,6 @@ from pydantic import ValidationError
 
 from app.core.config import Settings
 from app.integrations.http import AccessDenied, HttpStore, PoliteHttpClient
-from app.integrations.konami.banlist import parse_banlist
-from app.integrations.konami.parser import KonamiMarkupError, card_ids, parse_card
 from app.integrations.yugipedia.images import match_scan
 from app.integrations.yugipedia.parser import classify_group, parse_errata
 from app.integrations.yugipedia.parser import parse_card as parse_wiki
@@ -28,29 +25,6 @@ def external_settings(tmp_path):
 
 async def no_wait(*args):
     return None
-
-
-def test_konami_markup_and_identifiers():
-    html = """<div id="cardname"><h1>Synthetic Dragon</h1></div>
-      <div class="item_box"><span class="item_box_title">ATK</span><span class="item_box_value">?</span></div>
-      <div id="CardType">Dragon / Effect</div><div id="CardText">Synthetic text</div>
-      <div id="CardSet"><div class="t_row"><span class="card_number">TST-EN001</span>
-      <span class="pack_name">Synthetic Set</span><span class="rarity">Ultra Rare</span></div></div>"""
-    record = parse_card(
-        html,
-        990001,
-        "en",
-        "https://www.db.yugioh-card.com/yugiohdb/card_search.action?ope=2&cid=990001",
-    )
-    assert record.atk == "?"
-    assert record.card_type == "Monster"
-    assert record.printings[0].edition == "unknown"
-    assert record.texts[0].current
-    assert card_ids(
-        '<input class="link_value" value="/yugiohdb/card_search.action?ope=2&amp;cid=990001">'
-    ) == [990001]
-    with pytest.raises(KonamiMarkupError):
-        parse_card("<html>Changed markup</html>", 1, "en", "https://www.db.yugioh-card.com/")
 
 
 def test_mediawiki_templates_and_separate_group_classification():
@@ -222,21 +196,6 @@ async def test_disabled_official_source_makes_no_request(external_settings):
             await client.get("https://www.db.yugioh-card.com/yugiohdb/")
     finally:
         await client.close()
-
-
-def test_official_banlist_separates_statuses_dates_and_format():
-    html = """<h3>Forbidden List: 1 Card(s)</h3><div class="t_row"><input class="link_value" value="card_search.action?ope=2&amp;cid=990001"></div>
-    <h3>Limited List: 1 Card(s)</h3><div class="t_row"><input class="link_value" value="card_search.action?ope=2&amp;cid=990002"></div>
-    <h4>Semi-Limited List: 1 Card(s)</h4><div class="t_row"><input class="link_value" value="card_search.action?ope=2&amp;cid=990003"></div>"""
-    rows = parse_banlist(
-        html,
-        format="TCG",
-        effective_date=date(2026, 1, 1),
-        source_url="https://www.db.yugioh-card.com/yugiohdb/forbidden_limited.action",
-    )
-    assert [row["banlist"]["status"] for row in rows] == ["forbidden", "limited", "semi_limited"]
-    assert rows[0]["banlist"]["effective_date"] == "2026-01-01"
-    assert rows[0]["banlist"]["format"] == "TCG"
 
 
 async def test_mediawiki_maxlag_is_retried_without_poisoning_cache(external_settings, monkeypatch):

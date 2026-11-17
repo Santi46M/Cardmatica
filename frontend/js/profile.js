@@ -3,6 +3,8 @@
 import { escapeHtml, html } from "./html.js";
 import { lang, t } from "./lang.js";
 import { countItems, listCount } from "./wantlists.js";
+import { accountNavHtml } from "./account-nav.js";
+import { stockTotals } from "./market.js";
 import { currentUser } from "./auth.js";
 import { request } from "./session-api.js";
 import { readJson, writeJson } from "./storage.js";
@@ -66,25 +68,96 @@ function preferencesHtml() {
 
 const sells = (role) => role === "seller" || role === "both";
 
-function summaryHtml() {
-    if (!profile) return "";
-    const role = t(ROLES.find(([value]) => value === profile.role)?.[1] || "");
-    const store = profile.store ? ` · ${t("Tienda")} <b>${h(profile.store)}</b>` : "";
-    const contact = [profile.address, t(profile.country), profile.phone].filter(Boolean).join(" · ");
-    const methods = profile.payments?.map((method) => t(method)).join(", ");
-    const payments = methods ? `<small>${h(t("Pagos aceptados: {methods}", { methods }))}</small>` : "";
+// ---- The account's card -----------------------------------------------------
+// "Mi perfil" opens with the person as a trading card of their own: the
+// initials as its art, the role and country as its type line, and the two
+// numbers that matter as its stats (items and units for a seller, lists and
+// cards for a buyer). Framed in the colours of the game on screen.
+
+function initials(name) {
+    const words = name.trim().split(/\s+/).filter(Boolean);
+    return (words.length > 1 ? words[0][0] + words.at(-1)[0] : name.slice(0, 2)).toUpperCase() || "?";
+}
+
+function memberSince(user) {
+    const date = new Date(user.created_at);
+    return date.toLocaleDateString(window.I18N.locale, { month: "long", year: "numeric" });
+}
+
+function cardStatsHtml(role) {
+    const stat = (label, id, value) =>
+        `<span><small>${t(label)}</small><b id="${id}">${value}</b></span>`;
+    // A seller's figures arrive with their stock (fillStock); without an account there is none.
+    const pending = currentUser() ? "…" : "—";
+    return sells(role)
+        ? stat("Artículos", "pf-stat-items", pending) + stat("Unidades", "pf-stat-units", pending)
+        : stat("Listas", "pf-stat-lists", listCount()) + stat("Cartas buscadas", "pf-stat-wanted", countItems());
+}
+
+function identityHtml(value) {
+    const user = currentUser();
+    const [from, to] = window.GAMES[window.game]?.colors || ["#2a6f97", "#6fd3f2"];
+    const name = value.name || user?.display_name || t("Invitado");
+    const role = t(ROLE_LABELS[value.role] || "");
+    const country = value.country ? `${window.flag?.(value.country) || ""}${h(t(value.country))}` : "";
+    const store = sells(value.role) && value.store ? t("Tienda: {store}", { store: h(value.store) }) : "";
+    const facts = user
+        ? [
+              t("Miembro desde {date}", { date: memberSince(user) }),
+              user.email_verified ? `✓ ${t("Correo confirmado")}` : t("Correo sin confirmar"),
+              store
+          ]
+        : [store, t("Sin sesión iniciada: lo que guardes queda en este navegador.")];
+    const actions = user
+        ? sells(value.role)
+            ? `<button class="btn s" data-real-seller="${h(user.id)}">${t("Ver mi tienda pública")}</button>`
+            : ""
+        : `<button class="btn s" data-go="Acceso" data-auth-mode="login">${t("Iniciar sesión")}</button>
+           <button class="ghost s" data-go="Acceso" data-auth-mode="register">${t("Crear cuenta")}</button>`;
     return html`
-        <div class="gl pnl profile-card">
-            <div>${window.flag ? window.flag(profile.country) : ""}<b>${h(profile.name)}</b> · ${h(role)}${store}</div>
-            <small>${h(contact)}</small>
-            ${payments}
-        </div>`;
+        <aside class="acct-side">
+            <div class="idc" style="--idc-from:${from};--idc-to:${to}">
+                <div class="idc-name"><b>${h(name)}</b></div>
+                <div class="idc-art" aria-hidden="true">${h(initials(name))}</div>
+                <div class="idc-type">${h(role)}${country ? ` · ${country}` : ""}</div>
+                <div class="idc-text">${facts.filter(Boolean).map((fact) => `<p>${fact}</p>`).join("")}</div>
+                <div class="idc-stats">${cardStatsHtml(value.role)}</div>
+            </div>
+            <div class="acct-actions">${actions}</div>
+        </aside>`;
+}
+
+// ---- A seller's stock at a glance: what the card does not say -------------
+
+function tilesHtml(role) {
+    if (!sells(role)) return "";
+    const tile = (label, id) =>
+        html`<button class="gl acct-tile" data-go="Stock"><small>${t(label)}</small><b id="${id}">…</b></button>`;
+    return `<div class="acct-tiles">${tile("Valor del stock", "pf-tile-value")}${tile("Con foto", "pf-tile-photos")}</div>`;
+}
+
+// A seller's figures come from their stock (backend/app/api/listings.py).
+async function fillStock(role) {
+    if (!currentUser() || !sells(role)) return;
+    let totals;
+    try {
+        totals = stockTotals(await request("/api/v1/listings/mine"));
+    } catch {
+        return;
+    }
+    const put = (id, value) => {
+        const slot = document.getElementById(id);
+        if (slot) slot.textContent = value;
+    };
+    put("pf-stat-items", totals.items);
+    put("pf-stat-units", totals.units);
+    put("pf-tile-value", window.formatPrice(totals.value));
+    put("pf-tile-photos", `${totals.photos} / ${totals.items}`);
 }
 
 const selected = (yes) => (yes ? " selected" : "");
 
-export function renderProfile(container) {
-    const value = profile || { role: "buyer", country: "Uruguay", payments: [] };
+function formHtml(value) {
     const roles = ROLES.map(([key, label]) => `<option value="${key}"${selected(value.role === key)}>${t(label)}</option>`).join("");
     const countries = COUNTRIES.map(
         (country) => `<option value="${country}"${selected(value.country === country)}>${t(country)}</option>`
@@ -94,41 +167,58 @@ export function renderProfile(container) {
             `<label><input type="checkbox" name="pf-payment" value="${h(method)}"${value.payments.includes(method) ? " checked" : ""}> ${h(t(method))}</label>`
     ).join("");
     const sellerOnly = sells(value.role) ? "" : " hidden";
-    const minimal = t(
-        "Solo pedimos lo necesario: la dirección y el teléfono se usarán para envíos cuando existan, y los métodos de pago solo si vendes."
-    );
     const where = t(
         currentUser()
-            ? "El perfil se guarda en tu cuenta. Un perfil de vendedor todavía no publica una tienda."
+            ? "Solo pedimos lo necesario: la dirección y el teléfono, para los envíos; los métodos de pago, si vendes."
             : "Sin sesión iniciada, el perfil se guarda solo en este navegador. Inicia sesión para guardarlo en tu cuenta."
     );
-    const lists = t(listCount() === 1 ? "{count} lista" : "{count} listas", { count: listCount() });
-    container.innerHTML = html`
-        <h3>${t("Mi perfil")}</h3>
-        ${summaryHtml()}
+    return html`
         <form class="gl pnl" id="pf-form" novalidate>
+            <b>${t("Datos de la cuenta")}</b>
             <div class="fm">
-                <label>${t("Quiero registrarme como")}<select id="pf-role">${roles}</select></label>
+                <label>${t("Quiero")}<select id="pf-role">${roles}</select></label>
                 <label>${t("Nombre completo")}<input id="pf-name" autocomplete="name" maxlength="120" value="${h(value.name)}"></label>
                 <label id="pf-store-field"${sellerOnly}>${t("Nombre de la tienda")}<input id="pf-store" autocomplete="organization" maxlength="80" value="${h(value.store)}"></label>
                 <label>${t("País")}<select id="pf-country" autocomplete="country-name">${countries}</select></label>
-                <label class="full">${t("Dirección (opcional, para envíos)")}<input id="pf-address" autocomplete="street-address" maxlength="200" value="${h(value.address)}"></label>
                 <label>${t("Teléfono (opcional)")}<input id="pf-phone" type="tel" autocomplete="tel" maxlength="30" value="${h(value.phone)}"></label>
+                <label class="full">${t("Dirección (opcional, para envíos)")}<input id="pf-address" autocomplete="street-address" maxlength="200" value="${h(value.address)}"></label>
                 <fieldset class="full" id="pf-payments"${sellerOnly}>
                     <legend>${t("Métodos de pago que aceptas")}</legend>
                     <div class="chk">${payments}</div>
                 </fieldset>
             </div>
             <p id="pf-error" class="warn" role="alert" hidden></p>
-            <p><button class="btn" type="submit">${t("Guardar perfil")}</button></p>
-            <small>${minimal}</small> <small>${where}</small>
-        </form>
-        <div class="gl pnl" style="margin-top:12px">
-            <b>${t("Listas de deseados")}</b>
-            <small>${lists} · ${t("{count} cartas", { count: countItems() })}</small>
-            <p><button class="btn s" data-go="Deseados">${t("Ver mis listas")}</button></p>
-        </div>
-        ${preferencesHtml()}`;
+            <div class="acct-save">
+                <button class="btn" type="submit">${t("Guardar perfil")}</button>
+                <small>${where}</small>
+            </div>
+        </form>`;
+}
+
+export function renderProfile(container) {
+    // Before the first save, what the server knows: a seller made by staff sells.
+    const value = {
+        role: currentUser()?.sells ? "seller" : "buyer",
+        name: "",
+        store: "",
+        country: "Uruguay",
+        address: "",
+        phone: "",
+        payments: [],
+        ...Object.fromEntries(Object.entries(profile || {}).filter(([, field]) => field !== null && field !== ""))
+    };
+    container.innerHTML = html`
+        <h3>${t("Mi perfil")}</h3>
+        ${currentUser() ? accountNavHtml("Perfil", sells(value.role)) : ""}
+        <div class="acct">
+            ${identityHtml(value)}
+            <div class="acct-main">
+                ${tilesHtml(value.role)}
+                ${formHtml(value)}
+                ${preferencesHtml()}
+            </div>
+        </div>`;
+    fillStock(value.role);
 }
 
 function read() {

@@ -135,6 +135,10 @@ function saleCell(sale) {
     return `<td class="num"><b class="price">${salePrice(sale)}</b><small>${saleDate(sale)}</small></td>`;
 }
 
+// The banlist mark, small, on its own line under the type line.
+const banLine = (card) =>
+    card.market_banlist ? `<span class="ban-line">${badgeHtml(card.market_banlist, { small: true })}</span>` : "";
+
 const NO_CARDS = "No hay cartas almacenadas que coincidan con estos filtros.";
 
 function catalogRow(card) {
@@ -146,8 +150,9 @@ function catalogRow(card) {
                 <div class="nm" data-preview="${h(card.id)}">
                     ${imageHtml(card.image, `${card.name} — ${t(kind)}`)}
                     <div class="nm-text">
-                        <b>${badgeHtml(card.market_banlist)}${h(card.name)}</b>
+                        <b>${h(card.name)}</b>
                         <small class="meta" title="${h(meta)}">${h(meta)}</small>
+                        ${banLine(card)}
                     </div>
                 </div>
             </td>
@@ -183,8 +188,9 @@ export function tileHtml(card, line = cardMeta(card)) {
         <button class="card-tile gl" data-catalog-card="${h(card.id)}" data-preview="${h(card.id)}">
             ${gridImage(card)}
             <span class="card-tile-body">
-                <b>${badgeHtml(card.market_banlist)}${h(card.name)}</b>
+                <b>${h(card.name)}</b>
                 <small class="meta" title="${h(line)}">${h(line)}</small>
+                ${banLine(card)}
                 <span class="card-tile-price">${tilePrice(card.last_sale)}</span>
             </span>
         </button>`;
@@ -251,9 +257,10 @@ export function previewHtml(card) {
     return html`
         ${picture}
         <div class="preview-body">
-            <b>${badgeHtml(card.market_banlist)}${h(card.name)}</b>
+            <b>${h(card.name)}</b>
             ${warning}
             <small>${h(cardMeta(card))}</small>
+            ${banLine(card)}
             <small>${printings}</small>
             ${price}
         </div>`;
@@ -399,7 +406,7 @@ function creditHtml(image) {
 }
 
 // Finishes a printing is sold in (Scryfall, TCGdex), in words.
-const FINISHES = {
+export const FINISHES = {
     nonfoil: "Normal",
     foil: "Foil",
     etched: "Foil grabado",
@@ -408,7 +415,8 @@ const FINISHES = {
     reverse: "Reverso holo",
     firstEdition: "1.ª edición"
 };
-const finishesText = (printing) => (printing.finishes || []).map((finish) => t(FINISHES[finish] || finish)).join(", ");
+export const finishName = (finish) => t(FINISHES[finish] || finish);
+const finishesText = (printing) => (printing.finishes || []).map(finishName).join(", ");
 
 // Yu-Gi-Oh!'s banlist has its equivalent in the other games: Magic's banned and
 // restricted list, format by format, and Pokémon's Standard and Expanded, which

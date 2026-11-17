@@ -21,12 +21,13 @@ const TABS = {
         "Cajas y accesorios (demo) · Cardmática",
         "Cajas selladas, sobres y accesorios de la tienda de demostración."
     ],
-    Vendedores: ["Vendedores (demo) · Cardmática", "Vendedores de la tienda de demostración."],
+    Vendedores: ["Vendedores · Cardmática", "Vendedores de Cardmática y tiendas de demostración."],
     Deseados: [
         "Mi lista de deseados · Cardmática",
         "Las cartas que buscas, con avisos de precio y asistente de compra."
     ],
     Perfil: ["Mi perfil · Cardmática", DEFAULT_DESCRIPTION],
+    Stock: ["Mi stock · Cardmática", DEFAULT_DESCRIPTION],
     Carrito: ["Carrito · Cardmática", DEFAULT_DESCRIPTION],
     Acceso: ["Iniciar sesión o crear cuenta · Cardmática", DEFAULT_DESCRIPTION],
     Seguridad: ["Seguridad de la cuenta · Cardmática", DEFAULT_DESCRIPTION],
@@ -62,7 +63,7 @@ function metaFor(tab) {
     if (game === "yugioh" || !GAME_META[game]) return TABS[tab] || TABS.Inicio;
     if (tab === "Inicio") return GAME_META[game];
     // The account's own pages are the same in every game.
-    if (["Deseados", "Perfil", "Carrito", "Acceso", "Seguridad", "Admin"].includes(tab)) return TABS[tab];
+    if (["Deseados", "Perfil", "Carrito", "Acceso", "Seguridad", "Admin", "Stock"].includes(tab)) return TABS[tab];
     // "Criaturas · Magic: The Gathering · Cardmática"
     const label = t(window.TAB_LABELS[tab] || tab).replace(/ \(demo\)$/, "");
     const name = window.GAMES[game].name;

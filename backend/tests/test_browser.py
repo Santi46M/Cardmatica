@@ -254,7 +254,10 @@ def test_banlist_price_history_wantlists_and_profile(live_server, browser_page, 
     page.locator("#pf-phone").fill("+598 99 123 456")
     page.locator('input[name="pf-payment"]').first.check()
     page.locator("#pf-form button[type=submit]").click()
-    expect(page.locator("#pfv .profile-card")).to_contain_text("Duelos del Sur")
+    # The account's card: name, role and store.
+    card = page.locator("#pfv .idc")
+    expect(card).to_contain_text("Duelos del Sur")
+    expect(card).to_contain_text("Vendedor")
     expect(page.locator("#account-button")).to_have_text("AP")
     page.locator("#account-button").click()
     expect(page.locator("#account-menu")).to_contain_text("Duelos del Sur")
@@ -266,8 +269,8 @@ def test_banlist_price_history_wantlists_and_profile(live_server, browser_page, 
     page.reload()
     page.locator("#account-button").click()
     page.locator('#account-menu [data-go="Perfil"]').first.click()
-    expect(page.locator("#pfv .profile-card")).to_contain_text("Ana Pérez")
-    expect(page.locator("#pfv")).to_contain_text("1 lista · 1 cartas")
+    expect(page.locator("#pfv .idc")).to_contain_text("Ana Pérez")
+    expect(page.locator("#pfv .idc-art")).to_have_text("AP")
     assert not errors
 
 
@@ -777,8 +780,38 @@ def test_rarity_filter_grouped_by_family(live_server, browser_page):
     page.locator("#rar").select_option("Super Rare")
     page.locator("#list [data-catalog-card]").first.click()
     # The card opens on the printing of the rarity being looked for.
-    expect(page.locator(".card-detail .rr").first).to_have_text("Super Rare")
-    expect(page.locator(".card-detail .rr").first).to_have_attribute("data-tone", "super")
+    icon = page.locator(".card-detail .rr-icon").first
+    expect(icon).to_have_attribute("aria-label", "Super Rare")
+    # The binder's picture, and the rarity by name when hovering it.
+    expect(icon.locator("img")).to_have_attribute("src", "/frontend/assets/rarities/super-rare.png")
+    assert icon.get_attribute("data-tip").startswith("Super Rare · SR")
+
+
+def test_banlist_mark_sits_small_under_the_type_line(live_server, browser_page, factory):
+    with factory.begin() as session:
+        import_banlist(
+            session,
+            BanlistFile(
+                format="TCG",
+                effective_date=date(2026, 1, 1),
+                complete=True,
+                source_name="Synthetic test list",
+                source_url="https://example.com/synthetic-list",
+                retrieved_on=date(2026, 1, 2),
+                limited=["Synthetic Test Dragon"],
+            ),
+        )
+    page = browser_page
+    page.goto(f"{live_server}/?tab=Todas")
+    row = page.locator("#list [data-catalog-card]").first
+    expect(row).to_be_visible()
+    mark = row.locator(".nm-text .ban-line .bn-s")
+    expect(mark).to_be_visible()
+    box = mark.bounding_box()
+    meta = row.locator(".nm-text .meta").bounding_box()
+    assert box["y"] >= meta["y"] + meta["height"] - 1 and box["height"] <= 15
+    assert mark.get_attribute("data-tip").startswith("Limitada en TCG")
+    assert row.locator(".nm-text b .bn").count() == 0
 
 
 def test_shopping_wizard_plans_by_shipments_or_price(live_server, browser_page):
@@ -1165,3 +1198,108 @@ def test_moderator_and_admin_panels(live_server, browser_page, factory):
     expect(page.locator("#admin-record")).to_contain_text("Borró la cuenta")
     expect(page.locator("#admin-record")).not_to_contain_text(people["userbuyer"]["email"])
     assert not errors
+
+
+def synthetic_png():
+    import io
+
+    from PIL import Image
+
+    output = io.BytesIO()
+    Image.new("RGB", (300, 420), "teal").save(output, "PNG")
+    return output.getvalue()
+
+
+def test_a_seller_puts_a_card_on_sale_and_buyers_find_it(live_server, browser_page, factory):
+    from app.services import test_accounts
+
+    with factory.begin() as session:
+        people = {
+            row["role"] + row["type"]: row for row in test_accounts.create(session, "example.com")
+        }
+    seller = people["userseller"]
+    page = browser_page
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(f"{live_server}/yugioh?tab=Acceso")
+    page.locator("#auth-login input[type=email]").fill(seller["email"])
+    page.locator("#auth-login input[type=password]").fill(seller["password"])
+    page.locator("#auth-login button[type=submit]").click()
+    expect(page.locator("#ts")).to_contain_text("Hola,")
+    page.locator("#account-button").click()
+    page.locator('#account-menu [data-go="Stock"]').click()
+
+    stock = page.locator("#stockv")
+    expect(stock).to_contain_text("Todavía no tienes cartas a la venta.")
+    page.locator("#st-q").fill("Synthetic")
+    page.locator("[data-st-card]", has_text="Synthetic Test Dragon").click()
+    expect(page.locator("#st-printing")).to_contain_text("TST-EN001")
+    page.locator("#st-condition").select_option("EX")
+    page.locator("#st-quantity").fill("2")
+    page.locator("#st-price").fill("4.50")
+    page.locator("#st-currency").select_option("EUR")
+    page.locator("#st-form button[type=submit]").click()
+    mine = page.locator("#st-mine tbody tr")
+    expect(mine).to_have_count(1)
+    expect(mine).to_contain_text("Synthetic Test Dragon")
+    # Fewer copies left: saved from the table.
+    mine.locator("[data-st-quantity]").fill("1")
+    mine.locator("[data-st-save]").click()
+    expect(page.locator("#st-count")).to_contain_text("1 unidad")
+
+    # Above 10 USD, the copy needs its photo.
+    page.locator("#st-price").fill("20")
+    expect(page.locator("#st-photo-note")).to_contain_text("Obligatoria")
+    page.locator("#st-form button[type=submit]").click()
+    expect(page.locator("#st-error")).to_contain_text("añade una foto")
+    page.locator("#st-photo").set_input_files(
+        files=[{"name": "copia.png", "mimeType": "image/png", "buffer": synthetic_png()}]
+    )
+    expect(page.locator("#st-photo-preview")).to_be_visible()
+    page.locator("#st-form button[type=submit]").click()
+    expect(mine).to_have_count(2)
+    expect(page.locator("#st-mine .photo-thumb img")).to_have_count(1)
+
+    # A buyer finds the store among the sellers, and the offer under the card.
+    page.locator('[data-g="Vendedores"]').click()
+    store = page.locator("#vl .real-seller")
+    expect(store).to_contain_text("Tienda de prueba")
+    store.click()
+    expect(page.locator("#mb")).to_contain_text("TST-EN001")
+    page.locator("#mb [data-catalog-card]").first.click()
+    offers = page.locator("#mb .cd-offers tbody")
+    expect(offers).to_contain_text("Tienda de prueba")
+    expect(offers).to_contain_text("4,50")
+    expect(offers.locator(".photo-thumb")).to_have_count(1)
+
+    # Their profile knows they sell, before they ever saved it, and sums their stock.
+    page.locator("[data-close=md]").first.click()
+    page.locator("#account-button").click()
+    page.locator('#account-menu [data-go="Perfil"]').first.click()
+    expect(page.locator("#pf-role")).to_have_value("seller")
+    expect(page.locator("#pf-stat-items")).to_have_text("2")
+    expect(page.locator("#pf-tile-photos")).to_have_text("1 / 2")
+    page.locator('#pfv .acct-nav [data-go="Stock"]').click()
+    expect(page.locator("#st-mine tbody tr")).to_have_count(2)
+    assert not errors
+
+
+def test_phone_tables_fit_and_edges_line_up(live_server, browser_page):
+    """On a phone no panel scrolls sideways, and header, content and footer share
+    one left and right edge (at every width)."""
+    page = browser_page
+    sideways = """() => [...document.querySelectorAll('.wrap')]
+        .filter((box) => box.offsetParent && box.scrollWidth > box.clientWidth + 1)
+        .map((box) => box.className)"""
+    edges = """() => ['header', 'main', '.site-footer'].map((selector) => {
+        const box = document.querySelector(selector).getBoundingClientRect();
+        return [Math.round(box.left), Math.round(box.right)];
+    })"""
+    for width in (390, 820, 1280):
+        page.set_viewport_size({"width": width, "height": 844})
+        for tab in ("Todas", "Vendedores", "Productos"):
+            page.goto(f"{live_server}/yugioh?tab={tab}")
+            page.wait_for_timeout(300)
+            assert page.evaluate(sideways) == [], (width, tab)
+            header, main, footer = page.evaluate(edges)
+            assert header == main == footer, (width, tab)

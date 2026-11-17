@@ -1,6 +1,6 @@
 // Price history of a card: the chart, its figures and the tooltip.
 import { escapeHtml, html } from "./html.js";
-import { formatDate, money, toEuro } from "./format.js";
+import { formatDate, money, onEachFrame, toEuro } from "./format.js";
 import { t } from "./lang.js";
 
 const h = escapeHtml;
@@ -183,13 +183,15 @@ export function priceChartHtml(history, { printingId = "", days = 365, stats = t
     return stats ? chart + statsHtml(points, last, printingId) : chart;
 }
 
-document.addEventListener("pointermove", (event) => {
+function followPointer(event) {
     const tip = document.getElementById("ph-tip");
     const cursor = document.getElementById("ph-cursor");
     if (!tip || !cursor) return;
     if (!rendered || event.target.id !== "ph-hit") {
-        tip.style.display = "none";
-        cursor.style.display = "none";
+        if (tip.style.display !== "none") {
+            tip.style.display = "none";
+            cursor.style.display = "none";
+        }
         return;
     }
     const box = document.getElementById("ph-svg").getBoundingClientRect();
@@ -212,4 +214,6 @@ document.addEventListener("pointermove", (event) => {
     const container = tip.parentElement.getBoundingClientRect();
     tip.style.left = `${Math.min(Math.max(event.clientX - container.left + 12, 0), container.width - 180)}px`;
     tip.style.top = "40px";
-});
+}
+
+document.addEventListener("pointermove", onEachFrame(followPointer), { passive: true });

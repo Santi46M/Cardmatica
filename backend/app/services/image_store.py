@@ -49,3 +49,16 @@ def read(session: Session, settings, name: str | None) -> bytes | None:
         return session.scalar(select(StoredImage.content).where(StoredImage.name == name))
     path = _path(settings, name)
     return path.read_bytes() if path and path.is_file() else None
+
+
+def delete(session: Session, settings, name: str | None):
+    if not name:
+        return
+    if settings.image_storage == "database":
+        stored = session.get(StoredImage, name)
+        if stored:
+            session.delete(stored)
+        return
+    path = _path(settings, name)
+    if path and path.is_file():
+        path.unlink()

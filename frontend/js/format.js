@@ -28,3 +28,18 @@ export function formatDate(value) {
     }
     return date.toLocaleDateString(window.I18N.locale, { day: "numeric", month: "short", year: "numeric" });
 }
+
+// Pointer and scroll events come faster than the screen is drawn: this runs
+// the handler at most once per frame, with the latest event.
+export function onEachFrame(handler) {
+    let latest = null;
+    return (event) => {
+        if (!latest)
+            requestAnimationFrame(() => {
+                const event = latest;
+                latest = null;
+                handler(event);
+            });
+        latest = event;
+    };
+}

@@ -6,6 +6,7 @@
 // the banner and any open window, whatever their z-index.
 import { previewHtml } from "./catalog-view.js";
 import { HOVER_PREVIEW } from "./config.js";
+import { onEachFrame } from "./format.js";
 
 // lookup(id) returns the card shown on the page with that id.
 export function installCardPreview({ lookup }) {
@@ -61,10 +62,14 @@ export function installCardPreview({ lookup }) {
     }
 
     document.addEventListener("pointerover", consider);
-    document.addEventListener("pointermove", (event) => {
-        if (!preview.hidden && target) place(event.clientX, event.clientY);
-        else consider(event);
-    });
+    document.addEventListener(
+        "pointermove",
+        onEachFrame((event) => {
+            if (!preview.hidden && target) place(event.clientX, event.clientY);
+            else consider(event);
+        }),
+        { passive: true }
+    );
     document.addEventListener("pointerout", (event) => {
         if (target && !target.contains(event.relatedTarget)) hidePreview();
     });

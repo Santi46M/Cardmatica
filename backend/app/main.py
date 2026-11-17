@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 
-from app.api import account, admin, analytics, auth, catalog, news, pages
+from app.api import account, admin, analytics, auth, catalog, listings, news, pages
 from app.core.caching import CacheControlMiddleware
 from app.core.config import ROOT, get_settings
 from app.core.logging import configure_logging
@@ -40,6 +40,7 @@ app.include_router(admin.router)
 app.include_router(admin.staff_router)
 app.include_router(auth.router)
 app.include_router(account.router)
+app.include_router(listings.router)
 app.include_router(analytics.router)
 app.include_router(news.router)
 

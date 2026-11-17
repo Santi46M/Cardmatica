@@ -1,4 +1,5 @@
 // Accounts in the browser: sign in, register, sign out, password and sessions.
+import { accountNavHtml } from "./account-nav.js";
 import { escapeHtml, html } from "./html.js";
 import { locale, t } from "./lang.js";
 import { track } from "./analytics.js";
@@ -182,6 +183,8 @@ export async function renderSecurity(container) {
             </section>`;
     container.innerHTML = html`
         ${title}
+        ${accountNavHtml("Seguridad", user.sells)}
+        <div class="acct-grid">
         ${unverified}
         <form class="gl pnl fm-stack" id="auth-password-form" novalidate>
             <b>${t("Cambiar contraseña")}</b>
@@ -195,7 +198,8 @@ export async function renderSecurity(container) {
             <b>${t("Sesiones abiertas")}</b>
             <p class="catalog-status">${t("Cargando…")}</p>
         </section>
-        ${dataHtml()}`;
+        ${dataHtml()}
+        </div>`;
     const slot = () => container.querySelector("#auth-sessions");
     try {
         const sessions = await call("/sessions");
