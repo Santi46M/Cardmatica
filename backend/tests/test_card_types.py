@@ -189,6 +189,8 @@ def test_level_rank_and_link_are_separate_and_sort_by_release(client, factory, r
     assert names(client, level=4) == ["Synthetic Four"]
     assert names(client, rank=4) == ["Synthetic Xyz"]
     assert names(client, link_rating=4) == ["Synthetic Link"]
+    # Level/Rank: the stars on the card, whichever they are; never a Link rating.
+    assert names(client, stars=4) == ["Synthetic Four", "Synthetic Xyz"]
 
     def order(sort):
         items = client.get("/api/v1/cards", params={"sort": sort, "market": "TCG"}).json()["items"]
@@ -198,4 +200,5 @@ def test_level_rank_and_link_are_separate_and_sort_by_release(client, factory, r
     assert order("oldest") == ["Synthetic Xyz", "Synthetic Four", "Synthetic Link"]
     types = client.get("/api/v1/facets").json()["types"]
     assert types["levels"] == [4] and types["ranks"] == [4] and types["link_ratings"] == [4]
-    assert types["attributes_present"] == ["LIGHT"]
+    # Every attribute is offered, DIVINE too, whatever the catalogue has.
+    assert types["monster"]["attributes"][-1] == "DIVINE"

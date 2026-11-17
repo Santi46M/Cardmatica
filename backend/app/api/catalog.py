@@ -39,7 +39,7 @@ from app.schemas.catalog import (
 from app.services import card_views, image_store, rarities, recommendations
 from app.services import product_images as product_photos
 from app.services.banlists import current_lists, list_view, statuses_for_cards
-from app.services.card_types import ATTRIBUTES, RACES, taxonomy
+from app.services.card_types import RACES, taxonomy
 from app.services.catalog import card_detail, card_summary, errata_views, printing_view
 from app.services.images import displayable
 from app.services.prices import last_sales, price_history
@@ -70,6 +70,8 @@ def cards(
     attribute: Annotated[str | None, Query(max_length=20)] = None,
     level: Annotated[int | None, Query(ge=0, le=13)] = None,
     rank: Annotated[int | None, Query(ge=0, le=13)] = None,
+    # A Level or a Rank (Xyz): the stars on the card, whichever they are.
+    stars: Annotated[int | None, Query(ge=0, le=13)] = None,
     link_rating: Annotated[int | None, Query(ge=1, le=8)] = None,
     card_property: Annotated[str | None, Query(alias="property", max_length=20)] = None,
     rarity: Annotated[str | None, Query(max_length=100)] = None,
@@ -97,6 +99,7 @@ def cards(
         attribute=attribute,
         level=level,
         rank=rank,
+        stars=stars,
         link_rating=link_rating,
         card_property=card_property,
         rarity_names=rarity_names(session, rarity, rarity_family, game),
@@ -467,10 +470,10 @@ def types_present(session, game="yugioh"):
     """What the catalogue has, so the filters never offer an empty choice."""
     if game != "yugioh":
         return game_types_present(session, game)
-    races, attributes = present(session, Card.monster_race), present(session, Card.attribute)
+    # Attributes are always the seven of card_types.ATTRIBUTES: the list is short.
+    races = present(session, Card.monster_race)
     return {
         "races_present": [race for race in RACES if race in races],
-        "attributes_present": [value for value in ATTRIBUTES if value in attributes],
         "levels": sorted(present(session, Card.level)),
         "ranks": sorted(present(session, Card.rank)),
         "link_ratings": sorted(present(session, Card.link_rating)),

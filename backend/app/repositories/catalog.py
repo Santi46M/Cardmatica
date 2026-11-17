@@ -125,6 +125,7 @@ class CatalogRepository:
         attribute=None,
         level=None,
         rank=None,
+        stars=None,
         link_rating=None,
         card_property=None,
         rarity_names=None,
@@ -176,6 +177,8 @@ class CatalogRepository:
             *(column == value for column, value in equal.items() if value),
             *(column == value for column, value in numbers.items() if value is not None),
         )
+        if stars is not None:
+            query = query.where(or_(Card.level == stars, Card.rank == stars))
         # Lists stored as JSON: the value must be one of their items.
         if subtype:
             query = query.where(listed(Card.subtypes, subtype))

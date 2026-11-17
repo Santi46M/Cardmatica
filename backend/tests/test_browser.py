@@ -468,10 +468,15 @@ def test_type_filters_follow_the_tab(live_server, browser_page):
     page.locator("#f-frame").select_option("Effect")
     expect(page.locator("#list")).to_contain_text("Synthetic Test Dragon")
     assert "clase=Effect" in page.url
-    # Level, Rank and Link are separate groups with only the numbers the catalogue has.
-    expect(page.locator('#f-level optgroup[label="Nivel"] option')).to_have_text(["Nivel 8"])
+    # Level and Rank are one group, Link another, with only the numbers the catalogue has.
+    expect(page.locator('#f-level optgroup[label="Nivel/Rango"] option')).to_have_text(
+        ["Nivel/Rango 8"]
+    )
     expect(page.locator('#f-level optgroup[label="Link"]')).to_have_count(0)
-    page.locator("#f-level").select_option("level:8")
+    # The seven attributes, DIVINO included, whatever the catalogue has.
+    expect(page.locator("#f-attribute option")).to_have_count(8)
+    expect(page.locator("#f-attribute option").last).to_have_text("DIVINO")
+    page.locator("#f-level").select_option("stars:8")
     expect(page.locator("#list")).to_contain_text("Synthetic Test Dragon")
     page.reload()
     expect(page.locator("#f-frame")).to_have_value("Effect")
