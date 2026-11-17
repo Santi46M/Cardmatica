@@ -85,7 +85,7 @@ const ATTRIBUTE_LABELS = {
     WATER: "AGUA",
     FIRE: "FUEGO",
     WIND: "VIENTO",
-    DIVINE: "DIVINIDAD"
+    DIVINE: "DIVINO"
 };
 const PROPERTY_LABELS = {
     Spell: {
@@ -292,8 +292,9 @@ export const TYPE_FILTERS = [
     { id: "f-energy", param: "ener", api: "subtype", label: "Tipo de Energía", game: "pokemon", tabs: ["Energia"] }
 ];
 
-// The three numbers of a monster, each with its own API parameter.
-const STAR_PARAMS = { level: "level", rank: "rank", link: "link_rating" };
+// The numbers of a monster, each with its own API parameter. "stars" is a Level
+// or a Rank (Xyz): both are stars on the card, and a duelist looks for them as one.
+const STAR_PARAMS = { stars: "stars", level: "level", rank: "rank", link: "link_rating" };
 
 // Labels are translated here, so the tables above stay in one language.
 const option = (value, label) => `<option value="${h(value)}">${h(t(label))}</option>`;
@@ -317,14 +318,14 @@ function cardTypeOptions(types) {
     );
 }
 
-// Values read "level:4", "rank:4" or "link:2": three different numbers on a card.
+// Values read "stars:4" (Level 4 or Rank 4) or "link:2".
 function starOptions(types) {
     const numbers = (kind, values, label) =>
         values.map((value) => option(`${kind}:${value}`, label(value))).join("");
+    const stars = [...new Set([...(types.levels || []), ...(types.ranks || [])])].sort((a, b) => a - b);
     return (
         option("", "Cualquier nivel, rango o Link") +
-        group("Nivel", numbers("level", types.levels || [], (value) => t("Nivel {number}", { number: value }))) +
-        group("Rango (Xyz)", numbers("rank", types.ranks || [], (value) => t("Rango {number}", { number: value }))) +
+        group("Nivel/Rango", numbers("stars", stars, (value) => t("Nivel/Rango {number}", { number: value }))) +
         group("Link", numbers("link", types.link_ratings || [], (value) => `LINK-${value}`))
     );
 }
@@ -407,8 +408,8 @@ function optionsFor(filter, tab, types) {
         case "f-attribute":
             return (
                 option("", "Todos los atributos") +
-                (types.attributes_present?.length ? types.attributes_present : types.monster.attributes)
-                    .map((value) => option(value, ATTRIBUTE_LABELS[value]))
+                // All seven, DIVINE too, even before the catalogue has a card of each.
+                types.monster.attributes.map((value) => option(value, ATTRIBUTE_LABELS[value]))
                     .join("")
             );
         case "f-level":
