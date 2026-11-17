@@ -44,6 +44,9 @@ Family = Literal[
     "other",
 ]
 UNKNOWN = "Unknown"
+# What a source writes while it does not know the rarity yet ("New": a card of
+# an upcoming set on YGOPRODeck). Stored as Unknown, shown as "Sin documentar".
+PLACEHOLDERS = {"unknown", "new"}
 
 
 @dataclass(frozen=True)
@@ -234,7 +237,10 @@ def canonical(value: str | None, game: str = "yugioh") -> str:
     text = " ".join((value or "").split()).strip("() ")
     key = _key(text)
     # Basic Pokémon Energy has no rarity: TCGdex writes "None".
-    if not key or key == "unknown" or (game == "pokemon" and key == "none"):
+    if not key or key in PLACEHOLDERS or (game == "pokemon" and key == "none"):
+        return UNKNOWN
+    # A bare number ("2", "3") is a typing slip in the source, not a rarity.
+    if key.isdigit():
         return UNKNOWN
     spellings = _tables(game)[1]
     # "Secret" and "Quarter Century Secret" are the names without "Rare".
