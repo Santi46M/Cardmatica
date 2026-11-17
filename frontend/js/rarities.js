@@ -179,11 +179,32 @@ function letters(printing) {
         .slice(0, 4);
 }
 
+// Rough width of each letter in em, in a black (900) sans-serif: enough to
+// shrink a tag so it never touches the edges, whatever font the device has.
+const WIDE = "MW";
+const NARROW = "I.";
+const emWidth = (tag) =>
+    [...tag].reduce((sum, char) => sum + (WIDE.includes(char) ? 0.95 : NARROW.includes(char) ? 0.35 : 0.75), 0);
+
+// Badge size (the viewBox), the room left for the letters and their largest size.
+const WIDTH = 80;
+const HEIGHT = 54;
+const ROOM = 70;
+const LARGEST = 50;
+// The binder's letters are condensed; any font squeezed down to this width
+// matches them. Short tags are squeezed less, or not at all.
+const CONDENSED = 0.75;
+// Capital letters are about 0.7 em tall in every common font; putting the
+// baseline half of that below the middle centres them. ("central" would centre
+// the font's whole line box instead, and each font draws that lower or higher.)
+const HALF_CAP = 0.35;
+
 function drawnBadge(tag, dark, light) {
-    // Narrower letters for longer tags, as in the pictures; never past the edges.
-    const size = tag.length <= 2 ? 40 : tag.length === 3 ? 33 : 27;
-    const fit = tag.length >= 4 ? ' textLength="70" lengthAdjust="spacingAndGlyphs"' : "";
-    return `<svg viewBox="0 0 80 54" aria-hidden="true"><rect width="80" height="54" rx="6.5" fill="${light}"/><path d="M6.5 0H49.6L24 54H6.5A6.5 6.5 0 0 1 0 47.5V6.5A6.5 6.5 0 0 1 6.5 0Z" fill="${dark}"/><text x="40" y="29" dominant-baseline="central" text-anchor="middle" font-size="${size}"${fit}>${h(tag)}</text></svg>`;
+    const width = emWidth(tag);
+    const size = Math.min(LARGEST, ROOM / (width * CONDENSED));
+    const squeeze = Math.min(1, ROOM / (width * size)).toFixed(2);
+    const baseline = (HEIGHT / 2 + HALF_CAP * size).toFixed(1);
+    return `<svg viewBox="0 0 ${WIDTH} ${HEIGHT}" aria-hidden="true"><rect width="${WIDTH}" height="${HEIGHT}" rx="6.5" fill="${light}"/><path d="M6.5 0H49.6L24 54H6.5A6.5 6.5 0 0 1 0 47.5V6.5A6.5 6.5 0 0 1 6.5 0Z" fill="${dark}"/><text transform="translate(${WIDTH / 2} ${baseline}) scale(${squeeze} 1)" text-anchor="middle" font-size="${size.toFixed(1)}">${h(tag)}</text></svg>`;
 }
 
 function iconHtml(printing, known, game) {
