@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     serverless: bool = Field(default=False, validation_alias=AliasChoices("SERVERLESS", "VERCEL"))
     admin_token: str = Field(default="", repr=False)
     user_agent: str = "Cardmatica/0.2 (catalog maintenance)"
+    # How many cards each game's catalogue grows to, a few each build of the
+    # test site, e.g. CATALOG_CARDS='{"yugioh": 3000}' (cli.py prepare-test-site).
+    catalog_cards: dict[str, int] = {}
+    # Yu-Gi-Oh! archetypes imported whole, as YGOPRODeck names them,
+    # e.g. CATALOG_ARCHETYPES='["Blue-Eyes", "Dark Magician"]'.
+    catalog_archetypes: list[str] = []
     ygoprodeck_enabled: bool = True
     ygoprodeck_request_interval: float = Field(default=1.0, ge=0.05)
     deployment_mode: str = "production"

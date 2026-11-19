@@ -333,7 +333,7 @@ def test_new_sources_accept_their_languages_only():
     for options in (
         {"source": "scryfall", "language": "fr"},
         {"source": "tcgdex", "language": "ko"},
-        {"source": "ygoprodeck", "query": "e:tst"},
+        {"source": "tcgdex", "query": "e:tst"},
     ):
         with pytest.raises(ValidationError):
             JobRequest.model_validate({"mode": "initial", **options})

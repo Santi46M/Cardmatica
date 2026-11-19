@@ -297,8 +297,9 @@ class JobRequest(BaseModel):
             raise ValueError("YGOPRODeck admite en, fr, de, it y pt; no inventar traducciones")
         if self.source in {"scryfall", "tcgdex"} and self.language not in {"en", "es", "pt", "ja"}:
             raise ValueError(f"{self.source}: se importan en, es, pt y ja")
-        if self.query and self.source != "scryfall":
-            raise ValueError("query solo se usa con Scryfall")
+        # Scryfall: its search syntax; YGOPRODeck: one archetype's name.
+        if self.query and self.source not in {"scryfall", "ygoprodeck"}:
+            raise ValueError("query solo se usa con Scryfall y YGOPRODeck")
         if self.mode == "banlist":
             raise ValueError("La nueva fuente no documenta vigencia de banlists oficiales")
         if self.mode in {"card", "errata", "images"} and not self.identifier:

@@ -142,3 +142,38 @@ async def test_initial_sync_limits_printings_per_card(factory, settings, record)
     # Three cards, each with its original Common and the Secret Rare.
     assert codes.count("AAA-EN001") == 3 and codes.count("CCC-EN001") == 3
     assert "BBB-EN001" not in codes
+
+
+def test_the_build_grows_the_catalogue_and_adds_archetypes(factory, settings, record):
+    import time
+
+    from app import cli
+
+    source = FixtureSource(record)
+    runner = SyncRunner(factory, settings, {"ygoprodeck": source})
+
+    def cards():
+        with factory() as session:
+            return session.scalar(select(func.count()).select_from(Card))
+
+    # The first catalogue stopped after one card, as on the test site.
+    cli.run_job(
+        runner, runner.enqueue(JobRequest(source="ygoprodeck", mode="initial", max_cards=1))
+    )
+    assert cards() == 1
+
+    later = time.monotonic() + 60
+    cli.grow_catalogs(runner, {"yugioh": 2, "chess": 9}, later)
+    assert cards() == 2
+    # Time up: nothing more is asked for.
+    cli.grow_catalogs(runner, {"yugioh": 3}, time.monotonic() - 1)
+    assert cards() == 2
+
+    cli.import_archetypes(runner, ["Blue-Eyes"], later)
+    asked = len(source.calls)
+    with factory() as session:
+        job = session.scalars(select(SyncJob).order_by(SyncJob.created_at.desc())).first()
+        assert job.parameters["query"] == "Blue-Eyes" and job.status == "completed"
+    # An archetype already imported is not asked for again.
+    cli.import_archetypes(runner, ["Blue-Eyes"], later)
+    assert len(source.calls) == asked
