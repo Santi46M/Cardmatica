@@ -4,6 +4,7 @@ import base64
 
 import pytest
 
+from app.core import test_site
 from app.integrations.http import AccessDenied
 
 
@@ -33,13 +34,53 @@ def test_the_test_site_says_so_and_stays_out_of_search_engines(client, settings,
 def test_with_a_password_only_who_has_it_gets_in(client, settings, monkeypatch):
     monkeypatch.setattr(settings, "test_site", True)
     monkeypatch.setattr(settings, "test_site_password", "una clave de prueba")
-    refused = client.get("/")
-    assert refused.status_code == 401
-    assert refused.headers["www-authenticate"].startswith("Basic")
-    assert client.get("/", headers=basic("otra")).status_code == 401
-    assert client.get("/", headers=basic("una clave de prueba")).status_code == 200
+    monkeypatch.setattr(test_site, "WRONG_WAIT_SECONDS", 0)
+    html = {"Accept": "text/html"}
+    # A page asks for the password: no browser box (some never show it).
+    gate = client.get("/yugioh?tab=Todas", headers=html)
+    assert gate.status_code == 401 and "www-authenticate" not in gate.headers
+    assert 'name="password"' in gate.text and "noindex" in gate.text
+    assert client.get("/api/v1/sets").status_code == 401
+
+    wrong = client.post(test_site.GATE_PATH, data={"password": "otra", "next": "/yugioh"})
+    assert wrong.status_code == 401 and "Esa no es la contraseña" in wrong.text
+    assert test_site.COOKIE not in client.cookies
+
+    # Pasted with a space at the end, it still opens; back to the page asked for.
+    entered = client.post(
+        test_site.GATE_PATH,
+        data={"password": "una clave de prueba ", "next": "/yugioh?tab=Todas"},
+        follow_redirects=False,
+    )
+    assert entered.status_code == 303 and entered.headers["location"] == "/yugioh?tab=Todas"
+    assert "httponly" in entered.headers["set-cookie"].lower()
+    assert client.get("/yugioh", headers=html).status_code == 200
+    assert client.get("/api/v1/sets").status_code == 200
+
+    # A new password locks everyone out again.
+    monkeypatch.setattr(settings, "test_site_password", "otra clave")
+    assert client.get("/yugioh", headers=html).status_code == 401
     # The host's health check gets through without it.
     assert client.get("/health/live").status_code == 200
+
+
+def test_the_key_only_sends_back_to_this_site(client, settings, monkeypatch):
+    monkeypatch.setattr(settings, "test_site", True)
+    monkeypatch.setattr(settings, "test_site_password", "una clave de prueba")
+    for elsewhere in ("https://example.com/", "//example.com/", "/\\example.com"):
+        entered = client.post(
+            test_site.GATE_PATH,
+            data={"password": "una clave de prueba", "next": elsewhere},
+            follow_redirects=False,
+        )
+        assert entered.headers["location"] == "/"
+
+
+def test_scripts_may_still_send_basic_credentials(client, settings, monkeypatch):
+    monkeypatch.setattr(settings, "test_site", True)
+    monkeypatch.setattr(settings, "test_site_password", "una clave de prueba")
+    assert client.get("/", headers=basic("otra")).status_code == 401
+    assert client.get("/", headers=basic("una clave de prueba")).status_code == 200
 
 
 def test_with_a_user_name_both_must_match(client, settings, monkeypatch):

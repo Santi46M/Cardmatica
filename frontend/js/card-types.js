@@ -85,7 +85,7 @@ const ATTRIBUTE_LABELS = {
     WATER: "AGUA",
     FIRE: "FUEGO",
     WIND: "VIENTO",
-    DIVINE: "DIVINIDAD"
+    DIVINE: "DIVINO"
 };
 const PROPERTY_LABELS = {
     Spell: {
@@ -183,9 +183,12 @@ export const MAGIC_TYPES = {
     Artifact: "Artefacto",
     Enchantment: "Encantamiento",
     Land: "Tierra",
-    Kindred: "Tribal"
+    // Formerly "Tribal" (renamed in 2024); the Spanish cards now say "Estirpe".
+    Kindred: "Estirpe"
 };
-export const MAGIC_COLORS = { W: "Blanco", U: "Azul", B: "Negro", R: "Rojo", G: "Verde" };
+// The five colours, then the two choices that are not one colour
+// (COLORLESS and MULTICOLOR in backend/app/repositories/catalog.py).
+export const MAGIC_COLORS = { W: "Blanco", U: "Azul", B: "Negro", R: "Rojo", G: "Verde", C: "Incoloro", M: "Multicolor" };
 
 // "Criatura · {1}{U}{R}"; the whole type line, in English as Oracle writes it, is in the card window.
 function magicLine(card) {
@@ -222,13 +225,18 @@ const POKEMON_WORDS = {
     Lightning: "Rayo",
     Psychic: "Psíquico",
     Fighting: "Lucha",
-    Darkness: "Oscura",
-    Metal: "Metálica",
+    Darkness: "Oscuro",
+    Metal: "Metálico",
     Dragon: "Dragón",
     Fairy: "Hada",
-    Colorless: "Incolora"
+    Colorless: "Incoloro"
 };
 export const pokemonWord = (word) => (POKEMON_WORDS[word] ? t(POKEMON_WORDS[word]) : word);
+
+// A Pokémon is "de tipo Psíquico"; its Energy is "Energía Psíquica": the
+// types that change with the word, as the Spanish cards print them.
+const ENERGY_NAMES = { Psychic: "Psíquica", Darkness: "Oscura", Metal: "Metálica", Colorless: "Incolora" };
+const energyWord = (word) => (ENERGY_NAMES[word] ? t(ENERGY_NAMES[word]) : pokemonWord(word));
 
 // "Pokémon · Fase 2 · ex · Fuego · 360 PS" · "Entrenador · Partidario" · "Energía · Básica"
 function pokemonLine(card) {
@@ -240,7 +248,7 @@ function pokemonLine(card) {
         printing,
         pokemonWord(card.card_type),
         ...(card.subtypes || []).map(pokemonWord),
-        ...(card.colors || []).map(pokemonWord),
+        ...(card.colors || []).map(card.card_type === "Energy" ? energyWord : pokemonWord),
         card.hp ? t("{hp} PS", { hp: card.hp }) : ""
     ]
         .filter(Boolean)
@@ -292,8 +300,9 @@ export const TYPE_FILTERS = [
     { id: "f-energy", param: "ener", api: "subtype", label: "Tipo de Energía", game: "pokemon", tabs: ["Energia"] }
 ];
 
-// The three numbers of a monster, each with its own API parameter.
-const STAR_PARAMS = { level: "level", rank: "rank", link: "link_rating" };
+// The numbers of a monster, each with its own API parameter. "stars" is a Level
+// or a Rank (Xyz): both are stars on the card, and a duelist looks for them as one.
+const STAR_PARAMS = { stars: "stars", level: "level", rank: "rank", link: "link_rating" };
 
 // Labels are translated here, so the tables above stay in one language.
 const option = (value, label) => `<option value="${h(value)}">${h(t(label))}</option>`;
@@ -317,32 +326,29 @@ function cardTypeOptions(types) {
     );
 }
 
-// Values read "level:4", "rank:4" or "link:2": three different numbers on a card.
+// Values read "stars:4" (Level 4 or Rank 4) or "link:2".
 function starOptions(types) {
     const numbers = (kind, values, label) =>
         values.map((value) => option(`${kind}:${value}`, label(value))).join("");
+    const stars = [...new Set([...(types.levels || []), ...(types.ranks || [])])].sort((a, b) => a - b);
     return (
         option("", "Cualquier nivel, rango o Link") +
-        group("Nivel", numbers("level", types.levels || [], (value) => t("Nivel {number}", { number: value }))) +
-        group("Rango (Xyz)", numbers("rank", types.ranks || [], (value) => t("Rango {number}", { number: value }))) +
+        group("Nivel/Rango", numbers("stars", stars, (value) => t("Nivel/Rango {number}", { number: value }))) +
         group("Link", numbers("link", types.link_ratings || [], (value) => `LINK-${value}`))
     );
 }
-
-// The values of a list the catalogue has, in the order of `order`.
-const present = (order, values) => (order || []).filter((value) => (values || []).includes(value));
 
 function optionsFor(filter, tab, types) {
     switch (filter.id) {
         case "f-mtype":
             return (
                 option("", "Todos los tipos") +
-                present(Object.keys(MAGIC_TYPES), types.kinds_present).map((value) => option(value, MAGIC_TYPES[value])).join("")
+                Object.entries(MAGIC_TYPES).map(([value, label]) => option(value, label)).join("")
             );
         case "f-color":
             return (
                 option("", "Todos los colores") +
-                present(types.colors, types.colors_present).map((value) => option(value, MAGIC_COLORS[value])).join("")
+                Object.entries(MAGIC_COLORS).map(([value, label]) => option(value, label)).join("")
             );
         case "f-mana":
             return (
@@ -352,23 +358,23 @@ function optionsFor(filter, tab, types) {
                     .join("")
             );
         case "f-pkind":
-            return option("", "Todos los tipos") + present(types.kinds, types.kinds_present).map((value) => option(value, POKEMON_WORDS[value])).join("");
+            return option("", "Todos los tipos") + types.kinds.map((value) => option(value, POKEMON_WORDS[value])).join("");
         case "f-ptype":
             return (
-                option("", "Todos los tipos de energía") +
-                present(types.colors, types.colors_present).map((value) => option(value, POKEMON_WORDS[value])).join("")
+                option("", "Todos los tipos") +
+                types.colors.map((value) => option(value, POKEMON_WORDS[value])).join("")
             );
         case "f-stage":
-            return option("", "Todas las fases") + present(types.stages, types.subtypes_present).map((value) => option(value, POKEMON_WORDS[value] || value)).join("");
+            return option("", "Todas las fases") + types.stages.map((value) => option(value, POKEMON_WORDS[value] || value)).join("");
         case "f-trainer":
             return (
                 option("", "Todos los Entrenadores") +
-                present(types.trainer_types, types.subtypes_present).map((value) => option(value, POKEMON_WORDS[value])).join("")
+                types.trainer_types.map((value) => option(value, POKEMON_WORDS[value])).join("")
             );
         case "f-energy":
             return (
                 option("", "Todas las Energías") +
-                present(types.energy_types, types.subtypes_present).map((value) => option(value, POKEMON_WORDS[value])).join("")
+                types.energy_types.map((value) => option(value, POKEMON_WORDS[value])).join("")
             );
         case "f-type":
             return cardTypeOptions(types);
@@ -398,7 +404,7 @@ function optionsFor(filter, tab, types) {
         case "f-race":
             return (
                 option("", "Todos los tipos de monstruo") +
-                (types.races_present.length ? types.races_present : types.monster.races)
+                types.monster.races
                     .map((value) => [value, RACE_LABELS[value] || value])
                     .sort(byLabel)
                     .map(([value, label]) => option(value, label))
@@ -407,8 +413,8 @@ function optionsFor(filter, tab, types) {
         case "f-attribute":
             return (
                 option("", "Todos los atributos") +
-                (types.attributes_present?.length ? types.attributes_present : types.monster.attributes)
-                    .map((value) => option(value, ATTRIBUTE_LABELS[value]))
+                // All seven, DIVINE too, even before the catalogue has a card of each.
+                types.monster.attributes.map((value) => option(value, ATTRIBUTE_LABELS[value]))
                     .join("")
             );
         case "f-level":
@@ -424,20 +430,21 @@ function optionsFor(filter, tab, types) {
 }
 
 // The filters of a tab, as <select> elements (labels kept for screen readers).
-export function typeFiltersHtml(tab, types, game = "yugioh") {
+// `prefix` keeps apart two sets of filters on the same page ("st-" in Mi stock).
+export function typeFiltersHtml(tab, types, game = "yugioh", prefix = "") {
     return TYPE_FILTERS.filter((filter) => filter.game === game && filter.tabs.includes(tab))
         .map((filter) => {
             const label = labelOf(filter, tab);
-            return `<select id="${filter.id}" aria-label="${h(label)}" title="${h(label)}">${optionsFor(filter, tab, types)}</select>`;
+            return `<select id="${prefix}${filter.id}" aria-label="${h(label)}" title="${h(label)}">${optionsFor(filter, tab, types)}</select>`;
         })
         .join("");
 }
 
-// API parameters from the filters on screen.
-export function typeParams() {
+// API parameters from the filters on screen (those drawn with the same prefix).
+export function typeParams(prefix = "") {
     const params = {};
     for (const filter of TYPE_FILTERS) {
-        const value = document.getElementById(filter.id)?.value;
+        const value = document.getElementById(prefix + filter.id)?.value;
         if (!value) continue;
         if (filter.id === "f-type") {
             // "Monster::" is every monster; "Monster:frame:Effect" one kind of them.

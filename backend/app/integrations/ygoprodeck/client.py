@@ -5,8 +5,11 @@ CACHE_SECONDS = 172800
 
 
 class YgoprodeckClient:
-    def __init__(self, http: PoliteHttpClient):
+    """YGOPRODeck's cards, all of them or those of one archetype ("Blue-Eyes")."""
+
+    def __init__(self, http: PoliteHttpClient, archetype: str | None = None):
         self.http = http
+        self.archetype = archetype
         self._cards = {}
         self._sets = None
 
@@ -36,6 +39,8 @@ class YgoprodeckClient:
     async def batch(self, cursor, *, language="en", incremental=False):
         offset = int(cursor.get("api_offset", 0))
         params = {"num": 100, "offset": offset, "sort": "id", "misc": "yes"}
+        if self.archetype:
+            params["archetype"] = self.archetype
         if language != "en":
             params["language"] = language
         # No modification feed exists: incremental runs revalidate bounded pages.

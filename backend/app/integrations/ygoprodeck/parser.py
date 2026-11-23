@@ -3,6 +3,7 @@ from datetime import date
 
 from pydantic import HttpUrl
 
+from app.integrations.ygoprodeck import corrections
 from app.schemas.ingestion import (
     ArtworkInput,
     CardRecord,
@@ -11,6 +12,7 @@ from app.schemas.ingestion import (
     PrintingInput,
     TextInput,
 )
+from app.services import rarities
 
 BASE = "https://db.ygoprodeck.com/api/v7/"
 LANGUAGES = {
@@ -25,6 +27,13 @@ LANGUAGES = {
     "KR": "ko",
     "AE": "ae",
 }
+
+
+def rarity(code, sent):
+    """The rarity YGOPRODeck sends, or the documented one where it sends no rarity."""
+    if rarities.canonical(sent) == rarities.UNKNOWN and code in corrections.RARITIES:
+        return corrections.RARITIES[code][0]
+    return sent or rarities.UNKNOWN
 
 
 def parse_card(data: dict, language="en", sets=()) -> CardRecord:
@@ -67,7 +76,7 @@ def parse_card(data: dict, language="en", sets=()) -> CardRecord:
                 code=code,
                 set_key=printing["set_name"],
                 set_name=printing["set_name"],
-                rarity=printing.get("set_rarity") or "Unknown",
+                rarity=rarity(code, printing.get("set_rarity")),
                 language=locale,
                 market=market,
             )

@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID
 
-from sqlalchemy import exists, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.orm import aliased
 
 from app.core.config import get_settings
@@ -330,6 +330,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     prepare.add_argument("--max-cards", type=int, default=1000)
     prepare.add_argument(
+        "--catalog-minutes",
+        type=float,
+        default=0,
+        help="Minutos como máximo para sumar cartas (CATALOG_CARDS, CATALOG_ARCHETYPES)",
+    )
+    prepare.add_argument(
         "--image-minutes",
         type=float,
         default=0,
@@ -511,9 +517,83 @@ def run_prepare_test_site(args, parser):
             # A first catalogue that stops at the limit is a success ("paused").
             print(json.dumps({"game": game}))
             print_job(run_job(runner, runner.enqueue(request)))
+    if args.catalog_minutes:
+        deadline = time.monotonic() + args.catalog_minutes * 60
+        runner = SyncRunner()
+        import_archetypes(runner, settings.catalog_archetypes, deadline)
+        grow_catalogs(runner, settings.catalog_cards, deadline)
     if settings.local_image_preview and args.image_minutes:
         preview_images(5000, minutes=args.image_minutes)
     return 0
+
+
+# Cards a job adds before the clock is looked at again; what a build leaves
+# undone, the next one goes on with (the job keeps its place).
+CATALOG_STEP = 250
+FINISHED = {"completed", "completed_with_errors"}
+
+
+def run_step(runner, job_id, max_cards):
+    """Run a stopped job again for at most `max_cards` cards; its status after."""
+    with runner.factory.begin() as session:
+        job = session.get(SyncJob, job_id, with_for_update=True)
+        job.parameters = {**job.parameters, "max_cards": max_cards}
+        job.status = "pending"
+    job = run_job(runner, job_id)
+    print_job(job)
+    return job.status
+
+
+def import_archetypes(runner, names, deadline):
+    """Every card of each Yu-Gi-Oh! archetype named, each one once."""
+    for name in names:
+        with runner.factory() as session:
+            jobs = session.scalars(
+                select(SyncJob).where(SyncJob.source == "ygoprodeck", SyncJob.mode == "initial")
+            ).all()
+        job = next((job for job in jobs if job.parameters.get("query") == name), None)
+        if job and job.status in FINISHED:
+            continue
+        print(json.dumps({"archetype": name}))
+        if job is None:
+            request = JobRequest(
+                source="ygoprodeck", mode="initial", query=name, max_cards=1, max_printings=2
+            )
+            job_id = runner.enqueue(request)
+        else:
+            job_id = job.id
+        status = "paused"
+        while status == "paused" and time.monotonic() < deadline:
+            status = run_step(runner, job_id, CATALOG_STEP)
+
+
+def grow_catalogs(runner, targets, deadline):
+    """Each game's first catalogue, carried on until it has `targets[game]` cards."""
+    for game, target in targets.items():
+        source = GAME_SOURCES.get(game)
+        if not source:
+            print(json.dumps({"unknown_game": game}))
+            continue
+        with runner.factory() as session:
+            jobs = session.scalars(
+                select(SyncJob)
+                .where(SyncJob.source == source, SyncJob.mode == "initial")
+                .order_by(SyncJob.created_at)
+            ).all()
+        # The walk through the whole catalogue: the one without a query.
+        walk = next((job for job in jobs if not job.parameters.get("query")), None)
+        if walk is None or walk.status in FINISHED:
+            continue
+        while time.monotonic() < deadline:
+            with runner.factory() as session:
+                count = session.scalar(
+                    select(func.count()).select_from(Card).where(Card.game == game)
+                )
+            if count >= target:
+                break
+            print(json.dumps({"game": game, "cards": count, "target": target}))
+            if run_step(runner, walk.id, min(CATALOG_STEP, target - count)) != "paused":
+                break
 
 
 COMMANDS = {

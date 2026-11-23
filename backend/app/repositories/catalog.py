@@ -1,6 +1,7 @@
 from sqlalchemy import Text, case, exists, func, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from app.integrations.scryfall import parser as scryfall
 from app.models import Archetype, Card, CardArchetype, CardName, CardPrinting, CardSet, Rarity
 
 
@@ -28,6 +29,19 @@ def looks_like_code(text):
 def listed(column, value):
     """The JSON list in `column` includes `value`."""
     return column.cast(Text).contains('"' + value + '"', autoescape=True)
+
+
+# Magic's two choices that are not one colour (scryfall.COLORS holds the five).
+COLORLESS, MULTICOLOR = "C", "M"
+
+
+def color_filter(color):
+    """One colour or energy type; for Magic also colourless or several colours."""
+    if color not in (COLORLESS, MULTICOLOR):
+        return listed(Card.colors, color)
+    each = [case((listed(Card.colors, one), 1), else_=0) for one in scryfall.COLORS]
+    count = sum(each[1:], each[0])
+    return count == 0 if color == COLORLESS else count >= 2
 
 
 def matches_search(q, printing_filters):
@@ -125,6 +139,7 @@ class CatalogRepository:
         attribute=None,
         level=None,
         rank=None,
+        stars=None,
         link_rating=None,
         card_property=None,
         rarity_names=None,
@@ -176,11 +191,13 @@ class CatalogRepository:
             *(column == value for column, value in equal.items() if value),
             *(column == value for column, value in numbers.items() if value is not None),
         )
+        if stars is not None:
+            query = query.where(or_(Card.level == stars, Card.rank == stars))
         # Lists stored as JSON: the value must be one of their items.
         if subtype:
             query = query.where(listed(Card.subtypes, subtype))
         if color:
-            query = query.where(listed(Card.colors, color))
+            query = query.where(color_filter(color))
         if ability:
             query = query.where(listed(Card.monster_abilities, ability))
         # Type levels (app/services/card_types.py). "Pendulum" is a flag on top

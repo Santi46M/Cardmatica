@@ -22,7 +22,7 @@ Dos caminos, los dos gratis:
 | --- | --- |
 | `DATABASE_URL` | La cadena de Supabase, tal cual. |
 | `TEST_SITE` | `true` |
-| `TEST_SITE_USER` y `TEST_SITE_PASSWORD` | Usuario y contraseña que el navegador pide para entrar. |
+| `TEST_SITE_PASSWORD` | La contraseña que pide la página de entrada. `TEST_SITE_USER` solo cuenta para scripts que envían usuario y contraseña (HTTP Basic). |
 | `TEST_ACCOUNTS` | Las cuentas de prueba, en una lista: `[{"email": "...", "password": "...", "name": "...", "role": "admin"}, ...]` (`role`: `admin`, `moderator` o `user`; opcionales `type`: `buyer`, `seller` o `both`, y `store`, el nombre de la tienda). |
 | `CACHE_DIRECTORY` | `/tmp/cache` (lo único escribible en Vercel). |
 | `IMAGE_STORAGE` | `database`: las ilustraciones se guardan en Supabase (Vercel no conserva archivos). |
@@ -44,7 +44,11 @@ Lo que vale para los dos caminos:
   Render guarda las imágenes en archivos que se borran al dormirse: allí conviene
   `IMAGE_STORAGE=database` también.
 - **Cada página dice que es una versión de prueba** y los buscadores no la indexan.
-  Con `TEST_SITE_PASSWORD`, además, el navegador pide una contraseña antes de mostrar nada.
+  Con `TEST_SITE_PASSWORD`, además, una página propia pide esa contraseña antes de
+  mostrar nada, y el navegador la recuerda 30 días. Funciona en cualquier navegador,
+  también en los de WhatsApp o Instagram, que no muestran la ventanita de usuario y
+  contraseña del navegador. Cambiar la contraseña deja a todos afuera de nuevo
+  (`backend/app/core/test_site.py`).
 - **Los correos no salen**: se escriben en el registro del servicio (Logs), con su enlace. Un administrador puede marcar un correo como confirmado desde el panel.
 - **La tienda sigue siendo de demostración**: vendedores, precios y valoraciones ficticios
   y marcados como tales.

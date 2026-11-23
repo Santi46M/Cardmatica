@@ -318,6 +318,33 @@ async def test_pagination_reuses_records_and_robots_cache(tmp_path, payload, mon
         await http.close()
 
 
+async def test_an_archetype_narrows_the_walk(tmp_path, payload, monkeypatch):
+    asked = []
+
+    def handler(request):
+        if request.url.path == "/robots.txt":
+            return httpx.Response(404)
+        asked.append(dict(request.url.params))
+        return httpx.Response(200, json={"data": [payload], "meta": {"rows_remaining": 0}})
+
+    settings = Settings(_env_file=None, cache_directory=tmp_path / "cache")
+    http = PoliteHttpClient("ygoprodeck", settings, transport=httpx.MockTransport(handler))
+
+    async def no_wait(*args):
+        pass
+
+    monkeypatch.setattr(http.store, "wait", no_wait)
+    try:
+        await YgoprodeckClient(http, "Blue-Eyes").batch({})
+        assert asked[-1]["archetype"] == "Blue-Eyes"
+    finally:
+        await http.close()
+    # An archetype is a YGOPRODeck query; other sources still refuse one.
+    assert JobRequest(source="ygoprodeck", mode="initial", query="Blue-Eyes").query == "Blue-Eyes"
+    with pytest.raises(ValidationError):
+        JobRequest(source="tcgdex", mode="initial", query="Pikachu")
+
+
 def test_source_capabilities_are_validated():
     for options in ({"language": "es"}, {"mode": "banlist"}, {"mode": "errata"}):
         with pytest.raises(ValidationError):

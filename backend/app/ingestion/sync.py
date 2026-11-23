@@ -27,9 +27,9 @@ logger = logging.getLogger(__name__)
 
 
 def make_client(source, http, request):
-    """The client of each source; Scryfall's walk may be narrowed by a query."""
+    """The client of each source; Scryfall's and YGOPRODeck's walks may be narrowed by a query."""
     if source == "ygoprodeck":
-        return YgoprodeckClient(http)
+        return YgoprodeckClient(http, request.query)
     if source == "scryfall":
         return ScryfallClient(http, request.query)
     if source == "tcgdex":

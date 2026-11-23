@@ -468,10 +468,15 @@ def test_type_filters_follow_the_tab(live_server, browser_page):
     page.locator("#f-frame").select_option("Effect")
     expect(page.locator("#list")).to_contain_text("Synthetic Test Dragon")
     assert "clase=Effect" in page.url
-    # Level, Rank and Link are separate groups with only the numbers the catalogue has.
-    expect(page.locator('#f-level optgroup[label="Nivel"] option')).to_have_text(["Nivel 8"])
+    # Level and Rank are one group, Link another, with only the numbers the catalogue has.
+    expect(page.locator('#f-level optgroup[label="Nivel/Rango"] option')).to_have_text(
+        ["Nivel/Rango 8"]
+    )
     expect(page.locator('#f-level optgroup[label="Link"]')).to_have_count(0)
-    page.locator("#f-level").select_option("level:8")
+    # The seven attributes, DIVINO included, whatever the catalogue has.
+    expect(page.locator("#f-attribute option")).to_have_count(8)
+    expect(page.locator("#f-attribute option").last).to_have_text("DIVINO")
+    page.locator("#f-level").select_option("stars:8")
     expect(page.locator("#list")).to_contain_text("Synthetic Test Dragon")
     page.reload()
     expect(page.locator("#f-frame")).to_have_value("Effect")
@@ -1231,6 +1236,16 @@ def test_a_seller_puts_a_card_on_sale_and_buyers_find_it(live_server, browser_pa
 
     stock = page.locator("#stockv")
     expect(stock).to_contain_text("Todavía no tienes cartas a la venta.")
+    # The search has its own game, apart from the one the site has open.
+    page.locator("#st-game").select_option("magic")
+    expect(page.locator("#st-tab")).to_contain_text("Criaturas")
+    assert page.evaluate("window.game") == "yugioh"
+    page.locator("#st-game").select_option("yugioh")
+    # The store's filters find cards without typing a name.
+    page.locator("#st-tab").select_option("Monstruo")
+    expect(page.locator("#st-f-attribute")).to_be_visible()
+    expect(page.locator("[data-st-card]", has_text="Synthetic Test Dragon")).to_be_visible()
+    page.locator("#st-tab").select_option("Todas")
     page.locator("#st-q").fill("Synthetic")
     page.locator("[data-st-card]", has_text="Synthetic Test Dragon").click()
     expect(page.locator("#st-printing")).to_contain_text("TST-EN001")
@@ -1258,7 +1273,12 @@ def test_a_seller_puts_a_card_on_sale_and_buyers_find_it(live_server, browser_pa
     expect(page.locator("#st-photo-preview")).to_be_visible()
     page.locator("#st-form button[type=submit]").click()
     expect(mine).to_have_count(2)
-    expect(page.locator("#st-mine .photo-thumb img")).to_have_count(1)
+    # A camera beside the name; the photo only on hovering it.
+    camera = page.locator("#st-mine .st-photo[tabindex]")
+    expect(camera).to_have_count(1)
+    expect(camera.locator("img")).to_be_hidden()
+    camera.hover()
+    expect(camera.locator("img")).to_be_visible()
 
     # A buyer finds the store among the sellers, and the offer under the card.
     page.locator('[data-g="Vendedores"]').click()
@@ -1303,3 +1323,26 @@ def test_phone_tables_fit_and_edges_line_up(live_server, browser_page):
             assert page.evaluate(sideways) == [], (width, tab)
             header, main, footer = page.evaluate(edges)
             assert header == main == footer, (width, tab)
+
+
+def test_the_test_site_key_opens_in_a_real_browser(
+    live_server, browser_page, settings, monkeypatch
+):
+    """The password page works where the browser's own box would not appear."""
+    from app.core import test_site
+
+    monkeypatch.setattr(settings, "test_site", True)
+    monkeypatch.setattr(settings, "test_site_password", "llave-de-prueba-42")
+    monkeypatch.setattr(test_site, "WRONG_WAIT_SECONDS", 0)
+    page = browser_page
+    page.goto(f"{live_server}/yugioh?tab=Todas")
+    page.locator("#password").fill("otra")
+    page.locator("button[type=submit]").click()
+    expect(page.locator(".no")).to_be_visible()
+    page.locator("#password").fill("llave-de-prueba-42")
+    page.locator("button[type=submit]").click()
+    expect(page).to_have_url(f"{live_server}/yugioh?tab=Todas")
+    expect(page.locator("#list [data-catalog-card]").first).to_be_visible()
+    # Remembered: a new visit goes straight in.
+    page.goto(f"{live_server}/magic")
+    expect(page.locator("header")).to_be_visible()
