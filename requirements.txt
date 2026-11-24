@@ -24,7 +24,7 @@ pillow==13.0.0
 psycopg-binary==3.3.6
 psycopg==3.3.6
 pydantic-settings==2.16.1
-pydantic==2.14.1
+pydantic==2.14.4
 pydantic_core==2.50.1
 python-dotenv==1.2.4
 pyyaml==6.0.3
