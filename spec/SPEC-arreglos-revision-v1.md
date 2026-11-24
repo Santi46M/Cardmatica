@@ -90,7 +90,7 @@ Dos tandas:
 - Al quitar o reemplazar una foto, o al borrar una cuenta, se borra el
   archivo **solo si ninguna otra oferta lo usa**.
 - Una foto «bomba» devuelve el mismo mensaje claro que una foto inválida
-  (422), no un error 500.
+  (400, como hoy cualquier foto ilegible), no un error 500.
 - Archivos: `services/listings.py` y tests.
 
 ## Comandos
@@ -147,7 +147,7 @@ y nada de opciones que nadie pidió (criterio ponytail).
 5. `pip-audit` sin hallazgos y verde en el CI.
 6. El perfil ya no tiene dirección ni teléfono, y la base tampoco.
 7. Dos ofertas con la misma foto: quitar una no rompe la otra. Una foto
-   bomba da 422.
+   bomba da 400.
 8. Toda la suite pasa en SQLite y Postgres.
 
 ## Fuera de alcance (para después)

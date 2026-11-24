@@ -13,7 +13,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from PIL import Image, ImageOps
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -140,7 +140,8 @@ def _save_photo(session: Session, listing: Listing, data_url: str):
             ):
                 raise ListingError("La foto debe ser PNG, JPEG o WebP")
             raster = ImageOps.exif_transpose(raster).convert("RGB")
-    except (binascii.Error, IndexError, OSError) as error:
+    # DecompressionBombError: a tiny file that opens into a gigantic image.
+    except (binascii.Error, IndexError, OSError, Image.DecompressionBombError) as error:
         raise ListingError("No se pudo leer la foto") from error
     raster.thumbnail(PHOTO_SIZE)
     output = io.BytesIO()
@@ -149,9 +150,17 @@ def _save_photo(session: Session, listing: Listing, data_url: str):
     name = f"listing-{hashlib.sha256(photo).hexdigest()}.webp"
     settings = get_settings()
     image_store.save(session, settings, name, photo)
-    if listing.photo and listing.photo != name:
-        image_store.delete(session, settings, listing.photo)
-    listing.photo = name
+    old, listing.photo = listing.photo, name
+    if old != name:
+        _forget_photo(session, old, Listing.id != listing.id)
+
+
+def _forget_photo(session: Session, name: str | None, others):
+    """Deletes a photo file unless a listing matching `others` still shows it:
+    the file is named after its content, so two listings with the same picture
+    share one."""
+    if name and not session.scalar(select(exists().where(Listing.photo == name, others))):
+        image_store.delete(session, get_settings(), name)
 
 
 def _check_photo(listing: Listing):
@@ -209,11 +218,12 @@ def change(session: Session, user: User, listing_id: UUID, data: ListingChange) 
 
 def remove(session: Session, user: User, listing_id: UUID) -> None:
     listing = _own(session, user, listing_id)
-    image_store.delete(session, get_settings(), listing.photo)
+    _forget_photo(session, listing.photo, Listing.id != listing.id)
     session.delete(listing)
 
 
 def forget_photos(session: Session, user: User) -> None:
     """Before an account goes: its listings go by cascade, their photos here."""
-    for name in session.scalars(select(Listing.photo).where(Listing.seller_id == user.id)):
-        image_store.delete(session, get_settings(), name)
+    names = select(Listing.photo).where(Listing.seller_id == user.id).distinct()
+    for name in session.scalars(names):
+        _forget_photo(session, name, Listing.seller_id != user.id)
