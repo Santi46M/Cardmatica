@@ -88,8 +88,6 @@ class UserProfile(Entity, Base):
     full_name: Mapped[str | None] = mapped_column(String(120))
     store_name: Mapped[str | None] = mapped_column(String(80))
     country: Mapped[str | None] = mapped_column(String(40))
-    address: Mapped[str | None] = mapped_column(String(200))
-    phone: Mapped[str | None] = mapped_column(String(30))
     payment_methods: Mapped[list] = mapped_column(JSON, default=list)
     preferences: Mapped[dict] = mapped_column(JSON, default=dict)
 

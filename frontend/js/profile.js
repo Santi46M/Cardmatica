@@ -180,8 +180,6 @@ function formHtml(value) {
                 <label>${t("Nombre completo")}<input id="pf-name" autocomplete="name" maxlength="120" value="${h(value.name)}"></label>
                 <label id="pf-store-field"${sellerOnly}>${t("Nombre de la tienda")}<input id="pf-store" autocomplete="organization" maxlength="80" value="${h(value.store)}"></label>
                 <label>${t("País")}<select id="pf-country" autocomplete="country-name">${countries}</select></label>
-                <label>${t("Teléfono (opcional)")}<input id="pf-phone" type="tel" autocomplete="tel" maxlength="30" value="${h(value.phone)}"></label>
-                <label class="full">${t("Dirección (opcional, para envíos)")}<input id="pf-address" autocomplete="street-address" maxlength="200" value="${h(value.address)}"></label>
                 <fieldset class="full" id="pf-payments"${sellerOnly}>
                     <legend>${t("Métodos de pago que aceptas")}</legend>
                     <div class="chk">${payments}</div>
@@ -202,8 +200,6 @@ export function renderProfile(container) {
         name: "",
         store: "",
         country: "Uruguay",
-        address: "",
-        phone: "",
         payments: [],
         ...Object.fromEntries(Object.entries(profile || {}).filter(([, field]) => field !== null && field !== ""))
     };
@@ -228,8 +224,6 @@ function read() {
         name: field("pf-name"),
         store: sells(field("pf-role")) ? field("pf-store") : "",
         country: field("pf-country"),
-        address: field("pf-address"),
-        phone: field("pf-phone"),
         // A buyer's payment methods are not needed, so they are not sent.
         payments: sells(field("pf-role"))
             ? [...document.querySelectorAll('input[name="pf-payment"]:checked')].map((input) => input.value)
@@ -240,8 +234,6 @@ function read() {
 function problem(data) {
     if (!data.name) return ["pf-name", t("Escribe tu nombre completo.")];
     if (sells(data.role) && !data.store) return ["pf-store", t("Escribe el nombre de tu tienda.")];
-    if (data.phone && data.phone.replace(/\D/g, "").length < 6)
-        return ["pf-phone", t("El teléfono debe tener al menos 6 dígitos.")];
     if (sells(data.role) && !data.payments.length) return [null, t("Elige al menos un método de pago.")];
     return null;
 }

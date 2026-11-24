@@ -40,8 +40,6 @@ PROFILE = {
     "name": "Ana Pérez",
     "store": "Duelos del Sur",
     "country": "Uruguay",
-    "address": "Av. Siempre Viva 742",
-    "phone": "+598 99 123 456",
     "payments": ["Mercado Pago", "PIX"],
 }
 
@@ -58,15 +56,17 @@ def test_profile_and_preferences_round_trip(signed_in):
     assert client.put("/api/v1/account/preferences", json={"view": "grid"}).status_code == 204
     data = client.get("/api/v1/account").json()
     assert data["profile"]["store"] == "Duelos del Sur"
+    # No address nor phone: an old page that still sends them stores nothing.
+    old_page = {**PROFILE, "address": "Av. Siempre Viva 742", "phone": "+598 99 123 456"}
+    assert client.put("/api/v1/account/profile", json=old_page).status_code == 204
+    profile = client.get("/api/v1/account").json()["profile"]
+    assert "address" not in profile and "phone" not in profile
     assert data["preferences"] == {"currency": "BRL", "market": None, "view": "grid"}
 
 
 def test_profile_rules_match_the_form(signed_in):
     client, _, _ = signed_in
     assert client.put("/api/v1/account/profile", json={**PROFILE, "store": ""}).status_code == 422
-    assert (
-        client.put("/api/v1/account/profile", json={**PROFILE, "phone": "12-34"}).status_code == 422
-    )
     assert (
         client.put("/api/v1/account/profile", json={**PROFILE, "payments": ["Bitcoin"]}).status_code
         == 422

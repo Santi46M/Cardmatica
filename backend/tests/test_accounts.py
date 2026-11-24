@@ -323,7 +323,7 @@ def test_a_buyer_profile_needs_only_name_and_country(client, factory):
     with factory() as session:
         row = session.scalar(select(UserProfile))
         # A buyer's payment methods are not needed, so they are not kept.
-        assert row.address is None and row.phone is None and row.payment_methods == []
+        assert row.payment_methods == []
     seller = {"role": "seller", "name": "Ana", "store": "Duelos", "country": "Uruguay"}
     refused = client.put("/api/v1/account/profile", json=seller, headers=headers)
     assert refused.status_code == 422 and "pago" in refused.text
