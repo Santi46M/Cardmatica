@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from app.models import StaffAction, User, UserProfile
-from app.services import accounts, passwords, test_accounts
+from app.services import passwords, test_accounts
 
 PASSWORD = "dragon blanco de ojos azules"
 PEOPLE = {
@@ -21,7 +21,6 @@ def client(client, settings, monkeypatch, factory):
     monkeypatch.setattr(settings, "deployment_mode", "local")
     monkeypatch.setattr(passwords, "SCRYPT_N", 2**10)
     monkeypatch.setattr(passwords, "SCRYPT_P", 1)
-    accounts.limiter.clear()
     for email in PEOPLE:
         client.post(
             "/api/v1/auth/register",

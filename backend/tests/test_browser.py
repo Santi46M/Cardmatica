@@ -26,10 +26,6 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture
 def live_server(factory, settings, record):
-    # Each test starts with a fresh per-IP attempt budget (all tests share 127.0.0.1).
-    from app.services import accounts
-
-    accounts.limiter.clear()
     record.printings.append(
         PrintingInput(
             code="TST-EN002",
@@ -250,8 +246,8 @@ def test_banlist_price_history_wantlists_and_profile(live_server, browser_page, 
     page.locator("#pf-form button[type=submit]").click()
     expect(page.locator("#pf-error")).to_contain_text("tienda")
     page.locator("#pf-store").fill("Duelos del Sur")
-    page.locator("#pf-address").fill("Av. Siempre Viva 742, Montevideo")
-    page.locator("#pf-phone").fill("+598 99 123 456")
+    # Only what the site needs: no address or phone field.
+    expect(page.locator("#pf-address, #pf-phone")).to_have_count(0)
     page.locator('input[name="pf-payment"]').first.check()
     page.locator("#pf-form button[type=submit]").click()
     # The account's card: name, role and store.

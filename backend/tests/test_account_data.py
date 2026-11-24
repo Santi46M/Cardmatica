@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from app.models import Card, CardPrinting
-from app.services import accounts, passwords
+from app.services import passwords
 from app.services.ingestion import IngestionService
 
 PASSWORD = "dragon blanco de ojos azules"
@@ -15,7 +15,6 @@ def signed_in(client, settings, monkeypatch, factory, record):
     monkeypatch.setattr(settings, "deployment_mode", "local")
     monkeypatch.setattr(passwords, "SCRYPT_N", 2**10)
     monkeypatch.setattr(passwords, "SCRYPT_P", 1)
-    accounts.limiter.clear()
     with factory.begin() as session:
         IngestionService(session).ingest(record)
     response = client.post(
@@ -41,8 +40,6 @@ PROFILE = {
     "name": "Ana Pérez",
     "store": "Duelos del Sur",
     "country": "Uruguay",
-    "address": "Av. Siempre Viva 742",
-    "phone": "+598 99 123 456",
     "payments": ["Mercado Pago", "PIX"],
 }
 
@@ -59,15 +56,17 @@ def test_profile_and_preferences_round_trip(signed_in):
     assert client.put("/api/v1/account/preferences", json={"view": "grid"}).status_code == 204
     data = client.get("/api/v1/account").json()
     assert data["profile"]["store"] == "Duelos del Sur"
+    # No address nor phone: an old page that still sends them stores nothing.
+    old_page = {**PROFILE, "address": "Av. Siempre Viva 742", "phone": "+598 99 123 456"}
+    assert client.put("/api/v1/account/profile", json=old_page).status_code == 204
+    profile = client.get("/api/v1/account").json()["profile"]
+    assert "address" not in profile and "phone" not in profile
     assert data["preferences"] == {"currency": "BRL", "market": None, "view": "grid"}
 
 
 def test_profile_rules_match_the_form(signed_in):
     client, _, _ = signed_in
     assert client.put("/api/v1/account/profile", json={**PROFILE, "store": ""}).status_code == 422
-    assert (
-        client.put("/api/v1/account/profile", json={**PROFILE, "phone": "12-34"}).status_code == 422
-    )
     assert (
         client.put("/api/v1/account/profile", json={**PROFILE, "payments": ["Bitcoin"]}).status_code
         == 422

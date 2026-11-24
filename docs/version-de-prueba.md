@@ -16,7 +16,11 @@ Dos caminos, los dos gratis:
    *Transaction pooler* (puerto 6543). La web no prepara consultas, como pide ese modo.
 2. **Vercel**: un proyecto desde el repositorio, sin tocar los ajustes de construcción
    (los lee de `vercel.json`), con estas variables (Settings → Environment Variables,
-   las contraseñas marcadas como *Sensitive*):
+   las contraseñas marcadas como *Sensitive*). `DATABASE_URL` y `TEST_ACCOUNTS` van
+   **solo en Production**: cada publicación aplica las migraciones a esa base, y una
+   rama sin revisar no debe tocarla. Por lo mismo, `vercel.json` publica solo `main`.
+   `PUBLIC_BASE_URL` (la dirección del sitio, por ejemplo
+   `https://cardmatica-prueba.vercel.app`) arma los enlaces de los correos.
 
 | Variable | Valor |
 | --- | --- |
@@ -27,6 +31,7 @@ Dos caminos, los dos gratis:
 | `CACHE_DIRECTORY` | `/tmp/cache` (lo único escribible en Vercel). |
 | `IMAGE_STORAGE` | `database`: las ilustraciones se guardan en Supabase (Vercel no conserva archivos). |
 | `ALLOW_LOCAL_IMAGE_PREVIEW` | `true`, para ver ilustraciones (solo con `TEST_SITE_PASSWORD`, ver abajo). |
+| `CLIENT_IP_HEADER` | `x-vercel-forwarded-for`: la IP del visitante para los límites de intentos (Vercel reemplaza esa cabecera, así que no se puede falsificar). |
 | `YGOPRODECK_REQUEST_INTERVAL` | `0.25`: cuatro pedidos por segundo, bajo el límite de 20 que publica YGOPRODeck. |
 
 Cambiar una contraseña en Vercel y volver a desplegar la cambia en la cuenta, y cierra

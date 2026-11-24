@@ -7,7 +7,8 @@ updates:
     schedule:
       interval: weekly
   - package-ecosystem: pip
-    directory: /backend
+    # / is requirements.txt, what Vercel installs; /backend, what CI installs.
+    directories: ["/", "/backend"]
     schedule:
       interval: weekly
     open-pull-requests-limit: 5

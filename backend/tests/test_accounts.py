@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.models.accounts import User, UserProfile, UserSession
-from app.services import accounts, passwords
+from app.services import accounts, passwords, rate_limits
 
 PASSWORD = "dragon blanco de ojos azules"
 
@@ -19,9 +19,7 @@ def fast_hashing(monkeypatch, settings):
     # Cheaper scrypt keeps the suite fast; production parameters are unchanged.
     monkeypatch.setattr(passwords, "SCRYPT_N", 2**10)
     monkeypatch.setattr(passwords, "SCRYPT_P", 1)
-    accounts.limiter.clear()
     yield
-    accounts.limiter.clear()
 
 
 def register(client, email="Ana@Example.com", password=PASSWORD, **extra):
@@ -243,16 +241,53 @@ def test_cleanup_removes_expired_sessions_and_spent_links(client, factory, outbo
         assert accounts.remove_expired(session) == {"sessions": 1, "tokens": 1}
 
 
-def test_attempt_limiter_forgets_idle_addresses(monkeypatch):
-    limiter = accounts.AttemptLimiter()
-    clock = [1000.0]
-    monkeypatch.setattr(accounts.time, "monotonic", lambda: clock[0])
-    monkeypatch.setattr(accounts.AttemptLimiter, "PRUNE_EVERY", 3)
-    limiter.allow("a", 5)
-    limiter.allow("b", 5)
-    clock[0] += 120
-    limiter.allow("c", 5)  # third call: prunes before counting
-    assert set(limiter._attempts) == {"c"}
+def test_attempt_limit_is_shared_by_every_server(client, factory, settings, monkeypatch):
+    # One fixed moment: a minute turning over would reset the count mid-test.
+    monkeypatch.setattr(rate_limits.time, "time", lambda: 1_800_000_030.0)
+
+    monkeypatch.setattr(settings, "auth_attempts_per_minute", 3)
+    login = {"email": "nadie@example.com", "password": "no-es-esta"}
+    for _ in range(3):
+        assert client.post("/api/v1/auth/login", json=login).status_code == 401
+    # Past the limit: 429 Too Many Requests, with the seconds to wait (RFC 6585).
+    refused = client.post("/api/v1/auth/login", json=login)
+    assert refused.status_code == 429 and 1 <= int(refused.headers["Retry-After"]) <= 60
+    # Another server (another database session) sees the same count.
+    with factory() as other:
+        allowed, _ = rate_limits.allow(other, "auth:testclient", 3)
+    assert not allowed
+
+
+def test_attempt_limit_trusts_a_proxy_header_only_when_told(client, settings, monkeypatch):
+    # One fixed moment: a minute turning over would reset the count mid-test.
+    monkeypatch.setattr(rate_limits.time, "time", lambda: 1_800_000_030.0)
+    monkeypatch.setattr(settings, "auth_attempts_per_minute", 2)
+    login = {"email": "nadie@example.com", "password": "no-es-esta"}
+
+    def attempt(address):
+        return client.post(
+            "/api/v1/auth/login", json=login, headers={"x-vercel-forwarded-for": address}
+        ).status_code
+
+    # Not configured: a header the visitor writes changes nothing.
+    assert [attempt(f"10.0.0.{n}") for n in range(3)] == [401, 401, 429]
+    # Configured (Vercel overwrites that header): each address has its own count.
+    monkeypatch.setattr(settings, "client_ip_header", "x-vercel-forwarded-for")
+    assert [attempt("203.0.113.7") for _ in range(3)] == [401, 401, 429]
+    assert attempt("203.0.113.8") == 401
+
+
+def test_old_attempt_counts_are_forgotten(factory, monkeypatch):
+    from app.models import RateLimit
+    from app.services import rate_limits
+
+    clock = [1_800_000_000.0]
+    monkeypatch.setattr(rate_limits.time, "time", lambda: clock[0])
+    with factory() as session:
+        rate_limits.allow(session, "auth:a", 5)
+        clock[0] += (rate_limits.KEEP_MINUTES + 2) * 60
+        rate_limits.allow(session, "auth:b", 5)
+        assert [row.key for row in session.scalars(select(RateLimit))] == ["auth:b"]
 
 
 # ---- What people are owed: their data to take or delete, only the data needed,
@@ -291,7 +326,7 @@ def test_a_buyer_profile_needs_only_name_and_country(client, factory):
     with factory() as session:
         row = session.scalar(select(UserProfile))
         # A buyer's payment methods are not needed, so they are not kept.
-        assert row.address is None and row.phone is None and row.payment_methods == []
+        assert row.payment_methods == []
     seller = {"role": "seller", "name": "Ana", "store": "Duelos", "country": "Uruguay"}
     refused = client.put("/api/v1/account/profile", json=seller, headers=headers)
     assert refused.status_code == 422 and "pago" in refused.text
@@ -302,3 +337,26 @@ def test_account_emails_say_they_are_not_advertising(client, monkeypatch):
     monkeypatch.setattr("app.services.mail.send", lambda to, subject, body: sent.append(body))
     register(client)
     assert "no enviamos publicidad" in sent[0] and "/?tab=Seguridad" in sent[0]
+
+
+def test_console_email_shows_the_link_only_on_your_own_computer(monkeypatch, caplog):
+    from app.core.config import get_settings
+    from app.services import mail
+
+    settings = get_settings()
+    body = "Abre https://cardmatica.test/restablecer?token=secreto-123 para seguir."
+    monkeypatch.setattr(settings, "email_backend", "console")
+
+    # On a hosting provider: a notice, never the body or its link.
+    monkeypatch.setattr(settings, "deployment_mode", "production")
+    with caplog.at_level("INFO", logger="cardmatica.mail"):
+        mail.send("mateo@example.com", "Restablece tu contraseña", body)
+    assert "secreto-123" not in caplog.text and "mateo@" not in caplog.text
+    assert "m•••@example.com" in caplog.text
+
+    # On your own computer: the whole message, to try the flow.
+    caplog.clear()
+    monkeypatch.setattr(settings, "deployment_mode", "local")
+    with caplog.at_level("INFO", logger="cardmatica.mail"):
+        mail.send("mateo@example.com", "Restablece tu contraseña", body)
+    assert "secreto-123" in caplog.text

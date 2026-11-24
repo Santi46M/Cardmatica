@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.db.session import get_session
 from app.models.accounts import STAFF
-from app.services import accounts
+from app.services import accounts, rate_limits
 
 # Cookies of a signed-in browser (see app/api/auth.py).
 SESSION_COOKIE = "cm_session"
@@ -18,6 +18,23 @@ CSRF_HEADER = "X-CSRF-Token"
 
 SessionDep = Annotated[Session, Depends(get_session)]
 bearer = HTTPBearer(auto_error=False)
+
+
+def client_address(request: Request) -> str:
+    """The visitor's IP address: from CLIENT_IP_HEADER when a trusted proxy sets
+    it, else the connection's."""
+    header = get_settings().client_ip_header
+    if header and (value := request.headers.get(header)):
+        return value.split(",")[0].strip()[:64]
+    return request.client.host if request.client else "unknown"
+
+
+def limit(session: Session, request: Request, kind: str, per_minute: int, message: str):
+    """429 Too Many Requests, with Retry-After in seconds (RFC 6585), past
+    `per_minute` attempts of this kind from this address."""
+    allowed, wait = rate_limits.allow(session, f"{kind}:{client_address(request)}", per_minute)
+    if not allowed:
+        raise HTTPException(429, message, headers={"Retry-After": str(wait)})
 
 
 def is_https(request: Request) -> bool:

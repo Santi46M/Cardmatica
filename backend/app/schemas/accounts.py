@@ -84,10 +84,8 @@ class ProfileData(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     store: str = Field(default="", max_length=80)
     country: Country
-    # Only what is needed now: address and phone are for shipping, which does
-    # not exist yet, so they are optional; payment methods only matter to sellers.
-    address: str = Field(default="", max_length=200)
-    phone: str = Field(default="", max_length=30)
+    # Only what is needed now: payment methods only matter to sellers. Address
+    # and phone come with orders, asked only of whoever buys.
     payments: list[str] = Field(default_factory=list, max_length=len(PAYMENT_METHODS))
 
     @model_validator(mode="after")
@@ -95,8 +93,6 @@ class ProfileData(BaseModel):
         sells = self.role != "buyer"
         if sells and not self.store.strip():
             raise ValueError("Escribe el nombre de tu tienda.")
-        if self.phone.strip() and sum(ch.isdigit() for ch in self.phone) < 6:
-            raise ValueError("El teléfono debe tener al menos 6 dígitos.")
         if set(self.payments) - set(PAYMENT_METHODS):
             raise ValueError("Método de pago desconocido.")
         if sells and not self.payments:
@@ -118,8 +114,6 @@ class ProfileView(BaseModel):
     name: str = ""
     store: str = ""
     country: Country | None = None
-    address: str = ""
-    phone: str = ""
     payments: list[str] = Field(default_factory=list)
 
 

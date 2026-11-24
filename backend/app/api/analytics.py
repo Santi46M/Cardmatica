@@ -7,11 +7,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
-from app.api.dependencies import SessionDep, same_origin
+from app.api.dependencies import SessionDep, limit, same_origin
 from app.core.config import get_settings
 from app.db.base import utcnow
 from app.models import UsageCount
-from app.services.accounts import limiter
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["Estadísticas"])
 # Generous: a person browsing fast still counts; a script flooding does not.
@@ -50,9 +49,7 @@ def event(payload: EventInput, request: Request, session: SessionDep):
         raise HTTPException(422, "Evento desconocido")
     if not get_settings().analytics_enabled:
         return Response(status_code=204)
-    client = request.client.host if request.client else "unknown"
-    if not limiter.allow(f"analytics:{client}", EVENTS_PER_MINUTE):
-        raise HTTPException(429, "Demasiados eventos")
+    limit(session, request, "analytics", EVENTS_PER_MINUTE, "Demasiados eventos")
     increment(session, payload.key)
     session.commit()
     return Response(status_code=204)

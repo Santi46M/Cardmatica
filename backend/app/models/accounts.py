@@ -22,6 +22,7 @@ __all__ = [
     "ROLES",
     "STAFF",
     "AccountToken",
+    "RateLimit",
     "StaffAction",
     "CardView",
     "User",
@@ -87,8 +88,6 @@ class UserProfile(Entity, Base):
     full_name: Mapped[str | None] = mapped_column(String(120))
     store_name: Mapped[str | None] = mapped_column(String(80))
     country: Mapped[str | None] = mapped_column(String(40))
-    address: Mapped[str | None] = mapped_column(String(200))
-    phone: Mapped[str | None] = mapped_column(String(30))
     payment_methods: Mapped[list] = mapped_column(JSON, default=list)
     preferences: Mapped[dict] = mapped_column(JSON, default=dict)
 
@@ -168,3 +167,14 @@ class StaffAction(Entity, Base):
     target_id: Mapped[UUID | None] = mapped_column(index=True)
     target: Mapped[str | None] = mapped_column(String(254))
     detail: Mapped[str | None] = mapped_column(String(300))
+
+
+class RateLimit(Base):
+    """Attempts per key ("auth:<address>") in one minute, shared by every server
+    (app/services/rate_limits.py). Rows older than an hour are deleted."""
+
+    __tablename__ = "rate_limits"
+    key: Mapped[str] = mapped_column(String(120), primary_key=True)
+    # Minutes since 1970: one row per key and minute.
+    minute: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    count: Mapped[int] = mapped_column(Integer, default=0)

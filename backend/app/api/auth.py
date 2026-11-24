@@ -22,6 +22,7 @@ from app.api.dependencies import (
     SessionDep,
     csrf,
     is_https,
+    limit,
     same_origin,
     site_url,
 )
@@ -54,10 +55,14 @@ def send_confirmation(session, user, request: Request) -> None:
         logger.error("No se pudo enviar el correo de confirmación: %s", type(error).__name__)
 
 
-def limit_attempts(request: Request):
-    key = f"auth:{request.client.host if request.client else 'unknown'}"
-    if not accounts.limiter.allow(key, get_settings().auth_attempts_per_minute):
-        raise HTTPException(429, "Demasiados intentos. Espera un minuto y vuelve a intentarlo.")
+def limit_attempts(request: Request, session: SessionDep):
+    limit(
+        session,
+        request,
+        "auth",
+        get_settings().auth_attempts_per_minute,
+        "Demasiados intentos. Espera un minuto y vuelve a intentarlo.",
+    )
 
 
 def set_cookies(request: Request, response: Response, new: accounts.NewSession):
