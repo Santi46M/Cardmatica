@@ -19,9 +19,7 @@ def fast_hashing(monkeypatch, settings):
     # Cheaper scrypt keeps the suite fast; production parameters are unchanged.
     monkeypatch.setattr(passwords, "SCRYPT_N", 2**10)
     monkeypatch.setattr(passwords, "SCRYPT_P", 1)
-    accounts.limiter.clear()
     yield
-    accounts.limiter.clear()
 
 
 def register(client, email="Ana@Example.com", password=PASSWORD, **extra):
@@ -243,16 +241,50 @@ def test_cleanup_removes_expired_sessions_and_spent_links(client, factory, outbo
         assert accounts.remove_expired(session) == {"sessions": 1, "tokens": 1}
 
 
-def test_attempt_limiter_forgets_idle_addresses(monkeypatch):
-    limiter = accounts.AttemptLimiter()
-    clock = [1000.0]
-    monkeypatch.setattr(accounts.time, "monotonic", lambda: clock[0])
-    monkeypatch.setattr(accounts.AttemptLimiter, "PRUNE_EVERY", 3)
-    limiter.allow("a", 5)
-    limiter.allow("b", 5)
-    clock[0] += 120
-    limiter.allow("c", 5)  # third call: prunes before counting
-    assert set(limiter._attempts) == {"c"}
+def test_attempt_limit_is_shared_by_every_server(client, factory, settings, monkeypatch):
+    from app.services import rate_limits
+
+    monkeypatch.setattr(settings, "auth_attempts_per_minute", 3)
+    login = {"email": "nadie@example.com", "password": "no-es-esta"}
+    for _ in range(3):
+        assert client.post("/api/v1/auth/login", json=login).status_code == 401
+    # Past the limit: 429 Too Many Requests, with the seconds to wait (RFC 6585).
+    refused = client.post("/api/v1/auth/login", json=login)
+    assert refused.status_code == 429 and 1 <= int(refused.headers["Retry-After"]) <= 60
+    # Another server (another database session) sees the same count.
+    with factory() as other:
+        allowed, _ = rate_limits.allow(other, "auth:testclient", 3)
+    assert not allowed
+
+
+def test_attempt_limit_trusts_a_proxy_header_only_when_told(client, settings, monkeypatch):
+    monkeypatch.setattr(settings, "auth_attempts_per_minute", 2)
+    login = {"email": "nadie@example.com", "password": "no-es-esta"}
+
+    def attempt(address):
+        return client.post(
+            "/api/v1/auth/login", json=login, headers={"x-vercel-forwarded-for": address}
+        ).status_code
+
+    # Not configured: a header the visitor writes changes nothing.
+    assert [attempt(f"10.0.0.{n}") for n in range(3)] == [401, 401, 429]
+    # Configured (Vercel overwrites that header): each address has its own count.
+    monkeypatch.setattr(settings, "client_ip_header", "x-vercel-forwarded-for")
+    assert [attempt("203.0.113.7") for _ in range(3)] == [401, 401, 429]
+    assert attempt("203.0.113.8") == 401
+
+
+def test_old_attempt_counts_are_forgotten(factory, monkeypatch):
+    from app.models import RateLimit
+    from app.services import rate_limits
+
+    clock = [1_800_000_000.0]
+    monkeypatch.setattr(rate_limits.time, "time", lambda: clock[0])
+    with factory() as session:
+        rate_limits.allow(session, "auth:a", 5)
+        clock[0] += (rate_limits.KEEP_MINUTES + 2) * 60
+        rate_limits.allow(session, "auth:b", 5)
+        assert [row.key for row in session.scalars(select(RateLimit))] == ["auth:b"]
 
 
 # ---- What people are owed: their data to take or delete, only the data needed,

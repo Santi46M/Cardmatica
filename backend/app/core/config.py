@@ -103,6 +103,10 @@ class Settings(BaseSettings):
     login_lock_minutes: int = Field(default=15, ge=1, le=1440)
     # Login and registration attempts allowed per IP address per minute.
     auth_attempts_per_minute: int = Field(default=10, ge=1, le=120)
+    # The header a trusted proxy puts the visitor's address in, for the
+    # attempt limits. Only for one that overwrites what the visitor sends, as
+    # Vercel does with x-vercel-forwarded-for; empty: the connection's address.
+    client_ip_header: str = ""
     # How long the links in account emails work.
     email_confirmation_hours: int = Field(default=48, ge=1, le=336)
     password_reset_minutes: int = Field(default=60, ge=10, le=1440)

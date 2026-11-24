@@ -3,11 +3,9 @@
 from sqlalchemy import select
 
 from app.models import UsageCount
-from app.services import accounts
 
 
 def test_events_are_counted_per_day_without_personal_data(client, factory, settings):
-    accounts.limiter.clear()
     for key in ["tab:Todas", "tab:Todas", "carta"]:
         assert client.post("/api/v1/analytics/event", json={"key": key}).status_code == 204
     assert client.post("/api/v1/analytics/event", json={"key": "otra cosa"}).status_code == 422
@@ -23,7 +21,6 @@ def test_events_are_counted_per_day_without_personal_data(client, factory, setti
 
 def test_counts_can_be_turned_off(client, factory, settings, monkeypatch):
     monkeypatch.setattr(settings, "analytics_enabled", False)
-    accounts.limiter.clear()
     assert client.post("/api/v1/analytics/event", json={"key": "carta"}).status_code == 204
     with factory() as session:
         assert session.scalar(select(UsageCount)) is None

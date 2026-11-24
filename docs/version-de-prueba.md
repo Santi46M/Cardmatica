@@ -31,6 +31,7 @@ Dos caminos, los dos gratis:
 | `CACHE_DIRECTORY` | `/tmp/cache` (lo único escribible en Vercel). |
 | `IMAGE_STORAGE` | `database`: las ilustraciones se guardan en Supabase (Vercel no conserva archivos). |
 | `ALLOW_LOCAL_IMAGE_PREVIEW` | `true`, para ver ilustraciones (solo con `TEST_SITE_PASSWORD`, ver abajo). |
+| `CLIENT_IP_HEADER` | `x-vercel-forwarded-for`: la IP del visitante para los límites de intentos (Vercel reemplaza esa cabecera, así que no se puede falsificar). |
 | `YGOPRODECK_REQUEST_INTERVAL` | `0.25`: cuatro pedidos por segundo, bajo el límite de 20 que publica YGOPRODeck. |
 
 Cambiar una contraseña en Vercel y volver a desplegar la cambia en la cuenta, y cierra

@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from app.models import Card, CardPrinting
-from app.services import accounts, passwords
+from app.services import passwords
 from app.services.ingestion import IngestionService
 
 PASSWORD = "dragon blanco de ojos azules"
@@ -15,7 +15,6 @@ def signed_in(client, settings, monkeypatch, factory, record):
     monkeypatch.setattr(settings, "deployment_mode", "local")
     monkeypatch.setattr(passwords, "SCRYPT_N", 2**10)
     monkeypatch.setattr(passwords, "SCRYPT_P", 1)
-    accounts.limiter.clear()
     with factory.begin() as session:
         IngestionService(session).ingest(record)
     response = client.post(
