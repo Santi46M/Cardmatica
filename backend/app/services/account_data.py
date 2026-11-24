@@ -51,8 +51,6 @@ def account_data(session: Session, user: User) -> AccountData:
         name=row.full_name or "",
         store=row.store_name or "",
         country=row.country,
-        address=row.address or "",
-        phone=row.phone or "",
         payments=row.payment_methods or [],
     )
     return AccountData(profile=profile, preferences=Preferences(**(row.preferences or {})))
@@ -64,8 +62,6 @@ def save_profile(session: Session, user: User, data: ProfileData) -> None:
     row.full_name = data.name.strip()
     row.store_name = data.store.strip() if data.role != "buyer" else None
     row.country = data.country
-    row.address = data.address.strip() or None
-    row.phone = data.phone.strip() or None
     # A buyer's payment methods are not needed, so they are not kept.
     row.payment_methods = list(dict.fromkeys(data.payments)) if data.role != "buyer" else []
 
