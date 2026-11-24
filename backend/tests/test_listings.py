@@ -197,6 +197,52 @@ def test_dear_cards_need_a_photo_of_the_copy(client, printing_id, factory):
     assert client.get(listing["photo_url"]).status_code == 404
 
 
+def test_a_photo_two_listings_share_stays_until_the_last_goes(client, printing_id, factory):
+    """The file is named after its content: the same picture twice is one file."""
+    with factory.begin() as session:
+        ana = session.scalar(select(User).where(User.email == "ana@example.com"))
+        session.add(
+            UserProfile(user_id=ana.id, account_role="seller", store_name="Ana", country="Uruguay")
+        )
+    same = photo_url("green")
+
+    def put_on_sale(email):
+        sign_in(client, email)
+        added = client.post("/api/v1/listings", json=offer(printing_id, photo=same))
+        assert added.status_code == 201
+        return added.json()
+
+    first, second = put_on_sale("tienda@example.com"), put_on_sale("tienda@example.com")
+    other = put_on_sale("ana@example.com")
+    # One file: the same version (?v=) behind each listing's own address.
+    assert len({row["photo_url"].split("?v=")[1] for row in (first, second, other)}) == 1
+
+    # Taking one listing off sale, or changing its photo, leaves the others' photo.
+    sign_in(client, "tienda@example.com")
+    assert client.delete(f"/api/v1/listings/{first['id']}").status_code == 204
+    changed = client.patch(f"/api/v1/listings/{second['id']}", json={"photo": photo_url("blue")})
+    assert changed.status_code == 200
+    assert client.get(other["photo_url"]).status_code == 200
+
+    # Deleting the other seller's account keeps it too; the last one takes it.
+    assert client.post("/api/v1/account/delete", json={"password": PASSWORD}).status_code == 204
+    assert client.get(other["photo_url"]).status_code == 200
+    sign_in(client, "ana@example.com")
+    assert client.delete(f"/api/v1/listings/{other['id']}").status_code == 204
+    assert client.get(other["photo_url"]).status_code == 404
+
+
+def test_a_photo_bomb_is_refused_like_any_unreadable_photo(client, printing_id, monkeypatch):
+    from PIL import Image
+
+    # A small file that opens into far more pixels than allowed: Pillow raises
+    # DecompressionBombError past twice MAX_IMAGE_PIXELS.
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 1000)
+    sign_in(client, "tienda@example.com")
+    refused = client.post("/api/v1/listings", json=offer(printing_id, photo=photo_url()))
+    assert refused.status_code == 400 and "foto" in refused.json()["error"]["message"]
+
+
 def test_the_rates_are_the_storefronts(settings):
     """The photo rule converts with the same rates the page shows prices with."""
     import re
