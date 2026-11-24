@@ -16,7 +16,11 @@ Dos caminos, los dos gratis:
    *Transaction pooler* (puerto 6543). La web no prepara consultas, como pide ese modo.
 2. **Vercel**: un proyecto desde el repositorio, sin tocar los ajustes de construcción
    (los lee de `vercel.json`), con estas variables (Settings → Environment Variables,
-   las contraseñas marcadas como *Sensitive*):
+   las contraseñas marcadas como *Sensitive*). `DATABASE_URL` y `TEST_ACCOUNTS` van
+   **solo en Production**: cada publicación aplica las migraciones a esa base, y una
+   rama sin revisar no debe tocarla. Por lo mismo, `vercel.json` publica solo `main`.
+   `PUBLIC_BASE_URL` (la dirección del sitio, por ejemplo
+   `https://cardmatica-prueba.vercel.app`) arma los enlaces de los correos.
 
 | Variable | Valor |
 | --- | --- |
