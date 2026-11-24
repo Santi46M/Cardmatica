@@ -302,3 +302,26 @@ def test_account_emails_say_they_are_not_advertising(client, monkeypatch):
     monkeypatch.setattr("app.services.mail.send", lambda to, subject, body: sent.append(body))
     register(client)
     assert "no enviamos publicidad" in sent[0] and "/?tab=Seguridad" in sent[0]
+
+
+def test_console_email_shows_the_link_only_on_your_own_computer(monkeypatch, caplog):
+    from app.core.config import get_settings
+    from app.services import mail
+
+    settings = get_settings()
+    body = "Abre https://cardmatica.test/restablecer?token=secreto-123 para seguir."
+    monkeypatch.setattr(settings, "email_backend", "console")
+
+    # On a hosting provider: a notice, never the body or its link.
+    monkeypatch.setattr(settings, "deployment_mode", "production")
+    with caplog.at_level("INFO", logger="cardmatica.mail"):
+        mail.send("mateo@example.com", "Restablece tu contraseña", body)
+    assert "secreto-123" not in caplog.text and "mateo@" not in caplog.text
+    assert "m•••@example.com" in caplog.text
+
+    # On your own computer: the whole message, to try the flow.
+    caplog.clear()
+    monkeypatch.setattr(settings, "deployment_mode", "local")
+    with caplog.at_level("INFO", logger="cardmatica.mail"):
+        mail.send("mateo@example.com", "Restablece tu contraseña", body)
+    assert "secreto-123" in caplog.text
