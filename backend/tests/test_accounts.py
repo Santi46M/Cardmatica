@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.models.accounts import User, UserProfile, UserSession
-from app.services import accounts, passwords
+from app.services import accounts, passwords, rate_limits
 
 PASSWORD = "dragon blanco de ojos azules"
 
@@ -242,7 +242,8 @@ def test_cleanup_removes_expired_sessions_and_spent_links(client, factory, outbo
 
 
 def test_attempt_limit_is_shared_by_every_server(client, factory, settings, monkeypatch):
-    from app.services import rate_limits
+    # One fixed moment: a minute turning over would reset the count mid-test.
+    monkeypatch.setattr(rate_limits.time, "time", lambda: 1_800_000_030.0)
 
     monkeypatch.setattr(settings, "auth_attempts_per_minute", 3)
     login = {"email": "nadie@example.com", "password": "no-es-esta"}
@@ -258,6 +259,8 @@ def test_attempt_limit_is_shared_by_every_server(client, factory, settings, monk
 
 
 def test_attempt_limit_trusts_a_proxy_header_only_when_told(client, settings, monkeypatch):
+    # One fixed moment: a minute turning over would reset the count mid-test.
+    monkeypatch.setattr(rate_limits.time, "time", lambda: 1_800_000_030.0)
     monkeypatch.setattr(settings, "auth_attempts_per_minute", 2)
     login = {"email": "nadie@example.com", "password": "no-es-esta"}
 
