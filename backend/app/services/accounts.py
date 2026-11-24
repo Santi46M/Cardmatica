@@ -7,9 +7,6 @@ that changes something also needs the CSRF token (app/api/auth.py).
 
 import hashlib
 import secrets
-import threading
-import time
-from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -162,55 +159,6 @@ def change_password(session: Session, user: User, current: str, new: str) -> Non
         raise AccountError(problem)
     user.password_hash = hash_password(new)
     user.password_changed_at = utcnow()
-
-
-class AttemptLimiter:
-    """Allow at most `limit` attempts per key in any 60-second window.
-
-    Kept in memory: enough for one server process. With several processes it
-    should move to the database or a shared cache.
-    """
-
-    WINDOW_SECONDS = 60
-
-    def __init__(self):
-        self._attempts: dict[str, deque] = {}
-        self._lock = threading.Lock()
-        self._calls = 0
-
-    # Every so many calls, keys with no recent attempts are dropped, so the
-    # table does not grow with every address that ever visited.
-    PRUNE_EVERY = 1000
-
-    def allow(self, key: str, limit: int) -> bool:
-        now = time.monotonic()
-        with self._lock:
-            self._calls += 1
-            if self._calls % self.PRUNE_EVERY == 0:
-                self._prune(now)
-            attempts = self._attempts.setdefault(key, deque())
-            while attempts and now - attempts[0] > self.WINDOW_SECONDS:
-                attempts.popleft()
-            if len(attempts) >= limit:
-                return False
-            attempts.append(now)
-            return True
-
-    def _prune(self, now: float) -> None:
-        stale = [
-            key
-            for key, attempts in self._attempts.items()
-            if not attempts or now - attempts[-1] > self.WINDOW_SECONDS
-        ]
-        for key in stale:
-            del self._attempts[key]
-
-    def clear(self):
-        with self._lock:
-            self._attempts.clear()
-
-
-limiter = AttemptLimiter()
 
 
 # ---- Links sent by email: confirm the address, reset the password -----------

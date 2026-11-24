@@ -26,10 +26,6 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture
 def live_server(factory, settings, record):
-    # Each test starts with a fresh per-IP attempt budget (all tests share 127.0.0.1).
-    from app.services import accounts
-
-    accounts.limiter.clear()
     record.printings.append(
         PrintingInput(
             code="TST-EN002",
