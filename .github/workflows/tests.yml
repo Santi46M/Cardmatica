@@ -29,6 +29,18 @@ jobs:
       - run: ruff check backend
       - run: ruff format --check backend
 
+  # Known vulnerabilities in what Vercel installs (requirements.txt). To accept
+  # one, add --ignore-vuln <ID> with the reason in a comment.
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - run: pip install "pip-audit==2.10.1"
+      - run: pip-audit -r requirements.txt
+
   tests:
     runs-on: ubuntu-latest
     defaults:
